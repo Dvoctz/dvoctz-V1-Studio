@@ -1,5 +1,15 @@
-// FIX: Add a triple-slash directive to include Vite client types. This fixes the TypeScript error `Property 'env' does not exist on type 'ImportMeta'` by making TypeScript aware of `import.meta.env`.
-/// <reference types="vite/client" />
+// FIX: Manually define `import.meta.env` to resolve TypeScript errors.
+// This is a workaround for environments where Vite's client types are not automatically available,
+// which was causing "Cannot find type definition file for 'vite/client'" and subsequent errors.
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL: string;
+    readonly VITE_SUPABASE_ANON_KEY: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Fixture, Player, Team, Tournament, Sponsor, Score } from './types';

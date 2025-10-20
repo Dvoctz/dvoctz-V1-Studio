@@ -11,6 +11,10 @@ interface SportsState {
     loading: boolean;
 }
 
+export type CsvTeam = Omit<Team, 'id'>;
+export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'stats'> & { teamName: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
+
+
 interface SportsContextType extends SportsState {
     // We will no longer expose dispatch. Instead we provide specific functions.
     // This improves type safety and abstracts away the implementation details.
@@ -29,6 +33,8 @@ interface SportsContextType extends SportsState {
     addSponsor: (sponsor: Omit<Sponsor, 'id'>) => Promise<void>;
     updateSponsor: (sponsor: Sponsor) => Promise<void>;
     deleteSponsor: (id: number) => Promise<void>;
+    bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
+    bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
 
     // Getter functions remain, but they will operate on the fetched state
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
@@ -135,6 +141,42 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             addSponsor: createAction<Sponsor, Omit<Sponsor, 'id'>>('sponsors'),
             updateSponsor: updateAction<Sponsor>('sponsors'),
             deleteSponsor: deleteAction('sponsors'),
+            
+            bulkAddOrUpdateTeams: async (teamsData: CsvTeam[]) => {
+                const teamsToUpsert = teamsData.map(t => ({...t}));
+                const { error } = await supabase.from('teams').upsert(teamsToUpsert, { onConflict: 'name' });
+                if (error) throw error;
+                await fetchData();
+            },
+
+            bulkAddOrUpdatePlayers: async (playersData: CsvPlayer[]) => {
+                const teamNameMap = new Map<string, number>();
+                state.teams.forEach(team => {
+                    teamNameMap.set(team.name.toLowerCase(), team.id);
+                });
+
+                const playersToUpsert = playersData.map(p => {
+                    const teamId = teamNameMap.get(p.teamName.toLowerCase());
+                    if (!teamId) {
+                        throw new Error(`Team "${p.teamName}" not found for player "${p.name}". Please ensure all teams exist before importing players.`);
+                    }
+                    const { teamName, matches, aces, kills, blocks, ...player } = p;
+                    return { 
+                        ...player, 
+                        teamId,
+                        stats: {
+                            matches: parseInt(matches || '0', 10),
+                            aces: parseInt(aces || '0', 10),
+                            kills: parseInt(kills || '0', 10),
+                            blocks: parseInt(blocks || '0', 10),
+                        }
+                    };
+                }).filter(Boolean) as Omit<Player, 'id'>[];
+
+                const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,teamId' });
+                if (error) throw error;
+                await fetchData();
+            },
 
             getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => {
                 return state.tournaments.filter(t => t.division === division);
