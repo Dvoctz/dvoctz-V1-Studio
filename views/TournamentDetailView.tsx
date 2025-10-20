@@ -8,6 +8,20 @@ interface TournamentDetailViewProps {
   onBack: () => void;
 }
 
+const TeamLogo: React.FC<{ logoUrl: string | null; alt: string; className?: string; }> = ({ logoUrl, alt, className = "w-10 h-10" }) => {
+    if (logoUrl) {
+        return <img src={logoUrl} alt={alt} className={`${className} rounded-full object-cover`} />;
+    }
+    return (
+        <div className={`${className} rounded-full bg-accent flex items-center justify-center text-text-secondary`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" />
+            </svg>
+        </div>
+    );
+};
+
+
 const FixtureItem: React.FC<{ fixture: Fixture, onScorecardClick: (fixture: Fixture) => void }> = ({ fixture, onScorecardClick }) => {
     const { getTeamById } = useSports();
     const team1 = getTeamById(fixture.team1Id);
@@ -28,7 +42,7 @@ const FixtureItem: React.FC<{ fixture: Fixture, onScorecardClick: (fixture: Fixt
     
     const renderTeam = (team: Team) => (
         <div className="flex items-center space-x-3 flex-1">
-            <img src={team.logoUrl} alt={team.name} className="w-10 h-10 rounded-full" />
+            <TeamLogo logoUrl={team.logoUrl} alt={team.name} />
             <span className="font-semibold text-base sm:text-lg text-text-primary">{team.name}</span>
         </div>
     );
@@ -101,7 +115,7 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
                                 <td className={`${tableCellClasses} text-text-secondary font-semibold text-center`}>{index + 1}</td>
                                 <td className={`${tableCellClasses} text-text-primary font-medium`}>
                                     <div className="flex items-center">
-                                        <img className="h-8 w-8 rounded-full mr-3" src={s.logoUrl} alt={s.teamName} />
+                                        <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-8 w-8 mr-3"/>
                                         {s.teamName}
                                     </div>
                                 </td>
@@ -126,7 +140,7 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
                         <div className="flex justify-between items-center mb-4">
                             <div className="flex items-center">
                                 <span className="text-text-secondary font-semibold mr-3">{index + 1}</span>
-                                <img className="h-8 w-8 rounded-full mr-3" src={s.logoUrl} alt={s.teamName} />
+                                <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-8 w-8 mr-3"/>
                                 <span className="text-text-primary font-bold">{s.teamName}</span>
                             </div>
                             <div className="text-right">

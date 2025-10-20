@@ -4,7 +4,7 @@ export interface Player {
   id: number;
   name: string;
   teamId: number;
-  photoUrl: string;
+  photoUrl: string | null;
   role: 'Setter' | 'Outside Hitter' | 'Middle Blocker' | 'Opposite Hitter' | 'Libero';
   stats?: {
     matches: number;
@@ -18,7 +18,7 @@ export interface Team {
   id: number;
   name: string;
   shortName: string;
-  logoUrl: string;
+  logoUrl: string | null;
   division: 'Division 1' | 'Division 2';
 }
 
@@ -50,14 +50,14 @@ export interface Tournament {
 export interface Sponsor {
   id: number;
   name: string;
-  logoUrl: string;
+  logoUrl: string | null;
   website: string;
 }
 
 export interface TeamStanding {
   teamId: number;
   teamName: string;
-  logoUrl: string;
+  logoUrl: string | null;
   gamesPlayed: number;
   wins: number;
   draws: number;

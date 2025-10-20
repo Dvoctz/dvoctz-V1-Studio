@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor } from '../supabaseClient';
 import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score } from '../types';
 
@@ -17,27 +18,23 @@ export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'stats'> & { teamName: st
 
 
 interface SportsContextType extends SportsState {
-    // We will no longer expose dispatch. Instead we provide specific functions.
-    // This improves type safety and abstracts away the implementation details.
     addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
     updateTournament: (tournament: Tournament) => Promise<void>;
     deleteTournament: (id: number) => Promise<void>;
-    addTeam: (team: Omit<Team, 'id'>) => Promise<void>;
-    updateTeam: (team: Team) => Promise<void>;
+    addTeam: (team: Omit<Team, 'id'> & { logoFile?: File }) => Promise<void>;
+    updateTeam: (team: Team & { logoFile?: File }) => Promise<void>;
     deleteTeam: (id: number) => Promise<void>;
-    addPlayer: (player: Omit<Player, 'id'>) => Promise<void>;
-    updatePlayer: (player: Player) => Promise<void>;
+    addPlayer: (player: Omit<Player, 'id'> & { photoFile?: File }) => Promise<void>;
+    updatePlayer: (player: Player & { photoFile?: File }) => Promise<void>;
     deletePlayer: (id: number) => Promise<void>;
     addFixture: (fixture: Omit<Fixture, 'id' | 'score'>) => Promise<void>;
     updateFixture: (fixture: Fixture) => Promise<void>;
     deleteFixture: (id: number) => Promise<void>;
-    addSponsor: (sponsor: Omit<Sponsor, 'id'>) => Promise<void>;
-    updateSponsor: (sponsor: Sponsor) => Promise<void>;
+    addSponsor: (sponsor: Omit<Sponsor, 'id'> & { logoFile?: File }) => Promise<void>;
+    updateSponsor: (sponsor: Sponsor & { logoFile?: File }) => Promise<void>;
     deleteSponsor: (id: number) => Promise<void>;
     bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
-
-    // Getter functions remain, but they will operate on the fetched state
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
     getFixturesByTournament: (tournamentId: number) => Fixture[];
     getTeamById: (teamId: number) => Team | undefined;
@@ -48,6 +45,28 @@ interface SportsContextType extends SportsState {
 const SportsDataContext = createContext<SportsContextType | undefined>(undefined);
 
 const mapFixture = (f: DbFixture): Fixture => ({ ...f, score: f.score as Score | undefined });
+
+// Helper function to upload a file to Supabase Storage.
+// NOTE: This requires a public bucket named 'assets' to be created in your Supabase project.
+const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    
+    const { error } = await supabase.storage
+      .from('assets')
+      .upload(fileName, file);
+
+    if (error) {
+        console.error('Error uploading file:', error);
+        throw new Error(`Failed to upload asset: ${error.message}`);
+    }
+
+    const { data } = supabase.storage
+        .from('assets')
+        .getPublicUrl(fileName);
+        
+    return data.publicUrl;
+};
 
 export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { supabase } = useSupabase();
@@ -105,43 +124,104 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [fetchData]);
 
     const contextValue = useMemo(() => {
-        const createAction = <T, O>(table: string, transform?: (item: T) => any) => async (item: O) => {
-            const itemToInsert = transform ? transform(item as unknown as T) : item;
-            const { error } = await supabase.from(table).insert(itemToInsert as any);
-            if (error) console.error(`Error adding to ${table}:`, error);
-            else await fetchData();
-        };
-
-        const updateAction = <T extends {id: number}>(table: string, transform?: (item: T) => any) => async (item: T) => {
-            const { id, ...rest } = item;
-            const itemToUpdate = transform ? transform(item) : rest;
-            const { error } = await supabase.from(table).update(itemToUpdate as any).eq('id', id);
-            if (error) console.error(`Error updating ${table}:`, error);
-            else await fetchData();
-        };
-
         const deleteAction = (table: string) => async (id: number) => {
             const { error } = await supabase.from(table).delete().eq('id', id);
-            if (error) console.error(`Error deleting from ${table}:`, error);
-            else await fetchData();
+            if (error) throw error;
+            await fetchData();
         };
 
         return {
             ...state,
-            addTournament: createAction<Tournament, Omit<Tournament, 'id'>>('tournaments'),
-            updateTournament: updateAction<Tournament>('tournaments'),
+            addTournament: async (tournament) => {
+                const { error } = await supabase.from('tournaments').insert(tournament);
+                if (error) throw error;
+                await fetchData();
+            },
+            updateTournament: async (tournament) => {
+                const { id, ...rest } = tournament;
+                const { error } = await supabase.from('tournaments').update(rest).eq('id', id);
+                if (error) throw error;
+                await fetchData();
+            },
             deleteTournament: deleteAction('tournaments'),
-            addTeam: createAction<Team, Omit<Team, 'id'>>('teams'),
-            updateTeam: updateAction<Team>('teams'),
+            
+            addTeam: async (teamData) => {
+                let finalLogoUrl = teamData.logoUrl;
+                if (teamData.logoFile) {
+                    finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
+                }
+                const { logoFile, ...teamToInsert } = teamData;
+                const { error } = await supabase.from('teams').insert({ ...teamToInsert, logoUrl: finalLogoUrl });
+                if (error) throw error;
+                await fetchData();
+            },
+            updateTeam: async (teamData) => {
+                let finalLogoUrl = teamData.logoUrl;
+                if (teamData.logoFile) {
+                    finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
+                }
+                const { id, logoFile, ...teamToUpdate } = teamData;
+                const { error } = await supabase.from('teams').update({ ...teamToUpdate, logoUrl: finalLogoUrl }).eq('id', id);
+                if (error) throw error;
+                await fetchData();
+            },
             deleteTeam: deleteAction('teams'),
-            addPlayer: createAction<Player, Omit<Player, 'id'>>('players'),
-            updatePlayer: updateAction<Player>('players'),
+
+            addPlayer: async (playerData) => {
+                let finalPhotoUrl = playerData.photoUrl;
+                if (playerData.photoFile) {
+                    finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
+                }
+                const { photoFile, ...playerToInsert } = playerData;
+                const { error } = await supabase.from('players').insert({ ...playerToInsert, photoUrl: finalPhotoUrl });
+                if (error) throw error;
+                await fetchData();
+            },
+            updatePlayer: async (playerData) => {
+                let finalPhotoUrl = playerData.photoUrl;
+                if (playerData.photoFile) {
+                    finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
+                }
+                const { id, photoFile, ...playerToUpdate } = playerData;
+                const { error } = await supabase.from('players').update({ ...playerToUpdate, photoUrl: finalPhotoUrl }).eq('id', id);
+                if (error) throw error;
+                await fetchData();
+            },
             deletePlayer: deleteAction('players'),
-            addFixture: createAction<Fixture, Omit<Fixture, 'id'>>('fixtures'),
-            updateFixture: updateAction<Fixture>('fixtures'),
+            
+            addFixture: async (fixture) => {
+                const { error } = await supabase.from('fixtures').insert(fixture);
+                if (error) throw error;
+                await fetchData();
+            },
+            updateFixture: async (fixture) => {
+                const { id, ...rest } = fixture;
+                const { error } = await supabase.from('fixtures').update(rest).eq('id', id);
+                if (error) throw error;
+                await fetchData();
+            },
             deleteFixture: deleteAction('fixtures'),
-            addSponsor: createAction<Sponsor, Omit<Sponsor, 'id'>>('sponsors'),
-            updateSponsor: updateAction<Sponsor>('sponsors'),
+
+            addSponsor: async (sponsorData) => {
+                let finalLogoUrl = sponsorData.logoUrl;
+                if (sponsorData.logoFile) {
+                    finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
+                }
+                const { logoFile, ...sponsorToInsert } = sponsorData;
+                const { error } = await supabase.from('sponsors').insert({ ...sponsorToInsert, logoUrl: finalLogoUrl });
+                if (error) throw error;
+                await fetchData();
+            },
+            updateSponsor: async (sponsorData) => {
+                let finalLogoUrl = sponsorData.logoUrl;
+                if (sponsorData.logoFile) {
+                    finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
+                }
+                const { id, logoFile, ...sponsorToUpdate } = sponsorData;
+                const { error } = await supabase.from('sponsors').update({ ...sponsorToUpdate, logoUrl: finalLogoUrl }).eq('id', id);
+                if (error) throw error;
+                await fetchData();
+            },
             deleteSponsor: deleteAction('sponsors'),
             
             bulkAddOrUpdateTeams: async (teamsData: CsvTeam[]) => {

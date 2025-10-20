@@ -12,9 +12,11 @@ export const Footer: React.FC = () => {
         <div className="relative overflow-hidden">
           <div className="flex animate-marquee whitespace-nowrap">
             {sponsors.concat(sponsors).map((sponsor, index) => (
-              <a key={`${sponsor.id}-${index}`} href={sponsor.website} target="_blank" rel="noopener noreferrer" className="mx-8 flex-shrink-0">
-                <img src={sponsor.logoUrl} alt={sponsor.name} className="h-12 max-w-[150px] object-contain grayscale hover:grayscale-0 transition-all duration-300" />
-              </a>
+              sponsor.logoUrl ? (
+                <a key={`${sponsor.id}-${index}`} href={sponsor.website} target="_blank" rel="noopener noreferrer" className="mx-8 flex-shrink-0">
+                  <img src={sponsor.logoUrl} alt={sponsor.name} className="h-12 max-w-[150px] object-contain grayscale hover:grayscale-0 transition-all duration-300" />
+                </a>
+              ) : null
             ))}
           </div>
         </div>

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Team } from '../types';
@@ -12,7 +13,15 @@ const TeamCard: React.FC<{ team: Team, onSelect: () => void }> = ({ team, onSele
     onClick={onSelect}
     className="bg-secondary p-4 rounded-lg shadow-md text-center transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer"
   >
-    <img src={team.logoUrl} alt={`${team.name} logo`} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-accent" />
+    {team.logoUrl ? (
+      <img src={team.logoUrl} alt={`${team.name} logo`} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-accent object-cover" />
+    ) : (
+      <div className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-accent bg-accent flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" />
+        </svg>
+      </div>
+    )}
     <h3 className="text-lg font-bold text-white">{team.name}</h3>
     <p className="text-sm text-highlight">{team.division}</p>
   </div>

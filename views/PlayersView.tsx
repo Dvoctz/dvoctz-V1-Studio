@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Player } from '../types';
@@ -9,8 +10,14 @@ const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
 
     return (
         <div className="bg-secondary rounded-lg shadow-lg overflow-hidden text-center group">
-            <div className="relative">
-                <img src={player.photoUrl} alt={player.name} className="w-full h-48 object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+            <div className="relative h-48 bg-accent flex items-center justify-center">
+                {player.photoUrl ? (
+                    <img src={player.photoUrl} alt={player.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
                 <div className="absolute bottom-0 left-0 p-4">
                      <h3 className="text-xl font-bold text-white">{player.name}</h3>

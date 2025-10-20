@@ -41,7 +41,7 @@ const FormModal: React.FC<{ title: string; onClose: () => void; children: React.
                 <div className="p-6 border-b border-accent flex justify-between items-center">
                     <h3 className="text-2xl font-bold text-white">{title}</h3>
                     <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -54,20 +54,42 @@ const FormModal: React.FC<{ title: string; onClose: () => void; children: React.
     );
 };
 
+const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
+    <div className="bg-red-900/50 border border-red-700 text-red-300 p-3 rounded-md mb-4 text-sm">
+        <strong>Error:</strong> {message}
+    </div>
+);
+
 // Admin Panels for each section
 
 // Tournaments
 const TournamentsAdmin = () => {
     const { tournaments, addTournament, updateTournament, deleteTournament } = useSports();
     const [editing, setEditing] = useState<Tournament | Partial<Tournament> | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const handleSave = async (tournament: Tournament | Partial<Tournament>) => {
-        if ('id' in tournament && tournament.id) {
-            await updateTournament(tournament as Tournament);
-        } else {
-            await addTournament(tournament as Omit<Tournament, 'id'>);
+        setError(null);
+        try {
+            if ('id' in tournament && tournament.id) {
+                await updateTournament(tournament as Tournament);
+            } else {
+                await addTournament(tournament as Omit<Tournament, 'id'>);
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
         }
-        setEditing(null);
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this tournament? This action cannot be undone.')) {
+            try {
+                await deleteTournament(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
     };
 
     return (
@@ -82,21 +104,21 @@ const TournamentsAdmin = () => {
                         </div>
                         <div className="space-x-2">
                             <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
-                            <Button onClick={() => deleteTournament(t.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
+                            <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
                     </div>
                 ))}
             </div>
             {editing && (
-                <FormModal title={editing.id ? "Edit Tournament" : "Add Tournament"} onClose={() => setEditing(null)}>
-                    <TournamentForm tournament={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+                <FormModal title={editing.id ? "Edit Tournament" : "Add Tournament"} onClose={() => { setEditing(null); setError(null); }}>
+                    <TournamentForm tournament={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
                 </FormModal>
             )}
         </AdminSection>
     );
 };
 
-const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, onSave: (t: any) => void, onCancel: () => void }> = ({ tournament, onSave, onCancel }) => {
+const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ tournament, onSave, onCancel, error }) => {
     const [formData, setFormData] = useState(tournament);
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleSubmit = (e: React.FormEvent) => {
@@ -106,6 +128,7 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
             <div>
                 <Label htmlFor="name">Tournament Name</Label>
                 <Input id="name" name="name" type="text" value={formData.name || ''} onChange={handleChange} required />
@@ -129,14 +152,30 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
 const TeamsAdmin = () => {
     const { teams, addTeam, updateTeam, deleteTeam } = useSports();
     const [editing, setEditing] = useState<Team | Partial<Team> | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSave = async (team: Team | Partial<Team>) => {
-        if ('id' in team && team.id) {
-            await updateTeam(team as Team);
-        } else {
-            await addTeam(team as Omit<Team, 'id'>);
+    const handleSave = async (team: Team | Partial<Team> & { logoFile?: File }) => {
+        setError(null);
+        try {
+            if ('id' in team && team.id) {
+                await updateTeam(team as Team & { logoFile?: File });
+            } else {
+                await addTeam(team as Omit<Team, 'id'> & { logoFile?: File });
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
         }
-        setEditing(null);
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this team?')) {
+            try {
+                await deleteTeam(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
     };
 
     return (
@@ -145,35 +184,65 @@ const TeamsAdmin = () => {
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {teams.map(t => (
                     <div key={t.id} className="p-3 bg-accent rounded-md text-center">
-                        <img src={t.logoUrl} alt={t.name} className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary" />
+                         {t.logoUrl ? (
+                            <img src={t.logoUrl} alt={t.name} className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary object-cover" />
+                         ) : (
+                            <div className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary bg-primary flex items-center justify-center text-text-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" /></svg>
+                            </div>
+                         )}
                         <p className="font-bold">{t.name} ({t.shortName})</p>
                         <p className="text-sm text-highlight">{t.division}</p>
                         <div className="mt-2 space-x-2">
                             <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1">Edit</Button>
-                            <Button onClick={() => deleteTeam(t.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
+                            <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
                         </div>
                     </div>
                 ))}
             </div>
             {editing && (
-                <FormModal title={editing.id ? "Edit Team" : "Add Team"} onClose={() => setEditing(null)}>
-                    <TeamForm team={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+                <FormModal title={editing.id ? "Edit Team" : "Add Team"} onClose={() => { setEditing(null); setError(null); }}>
+                    <TeamForm team={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
                 </FormModal>
             )}
         </AdminSection>
     );
 };
 
-const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void, onCancel: () => void }> = ({ team, onSave, onCancel }) => {
+const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ team, onSave, onCancel, error }) => {
     const [formData, setFormData] = useState(team);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState(team.logoUrl);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setLogoFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleRemoveLogo = () => {
+        setPreviewUrl(null);
+        setLogoFile(null);
+        setFormData({ ...formData, logoUrl: null });
+        const fileInput = document.getElementById('logoFile') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        onSave({ ...formData, logoFile });
     };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
             <div>
                 <Label htmlFor="name">Team Name</Label>
                 <Input id="name" name="name" type="text" value={formData.name || ''} onChange={handleChange} required />
@@ -182,9 +251,21 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
                 <Label htmlFor="shortName">Short Name (3 letters)</Label>
                 <Input id="shortName" name="shortName" type="text" value={formData.shortName || ''} onChange={handleChange} required maxLength={3} />
             </div>
-            <div>
-                <Label htmlFor="logoUrl">Logo URL</Label>
-                <Input id="logoUrl" name="logoUrl" type="url" value={formData.logoUrl || ''} onChange={handleChange} required />
+             <div>
+                <Label>Logo Image (Optional)</Label>
+                <div className="mt-2 flex items-center gap-4">
+                    {previewUrl ? (
+                        <img src={previewUrl} alt="Logo preview" className="w-20 h-20 rounded-full object-cover bg-primary" />
+                    ) : (
+                         <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-text-secondary">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" /></svg>
+                         </div>
+                    )}
+                    <div className="flex-grow">
+                        <Input id="logoFile" name="logoFile" type="file" accept="image/png, image/jpeg" onChange={handleFileChange} className="text-sm" />
+                        {previewUrl && <Button type="button" onClick={handleRemoveLogo} className="bg-gray-600 hover:bg-gray-500 text-xs mt-2">Remove Logo</Button>}
+                    </div>
+                </div>
             </div>
             <div>
                 <Label htmlFor="division">Division</Label>
@@ -205,15 +286,31 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
 const PlayersAdmin = () => {
     const { players, teams, addPlayer, updatePlayer, deletePlayer } = useSports();
     const [editing, setEditing] = useState<Player | Partial<Player> | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSave = async (player: Player | Partial<Player>) => {
-        const payload = { ...player, stats: player.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 }};
-        if ('id' in payload && payload.id) {
-            await updatePlayer(payload as Player);
-        } else {
-            await addPlayer(payload as Omit<Player, 'id'>);
+    const handleSave = async (player: Player | Partial<Player> & { photoFile?: File }) => {
+        setError(null);
+        try {
+            const payload = { ...player, stats: player.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 }};
+            if ('id' in payload && payload.id) {
+                await updatePlayer(payload as Player & { photoFile?: File });
+            } else {
+                await addPlayer(payload as Omit<Player, 'id'> & { photoFile?: File });
+            }
+            setEditing(null);
+        } catch(err: any) {
+            setError(err.message);
         }
-        setEditing(null);
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this player?')) {
+            try {
+                await deletePlayer(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
     };
 
     return (
@@ -224,7 +321,13 @@ const PlayersAdmin = () => {
                 {players.map(p => (
                     <div key={p.id} className="flex items-center justify-between p-3 bg-accent rounded-md">
                         <div className="flex items-center">
-                            <img src={p.photoUrl} alt={p.name} className="w-10 h-10 rounded-full mr-3 object-cover" />
+                            {p.photoUrl ? (
+                                <img src={p.photoUrl} alt={p.name} className="w-10 h-10 rounded-full mr-3 object-cover" />
+                            ) : (
+                                <div className="w-10 h-10 rounded-full mr-3 bg-primary flex items-center justify-center text-text-secondary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                </div>
+                            )}
                             <div>
                                 <p className="font-bold">{p.name}</p>
                                 <p className="text-sm text-highlight">{p.role}</p>
@@ -232,38 +335,74 @@ const PlayersAdmin = () => {
                         </div>
                         <div className="space-x-2">
                             <Button onClick={() => setEditing(p)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
-                            <Button onClick={() => deletePlayer(p.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
+                            <Button onClick={() => handleDelete(p.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
                     </div>
                 ))}
             </div>
             {editing && (
-                <FormModal title={editing.id ? "Edit Player" : "Add Player"} onClose={() => setEditing(null)}>
-                    <PlayerForm player={editing} onSave={handleSave} onCancel={() => setEditing(null)} teams={teams} />
+                <FormModal title={editing.id ? "Edit Player" : "Add Player"} onClose={() => { setEditing(null); setError(null); }}>
+                    <PlayerForm player={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} teams={teams} error={error} />
                 </FormModal>
             )}
         </AdminSection>
     );
 };
 
-const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) => void, onCancel: () => void, teams: Team[] }> = ({ player, onSave, onCancel, teams }) => {
+const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) => void, onCancel: () => void, teams: Team[], error: string | null }> = ({ player, onSave, onCancel, teams, error }) => {
     const [formData, setFormData] = useState({...player});
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState(player.photoUrl);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setPhotoFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleRemovePhoto = () => {
+        setPreviewUrl(null);
+        setPhotoFile(null);
+        setFormData({ ...formData, photoUrl: null });
+        const fileInput = document.getElementById('photoFile') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleStatsChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, stats: { ...formData.stats, [e.target.name]: parseInt(e.target.value, 10) || 0 }});
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave({...formData, teamId: parseInt(formData.teamId as any, 10)});
+        onSave({...formData, teamId: parseInt(formData.teamId as any, 10), photoFile });
     };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
              <div>
                 <Label htmlFor="name">Player Name</Label>
                 <Input id="name" name="name" type="text" value={formData.name || ''} onChange={handleChange} required />
             </div>
              <div>
-                <Label htmlFor="photoUrl">Photo URL</Label>
-                <Input id="photoUrl" name="photoUrl" type="url" value={formData.photoUrl || ''} onChange={handleChange} required />
+                <Label>Photo (Optional)</Label>
+                <div className="mt-2 flex items-center gap-4">
+                    {previewUrl ? (
+                        <img src={previewUrl} alt="Photo preview" className="w-20 h-20 rounded-full object-cover bg-primary" />
+                    ) : (
+                         <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-text-secondary">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                         </div>
+                    )}
+                    <div className="flex-grow">
+                        <Input id="photoFile" name="photoFile" type="file" accept="image/png, image/jpeg" onChange={handleFileChange} className="text-sm" />
+                        {previewUrl && <Button type="button" onClick={handleRemovePhoto} className="bg-gray-600 hover:bg-gray-500 text-xs mt-2">Remove Photo</Button>}
+                    </div>
+                </div>
             </div>
              <div>
                 <Label htmlFor="teamId">Team</Label>
@@ -304,17 +443,33 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
 const FixturesAdmin = () => {
     const { fixtures, teams, tournaments, addFixture, updateFixture, deleteFixture } = useSports();
     const [editing, setEditing] = useState<Fixture | Partial<Omit<Fixture, 'score'>> | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const getTeam = (id: number) => teams.find(t => t.id === id)?.shortName || 'N/A';
     
     const handleSave = async (fixture: Fixture) => {
-        if (fixture.id) {
-            const existingFixture = fixtures.find(f => f.id === fixture.id)!;
-            await updateFixture({ ...existingFixture, ...fixture });
-        } else {
-            await addFixture(fixture);
+        setError(null);
+        try {
+            if (fixture.id) {
+                const existingFixture = fixtures.find(f => f.id === fixture.id)!;
+                await updateFixture({ ...existingFixture, ...fixture });
+            } else {
+                await addFixture(fixture);
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
         }
-        setEditing(null);
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this fixture?')) {
+            try {
+                await deleteFixture(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
     };
 
     return (
@@ -331,21 +486,21 @@ const FixturesAdmin = () => {
                         <p className="text-sm text-text-secondary">{new Date(f.dateTime).toLocaleString()}</p>
                         <div className="mt-2 text-right space-x-2">
                              <Button onClick={() => setEditing(f)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
-                            <Button onClick={() => deleteFixture(f.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
+                            <Button onClick={() => handleDelete(f.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
                     </div>
                 ))}
             </div>
              {editing && (
-                <FormModal title={editing.id ? "Edit Fixture" : "Add Fixture"} onClose={() => setEditing(null)}>
-                    <FixtureForm fixture={editing} onSave={handleSave} onCancel={() => setEditing(null)} teams={teams} tournaments={tournaments} />
+                <FormModal title={editing.id ? "Edit Fixture" : "Add Fixture"} onClose={() => { setEditing(null); setError(null); }}>
+                    <FixtureForm fixture={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} teams={teams} tournaments={tournaments} error={error} />
                 </FormModal>
             )}
         </AdminSection>
     );
 };
 
-const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: any) => void, onCancel: () => void, teams: Team[], tournaments: Tournament[] }> = ({ fixture, onSave, onCancel, teams, tournaments }) => {
+const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: any) => void, onCancel: () => void, teams: Team[], tournaments: Tournament[], error: string | null }> = ({ fixture, onSave, onCancel, teams, tournaments, error }) => {
     const toInputDateTimeString = (isoString?: string) => {
         if (!isoString) return '';
         const date = new Date(isoString);
@@ -378,6 +533,7 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
     
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
             <div>
                 <Label>Tournament</Label>
                 <Select name="tournamentId" value={formData.tournamentId || ''} onChange={handleChange} required>
@@ -425,14 +581,30 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
 const SponsorsAdmin = () => {
     const { sponsors, addSponsor, updateSponsor, deleteSponsor } = useSports();
     const [editing, setEditing] = useState<Sponsor | Partial<Sponsor> | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSave = async (sponsor: Sponsor | Partial<Sponsor>) => {
-        if (sponsor.id) {
-            await updateSponsor(sponsor as Sponsor);
-        } else {
-            await addSponsor(sponsor as Omit<Sponsor, 'id'>);
+    const handleSave = async (sponsor: Sponsor | Partial<Sponsor> & { logoFile?: File }) => {
+        setError(null);
+        try {
+            if (sponsor.id) {
+                await updateSponsor(sponsor as Sponsor & { logoFile?: File });
+            } else {
+                await addSponsor(sponsor as Omit<Sponsor, 'id'> & { logoFile?: File });
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
         }
-        setEditing(null);
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this sponsor?')) {
+            try {
+                await deleteSponsor(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
     };
 
     return (
@@ -441,36 +613,81 @@ const SponsorsAdmin = () => {
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                 {sponsors.map(s => (
                     <div key={s.id} className="p-3 bg-accent rounded-md text-center">
-                        <img src={s.logoUrl} alt={s.name} className="h-12 max-w-[150px] object-contain mx-auto mb-2" />
+                        {s.logoUrl ? (
+                            <img src={s.logoUrl} alt={s.name} className="h-12 max-w-[150px] object-contain mx-auto mb-2" />
+                        ) : (
+                             <div className="h-12 w-full flex items-center justify-center text-text-secondary mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                             </div>
+                        )}
                         <p className="font-bold text-sm">{s.name}</p>
                          <div className="mt-2 space-x-2">
                             <Button onClick={() => setEditing(s)} className="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1">Edit</Button>
-                            <Button onClick={() => deleteSponsor(s.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
+                            <Button onClick={() => handleDelete(s.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
                         </div>
                     </div>
                 ))}
             </div>
              {editing && (
-                <FormModal title={editing.id ? "Edit Sponsor" : "Add Sponsor"} onClose={() => setEditing(null)}>
-                    <SponsorForm sponsor={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+                <FormModal title={editing.id ? "Edit Sponsor" : "Add Sponsor"} onClose={() => { setEditing(null); setError(null); }}>
+                    <SponsorForm sponsor={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
                 </FormModal>
             )}
         </AdminSection>
     );
 };
 
-const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: any) => void, onCancel: () => void }> = ({ sponsor, onSave, onCancel }) => {
+const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: any) => void, onCancel: () => void, error: string | null }> = ({ sponsor, onSave, onCancel, error }) => {
     const [formData, setFormData] = useState(sponsor);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState(sponsor.logoUrl);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setLogoFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleRemoveLogo = () => {
+        setPreviewUrl(null);
+        setLogoFile(null);
+        setFormData({ ...formData, logoUrl: null });
+        const fileInput = document.getElementById('logoFile') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        onSave({ ...formData, logoFile });
     };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
             <div><Label>Sponsor Name</Label><Input name="name" value={formData.name || ''} onChange={handleChange} required /></div>
-            <div><Label>Logo URL</Label><Input name="logoUrl" type="url" value={formData.logoUrl || ''} onChange={handleChange} required /></div>
+            <div>
+                <Label>Logo Image (Optional)</Label>
+                <div className="mt-2 flex items-center gap-4">
+                    {previewUrl ? (
+                        <img src={previewUrl} alt="Logo preview" className="w-20 h-20 rounded-md object-contain bg-primary" />
+                    ) : (
+                         <div className="w-20 h-20 rounded-md bg-primary flex items-center justify-center text-text-secondary">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                         </div>
+                    )}
+                    <div className="flex-grow">
+                        <Input id="logoFile" name="logoFile" type="file" accept="image/png, image/jpeg" onChange={handleFileChange} className="text-sm" />
+                        {previewUrl && <Button type="button" onClick={handleRemoveLogo} className="bg-gray-600 hover:bg-gray-500 text-xs mt-2">Remove Logo</Button>}
+                    </div>
+                </div>
+            </div>
             <div><Label>Website</Label><Input name="website" type="url" value={formData.website || ''} onChange={handleChange} required /></div>
             <div className="flex justify-end space-x-2">
                 <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
@@ -520,7 +737,7 @@ const BulkImportAdmin = () => {
             const data = await parseCSV(file);
 
             if (type === 'teams') {
-                const requiredColumns = ['name', 'shortName', 'logoUrl', 'division'];
+                const requiredColumns = ['name', 'shortName', 'division'];
                 for (let i = 0; i < data.length; i++) {
                     const row = data[i] as CsvTeam;
                     for (const col of requiredColumns) {
@@ -535,7 +752,7 @@ const BulkImportAdmin = () => {
                 await bulkAddOrUpdateTeams(data as CsvTeam[]);
                 setSuccess(`${data.length} teams imported successfully!`);
             } else {
-                 const requiredColumns = ['name', 'teamName', 'photoUrl', 'role'];
+                 const requiredColumns = ['name', 'teamName', 'role'];
                  for (let i = 0; i < data.length; i++) {
                     const row = data[i] as CsvPlayer;
                     for (const col of requiredColumns) {
@@ -547,7 +764,6 @@ const BulkImportAdmin = () => {
                 await bulkAddOrUpdatePlayers(data as CsvPlayer[]);
                 setSuccess(`${data.length} players imported successfully!`);
             }
-// FIX: Rewrote the catch block to be more robust. This resolves a subtle parsing issue that caused cascading scope errors for `err`, `setError`, `setLoading`, `e`, and made the component's return type be inferred as `void`.
         } catch (err) {
             setError(err instanceof Error ? err.message : "An error occurred during import.");
         } finally {
@@ -564,13 +780,13 @@ const BulkImportAdmin = () => {
             <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-accent p-4 rounded-md">
                     <h3 className="font-bold mb-2">Import Teams</h3>
-                    <p className="text-xs text-text-secondary mb-2">Required columns: `name`, `shortName`, `logoUrl`, `division`</p>
+                    <p className="text-xs text-text-secondary mb-2">Required columns: `name`, `shortName`, `division`. Optional: `logoUrl`</p>
                     <Label htmlFor="teams-csv">Upload Teams CSV</Label>
                     <Input id="teams-csv" type="file" accept=".csv" onChange={handleFileUpload('teams')} disabled={loading} />
                 </div>
                  <div className="bg-accent p-4 rounded-md">
                     <h3 className="font-bold mb-2">Import Players</h3>
-                    <p className="text-xs text-text-secondary mb-2">Required columns: `name`, `teamName`, `photoUrl`, `role`. Optional: `matches`, `aces`, `kills`, `blocks`</p>
+                    <p className="text-xs text-text-secondary mb-2">Required: `name`, `teamName`, `role`. Optional: `photoUrl`, `matches`, `aces`, `kills`, `blocks`</p>
                      <Label htmlFor="players-csv">Upload Players CSV</Label>
                     <Input id="players-csv" type="file" accept=".csv" onChange={handleFileUpload('players')} disabled={loading} />
                 </div>
