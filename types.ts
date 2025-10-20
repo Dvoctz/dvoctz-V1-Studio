@@ -6,7 +6,7 @@ export interface Player {
   teamId: number;
   photoUrl: string;
   role: 'Setter' | 'Outside Hitter' | 'Middle Blocker' | 'Opposite Hitter' | 'Libero';
-  stats: {
+  stats?: {
     matches: number;
     aces: number;
     kills: number;

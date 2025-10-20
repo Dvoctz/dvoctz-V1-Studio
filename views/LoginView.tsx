@@ -6,20 +6,23 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const success = login(username, password);
+    setLoading(true);
+    const { success, error: loginError } = await login(email, password);
     if (success) {
       onLoginSuccess();
     } else {
-      setError('Invalid username or password.');
+      setError(loginError || 'An unknown error occurred.');
     }
+    setLoading(false);
   };
 
   return (
@@ -31,19 +34,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label
-              htmlFor="username"
+              htmlFor="email"
               className="block text-sm font-medium text-text-secondary"
             >
-              Username
+              Email
             </label>
             <input
-              id="username"
-              name="username"
-              type="text"
-              autoComplete="username"
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight"
             />
           </div>
@@ -73,9 +76,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           <div>
             <button
               type="submit"
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-highlight hover:bg-teal-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight transition-colors"
+              disabled={loading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-highlight hover:bg-teal-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight transition-colors disabled:bg-gray-500 disabled:cursor-wait"
             >
-              Sign in
+              {loading ? 'Signing In...' : 'Sign in'}
             </button>
           </div>
         </form>

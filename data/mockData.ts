@@ -1,3 +1,7 @@
+// THIS FILE IS NO LONGER IN USE.
+// ALL DATA IS NOW FETCHED FROM THE SUPABASE DATABASE.
+// You can use this file for reference or safely delete it.
+
 import type { Tournament, Team, Player, Fixture, Sponsor } from '../types';
 
 export const sponsors: Sponsor[] = [

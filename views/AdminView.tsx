@@ -24,7 +24,7 @@ const FormSelect: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { lab
     </div>
 );
 // Base form component
-const FormContainer: React.FC<{ onSave: (e: React.FormEvent) => void; onCancel: () => void; children: React.ReactNode; title: string }> = ({ onSave, onCancel, children, title }) => (
+const FormContainer: React.FC<{ onSave: (e: React.FormEvent) => Promise<void>; onCancel: () => void; children: React.ReactNode; title: string; saving?: boolean }> = ({ onSave, onCancel, children, title, saving }) => (
     <form onSubmit={onSave} className="bg-accent p-4 rounded-lg space-y-4 mb-3">
         <h3 className="text-lg font-semibold text-white text-center">{title}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -32,25 +32,30 @@ const FormContainer: React.FC<{ onSave: (e: React.FormEvent) => void; onCancel: 
         </div>
         <div className="flex justify-end space-x-3 pt-2">
             <button type="button" onClick={onCancel} className="bg-gray-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-gray-600 transition-colors">Cancel</button>
-            <button type="submit" className="bg-highlight text-white px-4 py-2 rounded-md font-semibold hover:bg-teal-400 transition-colors">Save</button>
+            <button type="submit" disabled={saving} className="bg-highlight text-white px-4 py-2 rounded-md font-semibold hover:bg-teal-400 transition-colors disabled:bg-gray-500 disabled:cursor-wait">
+                {saving ? 'Saving...' : 'Save'}
+            </button>
         </div>
     </form>
 );
 
 
 // Tournament Form
-const TournamentForm: React.FC<{ tournament?: Tournament; onSave: (data: Tournament | Omit<Tournament, 'id'>) => void; onCancel: () => void; }> = ({ tournament, onSave, onCancel }) => {
+const TournamentForm: React.FC<{ tournament?: Tournament; onSave: (data: Tournament | Omit<Tournament, 'id'>) => Promise<void>; onCancel: () => void; }> = ({ tournament, onSave, onCancel }) => {
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         name: tournament?.name || '',
         division: tournament?.division || 'Division 1',
     });
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name) return alert('Name is required');
-        onSave(tournament ? { ...tournament, ...formData } : formData);
+        setSaving(true);
+        await onSave(tournament ? { ...tournament, ...formData } : formData);
+        setSaving(false);
     };
     return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title={tournament ? 'Edit Tournament' : 'Add Tournament'}>
+        <FormContainer onSave={handleSave} onCancel={onCancel} title={tournament ? 'Edit Tournament' : 'Add Tournament'} saving={saving}>
             <FormInput label="Tournament Name" name="name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required/>
             <FormSelect label="Division" name="division" value={formData.division} onChange={e => setFormData({ ...formData, division: e.target.value as Team['division'] })}>
                 {divisions.map(d => <option key={d} value={d}>{d}</option>)}
@@ -60,20 +65,23 @@ const TournamentForm: React.FC<{ tournament?: Tournament; onSave: (data: Tournam
 };
 
 // Team Form
-const TeamForm: React.FC<{ team?: Team; onSave: (data: Team | Omit<Team, 'id'>) => void; onCancel: () => void; }> = ({ team, onSave, onCancel }) => {
+const TeamForm: React.FC<{ team?: Team; onSave: (data: Team | Omit<Team, 'id'>) => Promise<void>; onCancel: () => void; }> = ({ team, onSave, onCancel }) => {
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         name: team?.name || '',
         shortName: team?.shortName || '',
         logoUrl: team?.logoUrl || '',
         division: team?.division || 'Division 1',
     });
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name || !formData.shortName) return alert('Name and short name are required');
-        onSave(team ? { ...team, ...formData } : formData);
+        setSaving(true);
+        await onSave(team ? { ...team, ...formData } : formData);
+        setSaving(false);
     };
     return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title={team ? 'Edit Team' : 'Add Team'}>
+        <FormContainer onSave={handleSave} onCancel={onCancel} title={team ? 'Edit Team' : 'Add Team'} saving={saving}>
             <FormInput label="Team Name" name="name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required/>
             <FormInput label="Short Name" name="shortName" value={formData.shortName} onChange={e => setFormData({ ...formData, shortName: e.target.value })} required/>
             <FormInput label="Logo URL" name="logoUrl" value={formData.logoUrl} onChange={e => setFormData({ ...formData, logoUrl: e.target.value })} />
@@ -85,8 +93,9 @@ const TeamForm: React.FC<{ team?: Team; onSave: (data: Team | Omit<Team, 'id'>) 
 };
 
 // Player Form
-const PlayerForm: React.FC<{ player?: Player; onSave: (data: Player | Omit<Player, 'id'>) => void; onCancel: () => void; }> = ({ player, onSave, onCancel }) => {
+const PlayerForm: React.FC<{ player?: Player; onSave: (data: Player | Omit<Player, 'id'>) => Promise<void>; onCancel: () => void; }> = ({ player, onSave, onCancel }) => {
     const { teams } = useSports();
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         name: player?.name || '',
         photoUrl: player?.photoUrl || '',
@@ -94,16 +103,18 @@ const PlayerForm: React.FC<{ player?: Player; onSave: (data: Player | Omit<Playe
         role: player?.role || 'Setter',
         stats: player?.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 }
     });
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name || !formData.teamId) return alert('Name and team are required');
-        onSave(player ? { ...player, ...formData } : formData);
+        setSaving(true);
+        await onSave(player ? { ...player, ...formData } : formData);
+        setSaving(false);
     };
     const handleStatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, stats: { ...formData.stats, [e.target.name]: parseInt(e.target.value) || 0 }});
     };
     return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title={player ? 'Edit Player' : 'Add Player'}>
+        <FormContainer onSave={handleSave} onCancel={onCancel} title={player ? 'Edit Player' : 'Add Player'} saving={saving}>
             <FormInput label="Player Name" name="name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required/>
             <FormInput label="Photo URL" name="photoUrl" value={formData.photoUrl} onChange={e => setFormData({ ...formData, photoUrl: e.target.value })} />
             <FormSelect label="Team" name="teamId" value={formData.teamId} onChange={e => setFormData({ ...formData, teamId: parseInt(e.target.value) })}>
@@ -121,8 +132,9 @@ const PlayerForm: React.FC<{ player?: Player; onSave: (data: Player | Omit<Playe
 };
 
 // Fixture Add Form
-const FixtureAddForm: React.FC<{ onSave: (data: Omit<Fixture, 'id'>) => void; onCancel: () => void; }> = ({ onSave, onCancel }) => {
+const FixtureAddForm: React.FC<{ onSave: (data: Omit<Fixture, 'id' | 'score'>) => Promise<void>; onCancel: () => void; }> = ({ onSave, onCancel }) => {
     const { teams, tournaments } = useSports();
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         tournamentId: tournaments[0]?.id || 0,
         team1Id: teams[0]?.id || 0,
@@ -132,15 +144,17 @@ const FixtureAddForm: React.FC<{ onSave: (data: Omit<Fixture, 'id'>) => void; on
         status: 'upcoming' as const,
         referee: '',
     });
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.ground || formData.team1Id === formData.team2Id) {
             return alert('Ground is required and teams must be different.');
         }
-        onSave(formData);
+        setSaving(true);
+        await onSave(formData);
+        setSaving(false);
     };
     return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title="Add New Fixture">
+        <FormContainer onSave={handleSave} onCancel={onCancel} title="Add New Fixture" saving={saving}>
             <FormSelect label="Tournament" name="tournamentId" value={formData.tournamentId} onChange={e => setFormData({...formData, tournamentId: parseInt(e.target.value)})}>
                 {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </FormSelect>
@@ -158,53 +172,27 @@ const FixtureAddForm: React.FC<{ onSave: (data: Omit<Fixture, 'id'>) => void; on
 };
 
 // Sponsor Form
-const SponsorForm: React.FC<{ sponsor?: Sponsor; onSave: (data: Sponsor | Omit<Sponsor, 'id'>) => void; onCancel: () => void; }> = ({ sponsor, onSave, onCancel }) => {
+const SponsorForm: React.FC<{ sponsor?: Sponsor; onSave: (data: Sponsor | Omit<Sponsor, 'id'>) => Promise<void>; onCancel: () => void; }> = ({ sponsor, onSave, onCancel }) => {
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         name: sponsor?.name || '',
         logoUrl: sponsor?.logoUrl || '',
         website: sponsor?.website || '#',
     });
 
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) { // 2MB limit
-                alert('File is too large. Please select an image under 2MB.');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData({ ...formData, logoUrl: reader.result as string });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name || !formData.logoUrl) return alert('Name and Logo are required');
-        onSave(sponsor ? { ...sponsor, ...formData } : formData);
+        if (!formData.name || !formData.logoUrl) return alert('Name and Logo URL are required');
+        setSaving(true);
+        await onSave(sponsor ? { ...sponsor, ...formData } : formData);
+        setSaving(false);
     };
 
     return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title={sponsor ? 'Edit Sponsor' : 'Add Sponsor'}>
+        <FormContainer onSave={handleSave} onCancel={onCancel} title={sponsor ? 'Edit Sponsor' : 'Add Sponsor'} saving={saving}>
             <FormInput label="Sponsor Name" name="name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required/>
             <FormInput label="Website URL" name="website" value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} />
-            <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-text-secondary mb-1">Sponsor Logo (PNG, JPG)</label>
-                <div className="mt-1 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 p-2 bg-primary border border-accent rounded-md">
-                    {formData.logoUrl ?
-                        <img src={formData.logoUrl} alt="Sponsor Logo Preview" className="h-12 w-auto max-w-xs object-contain rounded-md bg-white p-1" /> :
-                        <div className="h-12 w-24 flex items-center justify-center bg-gray-700 rounded-md text-xs text-text-secondary">No Image</div>
-                    }
-                    <input
-                        type="file"
-                        accept="image/png, image/jpeg"
-                        onChange={handleLogoChange}
-                        className="block w-full text-sm text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-highlight file:text-white hover:file:bg-teal-400 cursor-pointer"
-                    />
-                </div>
-            </div>
+            <FormInput label="Logo URL" name="logoUrl" value={formData.logoUrl} onChange={e => setFormData({ ...formData, logoUrl: e.target.value })} required />
         </FormContainer>
     );
 };
@@ -245,8 +233,9 @@ const ItemRow: React.FC<{ name: string; description?: string; onDelete?: () => v
 );
 
 
-const FixtureEditForm: React.FC<{ fixture: Fixture; onSave: (updatedFixture: Fixture) => void; onCancel: () => void; }> = ({ fixture, onSave, onCancel }) => {
+const FixtureEditForm: React.FC<{ fixture: Fixture; onSave: (updatedFixture: Fixture) => Promise<void>; onCancel: () => void; }> = ({ fixture, onSave, onCancel }) => {
     const { getTeamById } = useSports();
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState<Fixture>(fixture);
     const team1 = getTeamById(formData.team1Id);
     const team2 = getTeamById(formData.team2Id);
@@ -300,8 +289,9 @@ const FixtureEditForm: React.FC<{ fixture: Fixture; onSave: (updatedFixture: Fix
         setFormData(prev => ({ ...prev, score: { ...prev.score!, sets: newSets }}));
     };
     
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSaving(true);
         let updatedFixture = { ...formData };
         if (updatedFixture.status === 'completed' && updatedFixture.score && team1 && team2) {
             const { team1Score, team2Score } = updatedFixture.score;
@@ -317,11 +307,12 @@ const FixtureEditForm: React.FC<{ fixture: Fixture; onSave: (updatedFixture: Fix
         } else if (updatedFixture.status !== 'completed') {
             delete updatedFixture.score;
         }
-        onSave(updatedFixture);
+        await onSave(updatedFixture);
+        setSaving(false);
     };
 
     return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title={`${team1?.name} vs ${team2?.name}`}>
+        <FormContainer onSave={handleSave} onCancel={onCancel} title={`${team1?.name} vs ${team2?.name}`} saving={saving}>
             <FormInput label="Ground" name="ground" value={formData.ground} onChange={handleInputChange} required/>
             <FormInput label="Referee" name="referee" value={formData.referee || ''} onChange={handleInputChange} placeholder="Appoint a referee" />
             <FormSelect label="Status" name="status" value={formData.status} onChange={handleInputChange}>
@@ -357,52 +348,19 @@ const FixtureEditForm: React.FC<{ fixture: Fixture; onSave: (updatedFixture: Fix
     );
 };
 
-const AdminUserForm: React.FC<{ onSave: (username: string, password_one: string, password_two: string) => void, onCancel: () => void }> = ({ onSave, onCancel }) => {
-    const [username, setUsername] = useState('');
-    const [passwordOne, setPasswordOne] = useState('');
-    const [passwordTwo, setPasswordTwo] = useState('');
-
-    const handleSave = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSave(username, passwordOne, passwordTwo);
-    };
-
-    return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title="Add New Admin">
-            <FormInput label="Username" type="text" value={username} onChange={e => setUsername(e.target.value)} required/>
-            <div />
-            <FormInput label="Password" type="password" value={passwordOne} onChange={e => setPasswordOne(e.target.value)} required/>
-            <FormInput label="Confirm Password" type="password" value={passwordTwo} onChange={e => setPasswordTwo(e.target.value)} required/>
-        </FormContainer>
-    );
-};
-
-const AdminEditForm: React.FC<{ admin: { id: number; username: string }; onSave: (id: number, pass1: string, pass2: string) => void; onCancel: () => void; }> = ({ admin, onSave, onCancel }) => {
-    const [passwordOne, setPasswordOne] = useState('');
-    const [passwordTwo, setPasswordTwo] = useState('');
-
-    const handleSave = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSave(admin.id, passwordOne, passwordTwo);
-    };
-
-    return (
-        <FormContainer onSave={handleSave} onCancel={onCancel} title={`Edit Admin: ${admin.username}`}>
-            <FormInput label="Username" type="text" value={admin.username} readOnly />
-            <div />
-            <FormInput label="New Password" type="password" value={passwordOne} onChange={e => setPasswordOne(e.target.value)} required placeholder="Enter new password" />
-            <FormInput label="Confirm New Password" type="password" value={passwordTwo} onChange={e => setPasswordTwo(e.target.value)} required placeholder="Confirm new password" />
-        </FormContainer>
-    );
-};
-
-
-type EditState = { type: 'player' | 'team' | 'tournament' | 'fixture' | 'sponsor' | 'admin' | null, id: number | null };
-type AddState = 'player' | 'team' | 'tournament' | 'fixture' | 'sponsor' | 'admin' | null;
+type EditState = { type: 'player' | 'team' | 'tournament' | 'fixture' | 'sponsor' | null, id: number | null };
+type AddState = 'player' | 'team' | 'tournament' | 'fixture' | 'sponsor' | null;
 
 export const AdminView: React.FC = () => {
-    const { players, teams, tournaments, fixtures, sponsors, dispatch, getTeamById } = useSports();
-    const { admins, registerAdmin, currentUser, deleteAdmin, updateAdminPassword } = useAuth();
+    const { 
+        players, teams, tournaments, fixtures, sponsors, getTeamById, loading,
+        addPlayer, updatePlayer, deletePlayer,
+        addTeam, updateTeam, deleteTeam,
+        addTournament, updateTournament, deleteTournament,
+        addFixture, updateFixture, deleteFixture,
+        addSponsor, updateSponsor, deleteSponsor,
+    } = useSports();
+    const { currentUser } = useAuth();
     const [editingState, setEditingState] = useState<EditState>({ type: null, id: null });
     const [addingType, setAddingType] = useState<AddState>(null);
 
@@ -416,131 +374,82 @@ export const AdminView: React.FC = () => {
         setAddingType(null);
     }
     
-    const handleDelete = (type: 'PLAYER' | 'TEAM' | 'TOURNAMENT' | 'FIXTURE' | 'SPONSOR', id: number) => {
+    const handleDelete = async (type: 'PLAYER' | 'TEAM' | 'TOURNAMENT' | 'FIXTURE' | 'SPONSOR', id: number) => {
         if (window.confirm('Are you sure you want to delete this item?')) {
-            dispatch({ type: `DELETE_${type}`, payload: id });
-        }
-    };
-
-    const handleAddAdmin = (username: string, pass1: string, pass2: string) => {
-        if (pass1 !== pass2) {
-            alert("Passwords do not match.");
-            return;
-        }
-        if (pass1.length < 6) {
-            alert("Password must be at least 6 characters long.");
-            return;
-        }
-        const success = registerAdmin(username, pass1);
-        if (success) {
-            handleSetAdding(null);
-        } else {
-            alert("Username already exists.");
-        }
-    };
-
-    const handleDeleteAdmin = (id: number) => {
-        if (window.confirm('Are you sure you want to delete this admin? This action cannot be undone.')) {
-            const success = deleteAdmin(id);
-            if (!success) {
-                alert('Error: You cannot delete your own account.');
+            switch(type) {
+                case 'PLAYER': await deletePlayer(id); break;
+                case 'TEAM': await deleteTeam(id); break;
+                case 'TOURNAMENT': await deleteTournament(id); break;
+                case 'FIXTURE': await deleteFixture(id); break;
+                case 'SPONSOR': await deleteSponsor(id); break;
             }
         }
     };
 
-    const handleUpdateAdmin = (id: number, pass1: string, pass2: string) => {
-        if (pass1 !== pass2) {
-            alert('Passwords do not match.');
-            return;
-        }
-        if (pass1.length < 6) {
-            alert('Password must be at least 6 characters long.');
-            return;
-        }
-        const success = updateAdminPassword(id, pass1);
-        if (success) {
-            handleSetEditing(null, 0); // Close form
-        } else {
-            alert('Failed to update admin.');
-        }
-    };
+    if (loading) {
+        return <div className="text-center p-12">Loading Admin Data...</div>
+    }
 
     return (
         <div>
             <h1 className="text-4xl font-extrabold text-center mb-8">Admin Panel</h1>
-            <p className="text-center text-text-secondary mb-8 -mt-6">Logged in as <span className="font-bold text-highlight">{currentUser?.username}</span></p>
+            <p className="text-center text-text-secondary mb-8 -mt-6">Logged in as <span className="font-bold text-highlight">{currentUser?.email}</span></p>
             <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-8">
                 <ManagementSection title="Manage Players" onAdd={() => handleSetAdding('player')} isAdding={addingType === 'player'}>
-                    {addingType === 'player' && <PlayerForm onSave={p => { dispatch({ type: 'ADD_PLAYER', payload: p as Omit<Player, 'id'> }); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
+                    {addingType === 'player' && <PlayerForm onSave={async p => { await addPlayer(p as Omit<Player, 'id'>); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
                     {players.map(player => editingState.type === 'player' && editingState.id === player.id ? (
-                        <PlayerForm key={player.id} player={player} onSave={p => { dispatch({ type: 'UPDATE_PLAYER', payload: p as Player }); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
+                        <PlayerForm key={player.id} player={player} onSave={async p => { await updatePlayer(p as Player); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
                     ) : (
                         <ItemRow key={player.id} name={player.name} description={`Team: ${getTeamById(player.teamId)?.name || 'N/A'}`} imageUrl={player.photoUrl} onEdit={() => handleSetEditing('player', player.id)} onDelete={() => handleDelete('PLAYER', player.id)} />
                     ))}
                 </ManagementSection>
 
                 <ManagementSection title="Manage Teams" onAdd={() => handleSetAdding('team')} isAdding={addingType === 'team'}>
-                    {addingType === 'team' && <TeamForm onSave={t => { dispatch({ type: 'ADD_TEAM', payload: t as Omit<Team, 'id'> }); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
+                    {addingType === 'team' && <TeamForm onSave={async t => { await addTeam(t as Omit<Team, 'id'>); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
                     {teams.map(team => editingState.type === 'team' && editingState.id === team.id ? (
-                        <TeamForm key={team.id} team={team} onSave={t => { dispatch({ type: 'UPDATE_TEAM', payload: t as Team }); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
+                        <TeamForm key={team.id} team={team} onSave={async t => { await updateTeam(t as Team); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
                     ) : (
                         <ItemRow key={team.id} name={team.name} description={team.division} imageUrl={team.logoUrl} onEdit={() => handleSetEditing('team', team.id)} onDelete={() => handleDelete('TEAM', team.id)} />
                     ))}
                 </ManagementSection>
 
                 <ManagementSection title="Manage Tournaments" onAdd={() => handleSetAdding('tournament')} isAdding={addingType === 'tournament'}>
-                    {addingType === 'tournament' && <TournamentForm onSave={t => { dispatch({ type: 'ADD_TOURNAMENT', payload: t as Omit<Tournament, 'id'>}); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
+                    {addingType === 'tournament' && <TournamentForm onSave={async t => { await addTournament(t as Omit<Tournament, 'id'>); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
                     {tournaments.map(tournament => editingState.type === 'tournament' && editingState.id === tournament.id ? (
-                         <TournamentForm key={tournament.id} tournament={tournament} onSave={t => { dispatch({ type: 'UPDATE_TOURNAMENT', payload: t as Tournament }); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
+                         <TournamentForm key={tournament.id} tournament={tournament} onSave={async t => { await updateTournament(t as Tournament); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
                     ) : (
                         <ItemRow key={tournament.id} name={tournament.name} description={tournament.division} onEdit={() => handleSetEditing('tournament', tournament.id)} onDelete={() => handleDelete('TOURNAMENT', tournament.id)} />
                     ))}
                 </ManagementSection>
 
                 <ManagementSection title="Manage Fixtures" onAdd={() => handleSetAdding('fixture')} isAdding={addingType === 'fixture'}>
-                    {addingType === 'fixture' && <FixtureAddForm onSave={f => { dispatch({ type: 'ADD_FIXTURE', payload: f as Omit<Fixture, 'id'>}); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
+                    {addingType === 'fixture' && <FixtureAddForm onSave={async f => { await addFixture(f as Omit<Fixture, 'id'>); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
                      {fixtures.sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map(fixture => editingState.type === 'fixture' && editingState.id === fixture.id ? (
-                        <FixtureEditForm key={fixture.id} fixture={fixture} onSave={f => { dispatch({ type: 'UPDATE_FIXTURE', payload: f }); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
+                        <FixtureEditForm key={fixture.id} fixture={fixture} onSave={async f => { await updateFixture(f); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
                     ) : (
                         <ItemRow key={fixture.id} name={`${getTeamById(fixture.team1Id)?.name || 'N/A'} vs ${getTeamById(fixture.team2Id)?.name || 'N/A'}`} description={`${fixture.ground} - ${new Date(fixture.dateTime).toLocaleString()}${fixture.referee ? ` | Referee: ${fixture.referee}` : ''}`} onEdit={() => handleSetEditing('fixture', fixture.id)} onDelete={() => handleDelete('FIXTURE', fixture.id)} />
                     ))}
                 </ManagementSection>
 
                 <ManagementSection title="Manage Sponsors" onAdd={() => handleSetAdding('sponsor')} isAdding={addingType === 'sponsor'}>
-                    {addingType === 'sponsor' && <SponsorForm onSave={s => { dispatch({ type: 'ADD_SPONSOR', payload: s as Omit<Sponsor, 'id'> }); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
+                    {addingType === 'sponsor' && <SponsorForm onSave={async s => { await addSponsor(s as Omit<Sponsor, 'id'>); handleSetAdding(null); }} onCancel={() => handleSetAdding(null)} />}
                     {sponsors.map(sponsor => editingState.type === 'sponsor' && editingState.id === sponsor.id ? (
-                        <SponsorForm key={sponsor.id} sponsor={sponsor} onSave={s => { dispatch({ type: 'UPDATE_SPONSOR', payload: s as Sponsor }); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
+                        <SponsorForm key={sponsor.id} sponsor={sponsor} onSave={async s => { await updateSponsor(s as Sponsor); handleSetEditing(null, 0); }} onCancel={() => handleSetEditing(null, 0)} />
                     ) : (
                         <ItemRow key={sponsor.id} name={sponsor.name} description={sponsor.website} imageUrl={sponsor.logoUrl} onEdit={() => handleSetEditing('sponsor', sponsor.id)} onDelete={() => handleDelete('SPONSOR', sponsor.id)} />
                     ))}
                 </ManagementSection>
-
-                <ManagementSection title="Manage Admins" onAdd={() => handleSetAdding('admin')} isAdding={addingType === 'admin'}>
-                    {addingType === 'admin' && (
-                        <AdminUserForm 
-                            onSave={handleAddAdmin} 
-                            onCancel={() => handleSetAdding(null)} 
-                        />
-                    )}
-                    {admins.map(admin => (
-                        editingState.type === 'admin' && editingState.id === admin.id ? (
-                            <AdminEditForm
-                                key={admin.id}
-                                admin={admin}
-                                onSave={handleUpdateAdmin}
-                                onCancel={() => handleSetEditing(null, 0)}
-                            />
-                        ) : (
-                            <ItemRow
-                                key={admin.id}
-                                name={admin.username}
-                                description={admin.id === currentUser?.id ? '(You)' : undefined}
-                                onEdit={() => handleSetEditing('admin', admin.id)}
-                                onDelete={admin.id !== currentUser?.id ? () => handleDeleteAdmin(admin.id) : undefined}
-                            />
-                        )
-                    ))}
-                </ManagementSection>
+                
+                <div className="bg-secondary p-6 rounded-lg shadow-lg">
+                    <h2 className="text-2xl font-bold text-white mb-4">Manage Admins</h2>
+                    <div className="bg-accent p-4 rounded-md text-text-secondary">
+                        <p>For enhanced security, admin users are now managed directly in your Supabase project dashboard.</p>
+                        <p className="mt-2">You can invite new admins and manage existing ones from the <strong className="text-text-primary">Authentication</strong> section of Supabase.</p>
+                        <a href="https://app.supabase.com/" target="_blank" rel="noopener noreferrer" className="inline-block mt-4 bg-highlight text-white px-4 py-2 rounded-md font-semibold hover:bg-teal-400 transition-colors">
+                            Go to Supabase
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     );

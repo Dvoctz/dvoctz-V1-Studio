@@ -102,13 +102,15 @@ const AppContent: React.FC = () => {
 
 
 const App: React.FC = () => {
-  return (
-    <AuthProvider>
-      <SportsDataProvider>
-        <AppContent />
-      </SportsDataProvider>
-    </AuthProvider>
-  );
+    // The Supabase client is now initialized automatically in supabaseClient.ts.
+    // We no longer need the modal or initialization logic here.
+    return (
+        <AuthProvider>
+            <SportsDataProvider>
+                <AppContent />
+            </SportsDataProvider>
+        </AuthProvider>
+    );
 };
 
 export default App;
