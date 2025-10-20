@@ -1,0 +1,5 @@
+{
+  "name": "DVOC Tanzania",
+  "description": "A web application for a volleyball association to display tournaments, fixtures, teams, and player information. Includes an admin panel for managing data, detailed score sheets for matches, and sponsor banners.",
+  "requestFramePermissions": []
+}
