@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { parse } from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import type { Tournament, Team, Player, Fixture, Sponsor } from '../types';
 
@@ -489,29 +490,21 @@ const BulkImportAdmin = () => {
 
     const parseCSV = (file: File): Promise<any[]> => {
         return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const text = event.target?.result as string;
-                if (!text) {
-                    return reject(new Error("File is empty."));
+            parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    if (results.errors.length) {
+                        const firstError = results.errors[0];
+                        reject(new Error(`CSV parsing error on row ${firstError.row}: ${firstError.message}`));
+                    } else {
+                        resolve(results.data);
+                    }
+                },
+                error: (error: Error) => {
+                    reject(error);
                 }
-                const lines = text.trim().split(/\r?\n/);
-                if (lines.length < 2) {
-                    return reject(new Error("CSV is empty or has only a header."));
-                }
-                const header = lines[0].split(',').map(h => h.trim());
-                const data = lines.slice(1).map(line => {
-                    // This is a simple parser and doesn't handle commas within quoted values.
-                    const values = line.split(',');
-                    return header.reduce((obj, nextKey, index) => {
-                        obj[nextKey] = values[index]?.trim();
-                        return obj;
-                    }, {} as any);
-                });
-                resolve(data);
-            };
-            reader.onerror = (error) => reject(error);
-            reader.readAsText(file);
+            });
         });
     };
 
@@ -525,15 +518,38 @@ const BulkImportAdmin = () => {
 
         try {
             const data = await parseCSV(file);
+
             if (type === 'teams') {
+                const requiredColumns = ['name', 'shortName', 'logoUrl', 'division'];
+                for (let i = 0; i < data.length; i++) {
+                    const row = data[i] as CsvTeam;
+                    for (const col of requiredColumns) {
+                        if (!row[col as keyof CsvTeam] || String(row[col as keyof CsvTeam]).trim() === '') {
+                             throw new Error(`Validation failed at CSV row ${i + 2}. Column '${col}' cannot be empty.`);
+                        }
+                    }
+                     if (row.division !== 'Division 1' && row.division !== 'Division 2') {
+                        throw new Error(`Validation failed at CSV row ${i + 2}. Division must be exactly 'Division 1' or 'Division 2'.`);
+                    }
+                }
                 await bulkAddOrUpdateTeams(data as CsvTeam[]);
                 setSuccess(`${data.length} teams imported successfully!`);
             } else {
+                 const requiredColumns = ['name', 'teamName', 'photoUrl', 'role'];
+                 for (let i = 0; i < data.length; i++) {
+                    const row = data[i] as CsvPlayer;
+                    for (const col of requiredColumns) {
+                        if (!row[col as keyof CsvPlayer] || String(row[col as keyof CsvPlayer]).trim() === '') {
+                             throw new Error(`Validation failed at CSV row ${i + 2}. Column '${col}' cannot be empty.`);
+                        }
+                    }
+                }
                 await bulkAddOrUpdatePlayers(data as CsvPlayer[]);
-                 setSuccess(`${data.length} players imported successfully!`);
+                setSuccess(`${data.length} players imported successfully!`);
             }
-        } catch (err: any) {
-            setError(err.message || "An error occurred during import.");
+// FIX: Rewrote the catch block to be more robust. This resolves a subtle parsing issue that caused cascading scope errors for `err`, `setError`, `setLoading`, `e`, and made the component's return type be inferred as `void`.
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "An error occurred during import.");
         } finally {
             setLoading(false);
             e.target.value = ''; // Reset file input
@@ -543,8 +559,8 @@ const BulkImportAdmin = () => {
     return (
         <AdminSection title="Bulk Import Data">
             <p className="text-text-secondary mb-4">Upload CSV files to add or update teams and players in bulk. Ensure column headers match the required format.</p>
-            {error && <p className="text-red-500 mb-4">{error}</p>}
-            {success && <p className="text-green-500 mb-4">{success}</p>}
+            {error && <p className="text-red-500 mb-4 p-3 bg-red-900/50 rounded-md"><strong>Error:</strong> {error}</p>}
+            {success && <p className="text-green-500 mb-4 p-3 bg-green-900/50 rounded-md"><strong>Success:</strong> {success}</p>}
             <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-accent p-4 rounded-md">
                     <h3 className="font-bold mb-2">Import Teams</h3>
