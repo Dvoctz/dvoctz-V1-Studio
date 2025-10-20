@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../supabaseClient';
+import { useSupabase } from './SupabaseContext';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -13,6 +13,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
+    const { supabase } = useSupabase();
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
@@ -35,7 +36,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         return () => {
             subscription?.unsubscribe();
         };
-    }, []);
+    }, [supabase]);
 
     const login = async (email: string, password_one: string) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password: password_one });

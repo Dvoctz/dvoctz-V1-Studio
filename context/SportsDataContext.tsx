@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
-import { supabase, DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor } from '../supabaseClient';
+import { useSupabase } from './SupabaseContext';
+import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor } from '../supabaseClient';
 import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score } from '../types';
 
 interface SportsState {
@@ -49,6 +50,7 @@ const SportsDataContext = createContext<SportsContextType | undefined>(undefined
 const mapFixture = (f: DbFixture): Fixture => ({ ...f, score: f.score as Score | undefined });
 
 export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const { supabase } = useSupabase();
     const [state, setState] = useState<SportsState>({
         tournaments: [],
         teams: [],
@@ -96,7 +98,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             );
             setState(s => ({...s, loading: false}));
         }
-    }, []);
+    }, [supabase]);
 
     useEffect(() => {
         fetchData();
@@ -274,7 +276,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 return standings;
             },
         };
-    }, [state, fetchData]);
+    }, [state, fetchData, supabase]);
 
     return (
         <SportsDataContext.Provider value={contextValue}>

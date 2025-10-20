@@ -13,6 +13,10 @@ import { LoginView } from './views/LoginView';
 import type { View, Tournament, Team } from './types';
 import { SportsDataProvider } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SupabaseSetupView } from './views/SupabaseSetupView';
+import { initializeSupabase } from './supabaseClient';
+import { SupabaseProvider } from './context/SupabaseContext';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
@@ -102,14 +106,20 @@ const AppContent: React.FC = () => {
 
 
 const App: React.FC = () => {
-    // The Supabase client is now initialized automatically in supabaseClient.ts.
-    // We no longer need the modal or initialization logic here.
+    const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(() => initializeSupabase());
+
+    if (!supabaseClient) {
+        return <SupabaseSetupView onSetupComplete={setSupabaseClient} />;
+    }
+
     return (
-        <AuthProvider>
-            <SportsDataProvider>
-                <AppContent />
-            </SportsDataProvider>
-        </AuthProvider>
+        <SupabaseProvider client={supabaseClient}>
+            <AuthProvider>
+                <SportsDataProvider>
+                    <AppContent />
+                </SportsDataProvider>
+            </AuthProvider>
+        </SupabaseProvider>
     );
 };
 
