@@ -1,18 +1,19 @@
+// FIX: Add a triple-slash directive to include Vite client types. This fixes the TypeScript error `Property 'env' does not exist on type 'ImportMeta'` by making TypeScript aware of `import.meta.env`.
+/// <reference types="vite/client" />
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Fixture, Player, Team, Tournament, Sponsor, Score } from './types';
 
-// These variables are injected by the platform during the build process.
-// For local development, you would need a .env file, but for deployment,
-// you will set these in your hosting provider's dashboard.
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+// Vite requires environment variables to be prefixed with VITE_ to be exposed to the client.
+// We use import.meta.env to access them, which is the standard way in Vite.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Check if the variables are set, and if not, throw an error to fail fast.
 // This prevents the app from running in a broken state.
 if (!supabaseUrl || !supabaseAnonKey) {
     // This provides a clear error message in the console if the credentials are missing.
-    const message = "Supabase URL and Anon Key are required. Make sure to set SUPABASE_URL and SUPABASE_ANON_KEY as environment variables in your deployment platform's settings.";
+    const message = "Supabase URL and Anon Key are required. Make sure to set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY as environment variables in your deployment platform's settings.";
     
     // In a development environment, you might see this error if you haven't set up your variables.
     // For the user, this will be a reminder to configure their hosting service.
