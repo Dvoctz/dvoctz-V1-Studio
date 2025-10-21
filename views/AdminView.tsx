@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { parse } from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
-import type { Tournament, Team, Player, Fixture, Sponsor } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, Score } from '../types';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -334,7 +334,7 @@ const PlayersAdmin = () => {
                                 <img src={p.photoUrl} alt={p.name} className="w-10 h-10 rounded-full mr-3 object-cover" />
                             ) : (
                                 <div className="w-10 h-10 rounded-full mr-3 bg-primary flex items-center justify-center text-text-secondary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                 </div>
                             )}
                             <div>
@@ -408,7 +408,7 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
                         <img src={previewUrl} alt="Photo preview" className="w-20 h-20 rounded-full object-cover bg-primary" />
                     ) : (
                          <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-text-secondary">
-                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                          </div>
                     )}
                     <div className="flex-grow">
@@ -452,13 +452,104 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
 };
 
 
-// Fixtures
-const FixturesAdmin = () => {
-    const { fixtures, teams, tournaments, addFixture, updateFixture, deleteFixture } = useSports();
-    const [editing, setEditing] = useState<Fixture | Partial<Omit<Fixture, 'score'>> | null>(null);
+// Score Update Modal
+const ScoreUpdateModal: React.FC<{ fixture: Fixture, onSave: (f: Fixture) => Promise<void>, onClose: () => void }> = ({ fixture, onSave, onClose }) => {
+    const { getTeamById } = useSports();
+    const [scoreData, setScoreData] = useState<Score>(fixture.score || {
+        team1Score: 0,
+        team2Score: 0,
+        sets: [{ team1Points: 0, team2Points: 0 }],
+        resultMessage: '',
+    });
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const getTeam = (id: number) => teams.find(t => t.id === id)?.shortName || 'N/A';
+    const team1 = getTeamById(fixture.team1Id);
+    const team2 = getTeamById(fixture.team2Id);
+
+    useEffect(() => {
+        let t1SetsWon = 0;
+        let t2SetsWon = 0;
+        scoreData.sets.forEach(set => {
+            if (set.team1Points > set.team2Points) t1SetsWon++;
+            else if (set.team2Points > set.team1Points) t2SetsWon++;
+        });
+        setScoreData(prev => ({ ...prev, team1Score: t1SetsWon, team2Score: t2SetsWon }));
+    }, [scoreData.sets]);
+
+    const handleSetChange = (index: number, teamField: 'team1Points' | 'team2Points', value: string) => {
+        const newSets = [...scoreData.sets];
+        newSets[index] = { ...newSets[index], [teamField]: parseInt(value, 10) || 0 };
+        setScoreData({ ...scoreData, sets: newSets });
+    };
+
+    const addSet = () => {
+        setScoreData({ ...scoreData, sets: [...scoreData.sets, { team1Points: 0, team2Points: 0 }] });
+    };
+    
+    const removeSet = (index: number) => {
+        if (scoreData.sets.length > 1) {
+            const newSets = scoreData.sets.filter((_, i) => i !== index);
+            setScoreData({ ...scoreData, sets: newSets });
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!team1 || !team2) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const resultMessage = `${team1.name} won ${scoreData.team1Score}-${scoreData.team2Score}`;
+            const finalScoreData = { ...scoreData, resultMessage };
+            await onSave({ ...fixture, score: finalScoreData });
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!team1 || !team2) return null;
+
+    return (
+        <FormModal title={`Update Score: ${team1.shortName} vs ${team2.shortName}`} onClose={onClose}>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {error && <ErrorMessage message={error} />}
+                <div className="bg-accent p-4 rounded-lg text-center">
+                    <p className="text-text-secondary">Final Score (Sets Won)</p>
+                    <p className="text-3xl font-bold text-white">{scoreData.team1Score} - {scoreData.team2Score}</p>
+                </div>
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                    {scoreData.sets.map((set, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                            <Label>Set {index + 1}</Label>
+                            <Input type="number" placeholder={team1.shortName} value={set.team1Points} onChange={(e) => handleSetChange(index, 'team1Points', e.target.value)} />
+                             <span className="text-text-secondary">-</span>
+                            <Input type="number" placeholder={team2.shortName} value={set.team2Points} onChange={(e) => handleSetChange(index, 'team2Points', e.target.value)} />
+                             <button type="button" onClick={() => removeSet(index)} disabled={scoreData.sets.length <= 1} className="text-red-500 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
+                             </button>
+                        </div>
+                    ))}
+                </div>
+                <Button type="button" onClick={addSet} className="w-full bg-gray-600 hover:bg-gray-500">Add Set</Button>
+                <div className="flex justify-end space-x-2 pt-4">
+                    <Button type="button" onClick={onClose} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                    <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Score'}</Button>
+                </div>
+            </form>
+        </FormModal>
+    );
+};
+
+
+// Fixtures
+const FixturesAdmin = () => {
+    const { fixtures, teams, tournaments, addFixture, updateFixture, deleteFixture, getTeamById } = useSports();
+    const [editing, setEditing] = useState<Fixture | Partial<Omit<Fixture, 'score'>> | null>(null);
+    const [scoringFixture, setScoringFixture] = useState<Fixture | null>(null);
+    const [error, setError] = useState<string | null>(null);
     
     const handleSave = async (fixture: Fixture) => {
         setError(null);
@@ -473,6 +564,11 @@ const FixturesAdmin = () => {
         } catch (err: any) {
             setError(err.message);
         }
+    };
+    
+    const handleScoreUpdate = async (fixtureWithScore: Fixture) => {
+        await updateFixture(fixtureWithScore);
+        setScoringFixture(null); // Close modal on success
     };
 
     const handleDelete = async (id: number) => {
@@ -493,11 +589,18 @@ const FixturesAdmin = () => {
                 {fixtures.map(f => (
                     <div key={f.id} className="p-3 bg-accent rounded-md">
                         <div className="flex items-center justify-between">
-                            <p className="font-bold">{getTeam(f.team1Id)} vs {getTeam(f.team2Id)}</p>
+                            <p className="font-bold">{getTeamById(f.team1Id)?.shortName || 'N/A'} vs {getTeamById(f.team2Id)?.shortName || 'N/A'}</p>
                             <span className="text-xs font-semibold uppercase">{f.status}</span>
                         </div>
                         <p className="text-sm text-text-secondary">{new Date(f.dateTime).toLocaleString()}</p>
                         <div className="mt-2 text-right space-x-2">
+                            <Button
+                                onClick={() => setScoringFixture(f)}
+                                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-500"
+                                disabled={f.status !== 'completed'}
+                            >
+                                Score
+                            </Button>
                              <Button onClick={() => setEditing(f)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
                             <Button onClick={() => handleDelete(f.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
@@ -508,6 +611,13 @@ const FixturesAdmin = () => {
                 <FormModal title={editing.id ? "Edit Fixture" : "Add Fixture"} onClose={() => { setEditing(null); setError(null); }}>
                     <FixtureForm fixture={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} teams={teams} tournaments={tournaments} error={error} />
                 </FormModal>
+            )}
+            {scoringFixture && (
+                <ScoreUpdateModal 
+                    fixture={scoringFixture} 
+                    onSave={handleScoreUpdate} 
+                    onClose={() => setScoringFixture(null)} 
+                />
             )}
         </AdminSection>
     );
