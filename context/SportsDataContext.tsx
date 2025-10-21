@@ -150,8 +150,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (teamData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
                 }
-                const { logoFile, ...teamToInsert } = teamData;
-                const { error } = await supabase.from('teams').insert({ ...teamToInsert, logoUrl: finalLogoUrl });
+                const { logoFile, logoUrl, ...teamToInsert } = teamData;
+                const { error } = await supabase.from('teams').insert({ ...teamToInsert, logo_url: finalLogoUrl });
                 if (error) throw error;
                 await fetchData();
             },
@@ -160,8 +160,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (teamData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
                 }
-                const { id, logoFile, ...teamToUpdate } = teamData;
-                const { error } = await supabase.from('teams').update({ ...teamToUpdate, logoUrl: finalLogoUrl }).eq('id', id);
+                const { id, logoFile, logoUrl, ...teamToUpdate } = teamData;
+                const { error } = await supabase.from('teams').update({ ...teamToUpdate, logo_url: finalLogoUrl }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },
@@ -172,8 +172,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (playerData.photoFile) {
                     finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
                 }
-                const { photoFile, ...playerToInsert } = playerData;
-                const { error } = await supabase.from('players').insert({ ...playerToInsert, photoUrl: finalPhotoUrl });
+                const { photoFile, photoUrl, ...playerToInsert } = playerData;
+                const { error } = await supabase.from('players').insert({ ...playerToInsert, photo_url: finalPhotoUrl });
                 if (error) throw error;
                 await fetchData();
             },
@@ -182,8 +182,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (playerData.photoFile) {
                     finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
                 }
-                const { id, photoFile, ...playerToUpdate } = playerData;
-                const { error } = await supabase.from('players').update({ ...playerToUpdate, photoUrl: finalPhotoUrl }).eq('id', id);
+                const { id, photoFile, photoUrl, ...playerToUpdate } = playerData;
+                const { error } = await supabase.from('players').update({ ...playerToUpdate, photo_url: finalPhotoUrl }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },
@@ -207,8 +207,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (sponsorData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
                 }
-                const { logoFile, ...sponsorToInsert } = sponsorData;
-                const { error } = await supabase.from('sponsors').insert({ ...sponsorToInsert, logoUrl: finalLogoUrl });
+                const { logoFile, logoUrl, ...sponsorToInsert } = sponsorData;
+                const { error } = await supabase.from('sponsors').insert({ ...sponsorToInsert, logo_url: finalLogoUrl });
                 if (error) throw error;
                 await fetchData();
             },
@@ -217,8 +217,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (sponsorData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
                 }
-                const { id, logoFile, ...sponsorToUpdate } = sponsorData;
-                const { error } = await supabase.from('sponsors').update({ ...sponsorToUpdate, logoUrl: finalLogoUrl }).eq('id', id);
+                const { id, logoFile, logoUrl, ...sponsorToUpdate } = sponsorData;
+                const { error } = await supabase.from('sponsors').update({ ...sponsorToUpdate, logo_url: finalLogoUrl }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },

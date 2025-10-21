@@ -119,7 +119,11 @@ const TournamentsAdmin = () => {
 };
 
 const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ tournament, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState(tournament);
+    const [formData, setFormData] = useState({
+        name: '',
+        division: 'Division 1',
+        ...tournament
+    });
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -210,7 +214,12 @@ const TeamsAdmin = () => {
 };
 
 const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ team, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState(team);
+    const [formData, setFormData] = useState({
+        name: '',
+        shortName: '',
+        division: 'Division 1',
+        ...team
+    });
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState(team.logoUrl);
 
@@ -350,7 +359,11 @@ const PlayersAdmin = () => {
 };
 
 const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) => void, onCancel: () => void, teams: Team[], error: string | null }> = ({ player, onSave, onCancel, teams, error }) => {
-    const [formData, setFormData] = useState({...player});
+    const [formData, setFormData] = useState({
+        name: '',
+        role: 'Setter',
+        ...player
+    });
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState(player.photoUrl);
 
@@ -509,6 +522,7 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
     };
     
     const [formData, setFormData] = useState({
+        status: 'upcoming',
         ...fixture,
         dateTime: toInputDateTimeString(fixture.dateTime)
     });
@@ -638,7 +652,11 @@ const SponsorsAdmin = () => {
 };
 
 const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: any) => void, onCancel: () => void, error: string | null }> = ({ sponsor, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState(sponsor);
+    const [formData, setFormData] = useState({
+        name: '',
+        website: '',
+        ...sponsor
+    });
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState(sponsor.logoUrl);
 
