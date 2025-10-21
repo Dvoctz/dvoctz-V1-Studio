@@ -1,6 +1,5 @@
 
-
-import React from 'react';
+import React, { useState } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Team } from '../types';
 
@@ -29,12 +28,42 @@ const TeamCard: React.FC<{ team: Team, onSelect: () => void }> = ({ team, onSele
 
 export const TeamsView: React.FC<TeamsViewProps> = ({ onSelectTeam }) => {
   const { teams } = useSports();
+  const [activeDivision, setActiveDivision] = useState<'all' | 'Division 1' | 'Division 2'>('all');
+
+  const filteredTeams = teams.filter(team => {
+      if (activeDivision === 'all') return true;
+      return team.division === activeDivision;
+  });
+
+  const renderTabs = () => (
+    <div className="flex justify-center border-b border-accent mb-8">
+        <button
+            onClick={() => setActiveDivision('all')}
+            className={`px-6 py-3 text-lg font-semibold transition-colors duration-300 ${activeDivision === 'all' ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+        >
+            All Teams
+        </button>
+        <button
+            onClick={() => setActiveDivision('Division 1')}
+            className={`px-6 py-3 text-lg font-semibold transition-colors duration-300 ${activeDivision === 'Division 1' ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+        >
+            Division 1
+        </button>
+        <button
+            onClick={() => setActiveDivision('Division 2')}
+            className={`px-6 py-3 text-lg font-semibold transition-colors duration-300 ${activeDivision === 'Division 2' ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+        >
+            Division 2
+        </button>
+    </div>
+  );
 
   return (
     <div>
       <h1 className="text-4xl font-extrabold text-center mb-8">Teams</h1>
+      {renderTabs()}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {teams.map(team => (
+        {filteredTeams.map(team => (
           <TeamCard key={team.id} team={team} onSelect={() => onSelectTeam(team)} />
         ))}
       </div>

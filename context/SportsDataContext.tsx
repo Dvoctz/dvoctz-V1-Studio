@@ -248,31 +248,29 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             deletePlayer: deleteAction('players'),
             
             addFixture: async (fixture) => {
-                const { tournamentId, team1Id, team2Id, ground, dateTime, status, referee } = fixture;
                 const { error } = await supabase.from('fixtures').insert({
-                    tournament_id: tournamentId,
-                    team_1_id: team1Id,
-                    team_2_id: team2Id,
-                    ground,
-                    date_time: dateTime,
-                    status,
-                    referee,
+                    tournament_id: fixture.tournamentId,
+                    team_1_id: fixture.team1Id,
+                    team_2_id: fixture.team2Id,
+                    ground: fixture.ground,
+                    date_time: fixture.dateTime,
+                    status: fixture.status,
+                    referee: fixture.referee,
                 });
                 if (error) throw error;
                 await fetchData();
             },
             updateFixture: async (fixture) => {
-                const { id, tournamentId, team1Id, team2Id, ground, dateTime, status, score, referee } = fixture;
                 const { error } = await supabase.from('fixtures').update({
-                     tournament_id: tournamentId,
-                    team_1_id: team1Id,
-                    team_2_id: team2Id,
-                    ground,
-                    date_time: dateTime,
-                    status,
-                    score,
-                    referee,
-                }).eq('id', id);
+                    tournament_id: fixture.tournamentId,
+                    team_1_id: fixture.team1Id,
+                    team_2_id: fixture.team2Id,
+                    ground: fixture.ground,
+                    date_time: fixture.dateTime,
+                    status: fixture.status,
+                    score: fixture.score,
+                    referee: fixture.referee,
+                }).eq('id', fixture.id);
                 if (error) throw error;
                 await fetchData();
             },

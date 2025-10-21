@@ -1,3 +1,4 @@
+
 import React from 'react';
 // FIX: Replaced useSportsData with useSports and updated the import path.
 import { useSports } from '../context/SportsDataContext';
@@ -39,7 +40,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
         <div className="space-y-12">
             <div className="text-center p-8 bg-secondary rounded-xl shadow-lg">
                 <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Welcome to DVOC Tanzania</h1>
-                <p className="text-lg text-text-secondary max-w-2xl mx-auto">Your one-stop destination for all tournaments, fixtures, teams, and player stats.</p>
+                <p className="text-lg text-text-secondary max-w-2xl mx-auto">Your one-stop destination for all Tanzania Traditional Volleyball tournaments, fixtures, teams, and player stats.</p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-8">
