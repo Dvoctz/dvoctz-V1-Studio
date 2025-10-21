@@ -44,7 +44,43 @@ interface SportsContextType extends SportsState {
 
 const SportsDataContext = createContext<SportsContextType | undefined>(undefined);
 
-const mapFixture = (f: DbFixture): Fixture => ({ ...f, score: f.score as Score | undefined });
+// MAPPING FUNCTIONS to convert snake_case from DB to camelCase for the app
+const mapTeam = (t: any): Team => ({
+  id: t.id,
+  name: t.name,
+  shortName: t.short_name,
+  logoUrl: t.logo_url,
+  division: t.division,
+});
+
+const mapPlayer = (p: any): Player => ({
+  id: p.id,
+  name: p.name,
+  teamId: p.team_id,
+  photoUrl: p.photo_url,
+  role: p.role,
+  stats: p.stats,
+});
+
+const mapSponsor = (s: any): Sponsor => ({
+  id: s.id,
+  name: s.name,
+  website: s.website,
+  logoUrl: s.logo_url,
+});
+
+const mapFixture = (f: any): Fixture => ({
+  id: f.id,
+  tournamentId: f.tournament_id,
+  team1Id: f.team_1_id,
+  team2Id: f.team_2_id,
+  ground: f.ground,
+  dateTime: f.date_time,
+  status: f.status,
+  referee: f.referee,
+  score: f.score as Score | undefined,
+});
+
 
 // Helper function to upload a file to Supabase Storage.
 // NOTE: This requires a public bucket named 'assets' to be created in your Supabase project.
@@ -103,11 +139,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (sponsorsError) throw sponsorsError;
 
             setState({
-                tournaments: tournamentsData as DbTournament[],
-                teams: teamsData as DbTeam[],
-                players: playersData as DbPlayer[],
-                fixtures: (fixturesData as DbFixture[]).map(mapFixture),
-                sponsors: sponsorsData as DbSponsor[],
+                tournaments: (tournamentsData || []) as DbTournament[],
+                teams: (teamsData || []).map(mapTeam),
+                players: (playersData || []).map(mapPlayer),
+                fixtures: (fixturesData || []).map(mapFixture),
+                sponsors: (sponsorsData || []).map(mapSponsor),
                 loading: false,
             });
         } catch (error) {
@@ -150,8 +186,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (teamData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
                 }
-                const { logoFile, logoUrl, ...teamToInsert } = teamData;
-                const { error } = await supabase.from('teams').insert({ ...teamToInsert, logo_url: finalLogoUrl });
+                const { name, shortName, division } = teamData;
+                const { error } = await supabase.from('teams').insert({
+                    name,
+                    short_name: shortName,
+                    division,
+                    logo_url: finalLogoUrl,
+                });
                 if (error) throw error;
                 await fetchData();
             },
@@ -160,8 +201,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (teamData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
                 }
-                const { id, logoFile, logoUrl, ...teamToUpdate } = teamData;
-                const { error } = await supabase.from('teams').update({ ...teamToUpdate, logo_url: finalLogoUrl }).eq('id', id);
+                const { id, name, shortName, division } = teamData;
+                const { error } = await supabase.from('teams').update({
+                    name,
+                    short_name: shortName,
+                    division,
+                    logo_url: finalLogoUrl
+                }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },
@@ -172,8 +218,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (playerData.photoFile) {
                     finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
                 }
-                const { photoFile, photoUrl, ...playerToInsert } = playerData;
-                const { error } = await supabase.from('players').insert({ ...playerToInsert, photo_url: finalPhotoUrl });
+                const { name, teamId, role, stats } = playerData;
+                const { error } = await supabase.from('players').insert({
+                    name,
+                    team_id: teamId,
+                    role,
+                    stats,
+                    photo_url: finalPhotoUrl,
+                });
                 if (error) throw error;
                 await fetchData();
             },
@@ -182,21 +234,45 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (playerData.photoFile) {
                     finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
                 }
-                const { id, photoFile, photoUrl, ...playerToUpdate } = playerData;
-                const { error } = await supabase.from('players').update({ ...playerToUpdate, photo_url: finalPhotoUrl }).eq('id', id);
+                const { id, name, teamId, role, stats } = playerData;
+                const { error } = await supabase.from('players').update({
+                    name,
+                    team_id: teamId,
+                    role,
+                    stats,
+                    photo_url: finalPhotoUrl,
+                }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },
             deletePlayer: deleteAction('players'),
             
             addFixture: async (fixture) => {
-                const { error } = await supabase.from('fixtures').insert(fixture);
+                const { tournamentId, team1Id, team2Id, ground, dateTime, status, referee } = fixture;
+                const { error } = await supabase.from('fixtures').insert({
+                    tournament_id: tournamentId,
+                    team_1_id: team1Id,
+                    team_2_id: team2Id,
+                    ground,
+                    date_time: dateTime,
+                    status,
+                    referee,
+                });
                 if (error) throw error;
                 await fetchData();
             },
             updateFixture: async (fixture) => {
-                const { id, ...rest } = fixture;
-                const { error } = await supabase.from('fixtures').update(rest).eq('id', id);
+                const { id, tournamentId, team1Id, team2Id, ground, dateTime, status, score, referee } = fixture;
+                const { error } = await supabase.from('fixtures').update({
+                     tournament_id: tournamentId,
+                    team_1_id: team1Id,
+                    team_2_id: team2Id,
+                    ground,
+                    date_time: dateTime,
+                    status,
+                    score,
+                    referee,
+                }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },
@@ -207,8 +283,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (sponsorData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
                 }
-                const { logoFile, logoUrl, ...sponsorToInsert } = sponsorData;
-                const { error } = await supabase.from('sponsors').insert({ ...sponsorToInsert, logo_url: finalLogoUrl });
+                const { name, website } = sponsorData;
+                const { error } = await supabase.from('sponsors').insert({
+                    name,
+                    website,
+                    logo_url: finalLogoUrl,
+                });
                 if (error) throw error;
                 await fetchData();
             },
@@ -217,15 +297,24 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (sponsorData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
                 }
-                const { id, logoFile, logoUrl, ...sponsorToUpdate } = sponsorData;
-                const { error } = await supabase.from('sponsors').update({ ...sponsorToUpdate, logo_url: finalLogoUrl }).eq('id', id);
+                const { id, name, website } = sponsorData;
+                const { error } = await supabase.from('sponsors').update({
+                    name,
+                    website,
+                    logo_url: finalLogoUrl,
+                }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },
             deleteSponsor: deleteAction('sponsors'),
             
             bulkAddOrUpdateTeams: async (teamsData: CsvTeam[]) => {
-                const teamsToUpsert = teamsData.map(t => ({...t}));
+                const teamsToUpsert = teamsData.map(t => ({
+                    name: t.name,
+                    short_name: t.shortName,
+                    division: t.division,
+                    logo_url: t.logoUrl,
+                }));
                 const { error } = await supabase.from('teams').upsert(teamsToUpsert, { onConflict: 'name' });
                 if (error) throw error;
                 await fetchData();
@@ -242,10 +331,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                     if (!teamId) {
                         throw new Error(`Team "${p.teamName}" not found for player "${p.name}". Please ensure all teams exist before importing players.`);
                     }
-                    const { teamName, matches, aces, kills, blocks, ...player } = p;
+                    const { name, role, photoUrl, matches, aces, kills, blocks } = p;
                     return { 
-                        ...player, 
-                        teamId,
+                        name,
+                        role,
+                        photo_url: photoUrl,
+                        team_id: teamId,
                         stats: {
                             matches: parseInt(matches || '0', 10),
                             aces: parseInt(aces || '0', 10),
@@ -253,9 +344,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                             blocks: parseInt(blocks || '0', 10),
                         }
                     };
-                }).filter(Boolean) as Omit<Player, 'id'>[];
+                });
 
-                const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,teamId' });
+                const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,team_id' });
                 if (error) throw error;
                 await fetchData();
             },
