@@ -72,8 +72,8 @@ const mapSponsor = (s: any): Sponsor => ({
 const mapFixture = (f: any): Fixture => ({
   id: f.id,
   tournamentId: f.tournament_id,
-  team1Id: f.team_1_id,
-  team2Id: f.team_2_id,
+  team1Id: f.team1_id,
+  team2Id: f.team2_id,
   ground: f.ground,
   dateTime: f.date_time,
   status: f.status,
@@ -250,8 +250,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             addFixture: async (fixture) => {
                 const { error } = await supabase.from('fixtures').insert({
                     tournament_id: fixture.tournamentId,
-                    team_1_id: fixture.team1Id,
-                    team_2_id: fixture.team2Id,
+                    team1_id: fixture.team1Id,
+                    team2_id: fixture.team2Id,
                     ground: fixture.ground,
                     date_time: fixture.dateTime,
                     status: fixture.status,
@@ -263,8 +263,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             updateFixture: async (fixture) => {
                 const { error } = await supabase.from('fixtures').update({
                     tournament_id: fixture.tournamentId,
-                    team_1_id: fixture.team1Id,
-                    team_2_id: fixture.team2Id,
+                    team1_id: fixture.team1Id,
+                    team2_id: fixture.team2Id,
                     ground: fixture.ground,
                     date_time: fixture.dateTime,
                     status: fixture.status,
