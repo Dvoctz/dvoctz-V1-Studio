@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Team } from '../types';
@@ -29,10 +30,12 @@ const TeamCard: React.FC<{ team: Team, onSelect: () => void }> = ({ team, onSele
 export const TeamsView: React.FC<TeamsViewProps> = ({ onSelectTeam }) => {
   const { teams } = useSports();
   const [activeDivision, setActiveDivision] = useState<'all' | 'Division 1' | 'Division 2'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const filteredTeams = teams.filter(team => {
-      if (activeDivision === 'all') return true;
-      return team.division === activeDivision;
+      const divisionMatch = activeDivision === 'all' || team.division === activeDivision;
+      const searchMatch = team.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return divisionMatch && searchMatch;
   });
 
   const renderTabs = () => (
@@ -61,12 +64,35 @@ export const TeamsView: React.FC<TeamsViewProps> = ({ onSelectTeam }) => {
   return (
     <div>
       <h1 className="text-4xl font-extrabold text-center mb-8">Teams</h1>
-      {renderTabs()}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {filteredTeams.map(team => (
-          <TeamCard key={team.id} team={team} onSelect={() => onSelectTeam(team)} />
-        ))}
+      <div className="mb-8 max-w-lg mx-auto">
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            placeholder="Search teams by name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-secondary p-3 pl-10 rounded-lg border border-accent focus:ring-highlight focus:border-highlight transition-colors"
+            aria-label="Search teams"
+          />
+        </div>
       </div>
+      {renderTabs()}
+      {filteredTeams.length > 0 ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {filteredTeams.map(team => (
+            <TeamCard key={team.id} team={team} onSelect={() => onSelectTeam(team)} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-10">
+          <p className="text-text-secondary text-lg">No teams found matching your search.</p>
+        </div>
+      )}
     </div>
   );
 };

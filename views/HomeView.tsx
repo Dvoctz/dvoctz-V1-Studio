@@ -13,20 +13,22 @@ const FixtureCard: React.FC<{ fixture: Fixture; team1?: Team; team2?: Team; }> =
     if (!team1 || !team2) return null;
     
     return (
-        <div className="bg-secondary rounded-lg p-4 text-center hover:bg-accent transition-colors duration-300">
-            <p className="text-sm text-text-secondary mb-2">{new Date(fixture.dateTime).toLocaleString()}</p>
-            <div className="flex items-center justify-center space-x-4">
-                <div className="flex flex-col items-center">
-                    <img src={team1.logoUrl} alt={team1.name} className="w-12 h-12 rounded-full mb-1" />
-                    <span className="font-semibold text-sm">{team1.shortName}</span>
-                </div>
-                <span className="text-2xl font-bold text-text-secondary">VS</span>
-                 <div className="flex flex-col items-center">
-                    <img src={team2.logoUrl} alt={team2.name} className="w-12 h-12 rounded-full mb-1" />
-                    <span className="font-semibold text-sm">{team2.shortName}</span>
+        <div className="bg-secondary rounded-lg p-4 text-center hover:bg-accent transition-colors duration-300 flex flex-col justify-between">
+            <div>
+                <p className="text-sm text-text-secondary mb-2">{new Date(fixture.dateTime).toLocaleString()}</p>
+                <div className="flex items-start justify-between space-x-2">
+                    <div className="flex flex-col items-center w-2/5 text-center">
+                        <img src={team1.logoUrl} alt={team1.name} className="w-16 h-16 rounded-full mb-2 object-cover" />
+                        <span className="font-semibold text-base text-text-primary break-words min-h-[48px]">{team1.name}</span>
+                    </div>
+                    <span className="text-2xl font-bold text-text-secondary pt-8">VS</span>
+                     <div className="flex flex-col items-center w-2/5 text-center">
+                        <img src={team2.logoUrl} alt={team2.name} className="w-16 h-16 rounded-full mb-2 object-cover" />
+                        <span className="font-semibold text-base text-text-primary break-words min-h-[48px]">{team2.name}</span>
+                    </div>
                 </div>
             </div>
-            <p className="text-xs text-text-secondary mt-2">{fixture.ground}</p>
+            <p className="text-xs text-text-secondary mt-4">{fixture.ground}</p>
         </div>
     );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 // FIX: Replaced useSportsData with useSports and updated the import path.
 import { useSports } from '../context/SportsDataContext';
@@ -24,10 +25,18 @@ const TournamentCard: React.FC<{ tournament: Tournament; onSelect: () => void; }
 
 export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTournament }) => {
   const [activeTab, setActiveTab] = useState<'d1' | 'd2'>('d1');
+  const [searchTerm, setSearchTerm] = useState('');
   const { getTournamentsByDivision } = useSports();
+  
+  const filterTournaments = (tournaments: Tournament[]) => {
+    if (!searchTerm) return tournaments;
+    return tournaments.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  };
 
-  const division1Tournaments = getTournamentsByDivision('Division 1');
-  const division2Tournaments = getTournamentsByDivision('Division 2');
+  const division1Tournaments = filterTournaments(getTournamentsByDivision('Division 1'));
+  const division2Tournaments = filterTournaments(getTournamentsByDivision('Division 2'));
+  
+  const displayedTournaments = activeTab === 'd1' ? division1Tournaments : division2Tournaments;
 
   const renderTabs = () => (
     <div className="flex border-b border-accent mb-6">
@@ -49,12 +58,35 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
   return (
     <div>
       <h1 className="text-4xl font-extrabold text-center mb-8">Tournaments</h1>
-      {renderTabs()}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(activeTab === 'd1' ? division1Tournaments : division2Tournaments).map(t => (
-          <TournamentCard key={t.id} tournament={t} onSelect={() => onSelectTournament(t)} />
-        ))}
+      <div className="mb-8 max-w-lg mx-auto">
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            placeholder="Search tournaments..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-secondary p-3 pl-10 rounded-lg border border-accent focus:ring-highlight focus:border-highlight transition-colors"
+            aria-label="Search tournaments"
+          />
+        </div>
       </div>
+      {renderTabs()}
+      {displayedTournaments.length > 0 ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {displayedTournaments.map(t => (
+            <TournamentCard key={t.id} tournament={t} onSelect={() => onSelectTournament(t)} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-10">
+          <p className="text-text-secondary text-lg">No tournaments found matching your search.</p>
+        </div>
+      )}
     </div>
   );
 };

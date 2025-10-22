@@ -1,6 +1,7 @@
 
 
-import React from 'react';
+
+import React, { useState } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Player } from '../types';
 
@@ -51,15 +52,43 @@ const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
 
 export const PlayersView: React.FC = () => {
   const { players } = useSports();
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredPlayers = players.filter(player => 
+    player.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div>
       <h1 className="text-4xl font-extrabold text-center mb-8">Players</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {players.map(player => (
-          <PlayerCard key={player.id} player={player} />
-        ))}
+      <div className="mb-8 max-w-lg mx-auto">
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            placeholder="Search players by name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-secondary p-3 pl-10 rounded-lg border border-accent focus:ring-highlight focus:border-highlight transition-colors"
+            aria-label="Search players"
+          />
+        </div>
       </div>
+      {filteredPlayers.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {filteredPlayers.map(player => (
+            <PlayerCard key={player.id} player={player} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-10">
+          <p className="text-text-secondary text-lg">No players found matching your search.</p>
+        </div>
+      )}
     </div>
   );
 };
