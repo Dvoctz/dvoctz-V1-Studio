@@ -82,6 +82,16 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
+    // This function maps app-style camelCase objects to database-style snake_case objects
+    const toSnakeCase = (obj: any): any => {
+        const newObj: any = {};
+        for (const key in obj) {
+            const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            newObj[snakeKey] = obj[key];
+        }
+        return newObj;
+    };
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -174,7 +184,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 standing1.wins++; standing2.losses++; standing1.points += 2;
             } else if (score.team2Score > score.team1Score) {
                 standing2.wins++; standing1.losses++; standing2.points += 2;
-            } else { // This case is for draws, which might not be common in volleyball but supported by the data structure.
+            } else {
                 standing1.draws++; standing2.draws++; standing1.points += 1; standing2.points += 1;
             }
         });
@@ -227,7 +237,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const filePath = `public/${teamData.shortName}_${Date.now()}`;
             logoUrl = await uploadFile(logoFile, 'team-logos', filePath);
         }
-        const { data, error } = await supabase.from('teams').insert({ ...teamData, logoUrl }).select();
+        const payload = {
+            name: teamData.name,
+            short_name: teamData.shortName,
+            division: teamData.division,
+            logo_url: logoUrl,
+        };
+        const { data, error } = await supabase.from('teams').insert(payload).select();
         if (error) throw error;
         const newTeam = data[0] as Team;
         setTeams(prev => [...prev, newTeam].sort((a,b) => a.name.localeCompare(b.name)));
@@ -235,7 +251,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     const updateTeam = async (team: Team & { logoFile?: File }): Promise<Team> => {
-        const { logoFile, ...teamData } = team;
+        const { logoFile, id, ...teamData } = team;
         let newLogoUrl = teamData.logoUrl;
         if (logoFile) {
             const filePath = `public/${teamData.shortName}_${Date.now()}`;
@@ -243,7 +259,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         } else if (teamData.logoUrl === null) {
             newLogoUrl = null;
         }
-        const payload = { ...teamData, logoUrl: newLogoUrl };
+        const payload = {
+            name: teamData.name,
+            short_name: teamData.shortName,
+            division: teamData.division,
+            logo_url: newLogoUrl,
+        };
         const { data, error } = await supabase.from('teams').update(payload).eq('id', team.id).select();
         if (error) throw error;
         const updatedTeam = data[0] as Team;
@@ -270,7 +291,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const filePath = `public/${playerData.name.replace(/\s+/g, '_')}_${Date.now()}`;
             photoUrl = await uploadFile(photoFile, 'player-photos', filePath);
         }
-        const { data, error } = await supabase.from('players').insert({ ...playerData, photoUrl }).select();
+        const payload = {
+            name: playerData.name,
+            team_id: playerData.teamId,
+            photo_url: photoUrl,
+            role: playerData.role,
+            stats: playerData.stats,
+        };
+        const { data, error } = await supabase.from('players').insert(payload).select();
         if (error) throw error;
         const newPlayer = data[0] as Player;
         setPlayers(prev => [...prev, newPlayer].sort((a, b) => a.name.localeCompare(b.name)));
@@ -278,7 +306,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     const updatePlayer = async (player: Player & { photoFile?: File }): Promise<Player> => {
-        const { photoFile, ...playerData } = player;
+        const { photoFile, id, ...playerData } = player;
         let newPhotoUrl = playerData.photoUrl;
         if (photoFile) {
             const filePath = `public/${playerData.name.replace(/\s+/g, '_')}_${Date.now()}`;
@@ -286,7 +314,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         } else if (playerData.photoUrl === null) {
             newPhotoUrl = null;
         }
-        const payload = { ...playerData, photoUrl: newPhotoUrl };
+        const payload = {
+            name: playerData.name,
+            team_id: playerData.teamId,
+            photo_url: newPhotoUrl,
+            role: playerData.role,
+            stats: playerData.stats,
+        };
         const { data, error } = await supabase.from('players').update(payload).eq('id', player.id).select();
         if (error) throw error;
         const updatedPlayer = data[0] as Player;
@@ -301,7 +335,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     const addFixture = async (fixture: Omit<Fixture, 'id' | 'score'>): Promise<Fixture> => {
-        const { data, error } = await supabase.from('fixtures').insert(fixture).select();
+        const payload = toSnakeCase(fixture);
+        const { data, error } = await supabase.from('fixtures').insert(payload).select();
         if (error) throw error;
         const newFixture = data[0] as Fixture;
         setFixtures(prev => [...prev, newFixture]);
@@ -309,7 +344,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
     
     const updateFixture = async (fixture: Fixture): Promise<Fixture> => {
-        const { data, error } = await supabase.from('fixtures').update(fixture).eq('id', fixture.id).select();
+        const { id, ...fixtureData } = fixture;
+        const payload = toSnakeCase(fixtureData);
+        const { data, error } = await supabase.from('fixtures').update(payload).eq('id', fixture.id).select();
         if (error) throw error;
         const updatedFixture = data[0] as Fixture;
         setFixtures(prev => prev.map(f => f.id === updatedFixture.id ? { ...updatedFixture, score: updatedFixture.score || undefined } : f));
@@ -329,7 +366,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const filePath = `public/${sponsorData.name.replace(/\s+/g, '_')}_${Date.now()}`;
             logoUrl = await uploadFile(logoFile, 'sponsor-logos', filePath);
         }
-        const { data, error } = await supabase.from('sponsors').insert({ ...sponsorData, logoUrl }).select();
+        const payload = {
+            name: sponsorData.name,
+            website: sponsorData.website,
+            is_global: !!sponsorData.isGlobal,
+            logo_url: logoUrl
+        };
+        const { data, error } = await supabase.from('sponsors').insert(payload).select();
         if (error) throw error;
         const newSponsor = data[0] as Sponsor;
         setSponsors(prev => [...prev, newSponsor].sort((a,b) => a.name.localeCompare(b.name)));
@@ -337,7 +380,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     const updateSponsor = async (sponsor: Sponsor & { logoFile?: File }): Promise<Sponsor> => {
-        const { logoFile, ...sponsorData } = sponsor;
+        const { logoFile, id, ...sponsorData } = sponsor;
         let newLogoUrl = sponsorData.logoUrl;
         if (logoFile) {
             const filePath = `public/${sponsorData.name.replace(/\s+/g, '_')}_${Date.now()}`;
@@ -345,7 +388,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         } else if (sponsorData.logoUrl === null) {
             newLogoUrl = null;
         }
-        const payload = { ...sponsorData, logoUrl: newLogoUrl };
+        const payload = {
+            name: sponsorData.name,
+            website: sponsorData.website,
+            is_global: !!sponsorData.isGlobal,
+            logo_url: newLogoUrl
+        };
         const { data, error } = await supabase.from('sponsors').update(payload).eq('id', sponsor.id).select();
         if (error) throw error;
         const updatedSponsor = data[0] as Sponsor;
@@ -376,7 +424,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     const bulkAddOrUpdateTeams = async (teamsData: CsvTeam[]): Promise<void> => {
-        const upsertData = teamsData.map(({ name, ...rest }) => ({ name, ...rest }));
+        const upsertData = teamsData.map(({ name, shortName, division, logoUrl }) => ({
+             name, 
+             short_name: shortName, 
+             division,
+             logo_url: logoUrl || null
+        }));
         const { error } = await supabase.from('teams').upsert(upsertData, { onConflict: 'name' });
         if (error) throw error;
         await fetchData();
@@ -389,9 +442,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (!teamId) throw new Error(`Team '${p.teamName}' not found for player '${p.name}'. Please create the team first or check for typos.`);
             return {
                 name: p.name,
-                teamId: teamId,
+                team_id: teamId,
                 role: p.role,
-                photoUrl: p.photoUrl || null,
+                photo_url: p.photoUrl || null,
                 stats: {
                     matches: Number(p.matches) || 0,
                     aces: Number(p.aces) || 0,
