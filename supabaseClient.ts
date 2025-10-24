@@ -56,3 +56,4 @@ export type DbTeam = Omit<Team, 'id'> & { id: number };
 export type DbPlayer = Omit<Player, 'id'> & { id: number };
 export type DbFixture = Omit<Fixture, 'id' | 'score'> & { id: number; score: Score | null };
 export type DbSponsor = Omit<Sponsor, 'id'> & { id: number };
+export type DbTournamentSponsor = { tournament_id: number; sponsor_id: number; };

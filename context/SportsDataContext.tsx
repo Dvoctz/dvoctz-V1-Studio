@@ -1,8 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor } from '../supabaseClient';
+import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbTournamentSponsor } from '../supabaseClient';
 import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score } from '../types';
+
+interface TournamentSponsorLink {
+    tournamentId: number;
+    sponsorId: number;
+}
 
 interface SportsState {
     tournaments: Tournament[];
@@ -10,6 +15,7 @@ interface SportsState {
     players: Player[];
     fixtures: Fixture[];
     sponsors: Sponsor[];
+    tournamentSponsors: TournamentSponsorLink[];
     loading: boolean;
 }
 
@@ -18,8 +24,8 @@ export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'stats'> & { teamName: st
 
 
 interface SportsContextType extends SportsState {
-    addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
-    updateTournament: (tournament: Tournament) => Promise<void>;
+    addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<Tournament>;
+    updateTournament: (tournament: Tournament) => Promise<Tournament>;
     deleteTournament: (id: number) => Promise<void>;
     addTeam: (team: Omit<Team, 'id'> & { logoFile?: File }) => Promise<void>;
     updateTeam: (team: Team & { logoFile?: File }) => Promise<void>;
@@ -33,12 +39,14 @@ interface SportsContextType extends SportsState {
     addSponsor: (sponsor: Omit<Sponsor, 'id'> & { logoFile?: File }) => Promise<void>;
     updateSponsor: (sponsor: Sponsor & { logoFile?: File }) => Promise<void>;
     deleteSponsor: (id: number) => Promise<void>;
+    updateSponsorsForTournament: (tournamentId: number, sponsorIds: number[]) => Promise<void>;
     bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
     getFixturesByTournament: (tournamentId: number) => Fixture[];
     getTeamById: (teamId: number) => Team | undefined;
     getPlayersByTeam: (teamId: number) => Player[];
+    getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getStandingsForTournament: (tournamentId: number) => TeamStanding[];
 }
 
@@ -81,9 +89,13 @@ const mapFixture = (f: any): Fixture => ({
   score: f.score as Score | undefined,
 });
 
+const mapTournamentSponsorLink = (ts: DbTournamentSponsor): TournamentSponsorLink => ({
+    tournamentId: ts.tournament_id,
+    sponsorId: ts.sponsor_id,
+});
+
 
 // Helper function to upload a file to Supabase Storage.
-// NOTE: This requires a public bucket named 'assets' to be created in your Supabase project.
 const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -112,6 +124,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         players: [],
         fixtures: [],
         sponsors: [],
+        tournamentSponsors: [],
         loading: true,
     });
 
@@ -124,12 +137,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 { data: playersData, error: playersError },
                 { data: fixturesData, error: fixturesError },
                 { data: sponsorsData, error: sponsorsError },
+                { data: tsData, error: tsError },
             ] = await Promise.all([
                 supabase.from('tournaments').select('*').order('name'),
                 supabase.from('teams').select('*').order('name'),
                 supabase.from('players').select('*').order('name'),
                 supabase.from('fixtures').select('*'),
-                supabase.from('sponsors').select('*').order('name')
+                supabase.from('sponsors').select('*').order('name'),
+                supabase.from('tournament_sponsors').select('*')
             ]);
 
             if (tournamentsError) throw tournamentsError;
@@ -137,6 +152,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (playersError) throw playersError;
             if (fixturesError) throw fixturesError;
             if (sponsorsError) throw sponsorsError;
+            if (tsError) throw tsError;
 
             setState({
                 tournaments: (tournamentsData || []) as DbTournament[],
@@ -144,6 +160,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 players: (playersData || []).map(mapPlayer),
                 fixtures: (fixturesData || []).map(mapFixture),
                 sponsors: (sponsorsData || []).map(mapSponsor),
+                tournamentSponsors: (tsData || []).map(mapTournamentSponsorLink),
                 loading: false,
             });
         } catch (error) {
@@ -169,15 +186,17 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         return {
             ...state,
             addTournament: async (tournament) => {
-                const { error } = await supabase.from('tournaments').insert(tournament);
+                const { data, error } = await supabase.from('tournaments').insert(tournament).select().single();
                 if (error) throw error;
                 await fetchData();
+                return data as Tournament;
             },
             updateTournament: async (tournament) => {
                 const { id, ...rest } = tournament;
-                const { error } = await supabase.from('tournaments').update(rest).eq('id', id);
+                const { data, error } = await supabase.from('tournaments').update(rest).eq('id', id).select().single();
                 if (error) throw error;
                 await fetchData();
+                return data as Tournament;
             },
             deleteTournament: deleteAction('tournaments'),
             
@@ -305,6 +324,18 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 await fetchData();
             },
             deleteSponsor: deleteAction('sponsors'),
+
+            updateSponsorsForTournament: async (tournamentId, sponsorIds) => {
+                const { error: deleteError } = await supabase.from('tournament_sponsors').delete().eq('tournament_id', tournamentId);
+                if (deleteError) throw deleteError;
+
+                if (sponsorIds.length > 0) {
+                    const links = sponsorIds.map(sponsorId => ({ tournament_id: tournamentId, sponsor_id: sponsorId }));
+                    const { error: insertError } = await supabase.from('tournament_sponsors').insert(links);
+                    if (insertError) throw insertError;
+                }
+                await fetchData();
+            },
             
             bulkAddOrUpdateTeams: async (teamsData: CsvTeam[]) => {
                 const teamsToUpsert = teamsData.map(t => ({
@@ -361,6 +392,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             },
             getPlayersByTeam: (teamId: number) => {
                 return state.players.filter(p => p.teamId === teamId);
+            },
+             getSponsorsForTournament: (tournamentId: number): Sponsor[] => {
+                const sponsorIds = state.tournamentSponsors
+                    .filter(ts => ts.tournamentId === tournamentId)
+                    .map(ts => ts.sponsorId);
+                return state.sponsors.filter(s => sponsorIds.includes(s.id));
             },
             getStandingsForTournament: (tournamentId: number): TeamStanding[] => {
                 const tournamentFixtures = state.fixtures.filter(

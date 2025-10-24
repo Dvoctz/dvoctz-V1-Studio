@@ -46,7 +46,7 @@ const FormModal: React.FC<{ title: string; onClose: () => void; children: React.
                         </svg>
                     </button>
                 </div>
-                <div className="p-6">
+                <div className="p-6 max-h-[80vh] overflow-y-auto">
                     {children}
                 </div>
             </div>
@@ -64,26 +64,32 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 
 // Tournaments
 const TournamentsAdmin = () => {
-    const { tournaments, addTournament, updateTournament, deleteTournament } = useSports();
+    const { tournaments, addTournament, updateTournament, deleteTournament, sponsors, getSponsorsForTournament, updateSponsorsForTournament } = useSports();
     const [editing, setEditing] = useState<Tournament | Partial<Tournament> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
-    const handleSave = async (tournament: Tournament | Partial<Tournament>) => {
+    const handleSave = async (tournament: Tournament | Partial<Tournament>, sponsorIds: number[]) => {
         setError(null);
+        setLoading(true);
         try {
+            let savedTournament: Tournament;
             if ('id' in tournament && tournament.id) {
-                await updateTournament(tournament as Tournament);
+                savedTournament = await updateTournament(tournament as Tournament);
             } else {
-                await addTournament(tournament as Omit<Tournament, 'id'>);
+                savedTournament = await addTournament(tournament as Omit<Tournament, 'id'>);
             }
+            await updateSponsorsForTournament(savedTournament.id, sponsorIds);
             setEditing(null);
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Are you sure you want to delete this tournament? This action cannot be undone.')) {
+        if (window.confirm('Are you sure you want to delete this tournament? This will also remove all its fixtures and sponsor links.')) {
             try {
                 await deleteTournament(id);
             } catch (err: any) {
@@ -111,23 +117,59 @@ const TournamentsAdmin = () => {
             </div>
             {editing && (
                 <FormModal title={editing.id ? "Edit Tournament" : "Add Tournament"} onClose={() => { setEditing(null); setError(null); }}>
-                    <TournamentForm tournament={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
+                    <TournamentForm 
+                        tournament={editing} 
+                        onSave={handleSave} 
+                        onCancel={() => { setEditing(null); setError(null); }} 
+                        error={error} 
+                        loading={loading}
+                        sponsors={sponsors}
+                        getSponsorsForTournament={getSponsorsForTournament}
+                    />
                 </FormModal>
             )}
         </AdminSection>
     );
 };
 
-const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ tournament, onSave, onCancel, error }) => {
+const TournamentForm: React.FC<{ 
+    tournament: Tournament | Partial<Tournament>, 
+    onSave: (t: any, s: number[]) => void, 
+    onCancel: () => void, 
+    error: string | null,
+    loading: boolean,
+    sponsors: Sponsor[],
+    getSponsorsForTournament: (id: number) => Sponsor[]
+}> = ({ tournament, onSave, onCancel, error, loading, sponsors, getSponsorsForTournament }) => {
     const [formData, setFormData] = useState({
         name: '',
         division: 'Division 1',
         ...tournament
     });
+    const [linkedSponsorIds, setLinkedSponsorIds] = useState<number[]>([]);
+
+    useEffect(() => {
+        if (tournament.id) {
+            const currentSponsors = getSponsorsForTournament(tournament.id);
+            setLinkedSponsorIds(currentSponsors.map(s => s.id));
+        }
+    }, [tournament, getSponsorsForTournament]);
+
+    const linkedSponsors = sponsors.filter(s => linkedSponsorIds.includes(s.id));
+    const availableSponsors = sponsors.filter(s => !linkedSponsorIds.includes(s.id));
+
+    const handleAddSponsor = (sponsorId: number) => {
+        setLinkedSponsorIds(prev => [...prev, sponsorId]);
+    };
+
+    const handleRemoveSponsor = (sponsorId: number) => {
+        setLinkedSponsorIds(prev => prev.filter(id => id !== sponsorId));
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        onSave(formData, linkedSponsorIds);
     };
 
     return (
@@ -144,9 +186,43 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
                     <option>Division 2</option>
                 </Select>
             </div>
-            <div className="flex justify-end space-x-2">
-                <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
-                <Button type="submit">Save</Button>
+            
+            <fieldset className="border border-accent p-4 rounded-md">
+                <legend className="px-2 text-text-secondary">Manage Sponsors</legend>
+                 <div className="space-y-3">
+                    <Label>Add Sponsor</Label>
+                    <div className="flex gap-2">
+                        <Select
+                            value=""
+                            onChange={(e) => handleAddSponsor(parseInt(e.target.value, 10))}
+                            disabled={availableSponsors.length === 0}
+                        >
+                            <option value="" disabled>
+                                {availableSponsors.length === 0 ? "No available sponsors" : "Select a sponsor to add"}
+                            </option>
+                            {availableSponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </Select>
+                    </div>
+
+                    <Label>Linked Sponsors</Label>
+                    {linkedSponsors.length > 0 ? (
+                        <div className="space-y-2">
+                            {linkedSponsors.map(s => (
+                                <div key={s.id} className="flex justify-between items-center bg-primary p-2 rounded">
+                                    <span>{s.name}</span>
+                                    <button type="button" onClick={() => handleRemoveSponsor(s.id)} className="text-red-500 hover:text-red-400 text-xs">REMOVE</button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-text-secondary">No sponsors linked to this tournament.</p>
+                    )}
+                </div>
+            </fieldset>
+
+            <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Tournament'}</Button>
             </div>
         </form>
     );
@@ -720,7 +796,7 @@ const SponsorsAdmin = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Are you sure you want to delete this sponsor?')) {
+        if (window.confirm('Are you sure you want to delete this sponsor? This will also remove them from any tournaments they are linked to.')) {
             try {
                 await deleteSponsor(id);
             } catch (err: any) {
