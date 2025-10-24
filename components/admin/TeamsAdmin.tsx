@@ -3,7 +3,7 @@ import { useSports } from '../../context/SportsDataContext';
 import type { Team } from '../../types';
 import { AdminSection, Button, Input, Select, Label, FormModal, ErrorMessage } from './AdminUI';
 
-const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ team, onSave, onCancel, error }) => {
+const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void, onCancel: () => void, error: string | null, loading: boolean }> = ({ team, onSave, onCancel, error, loading }) => {
     const [formData, setFormData] = useState({
         name: '',
         shortName: '',
@@ -75,7 +75,7 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
             </div>
             <div className="flex justify-end space-x-2">
                 <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
-                <Button type="submit">Save</Button>
+                <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
             </div>
         </form>
     );
@@ -85,9 +85,11 @@ export const TeamsAdmin = () => {
     const { teams, addTeam, updateTeam, deleteTeam } = useSports();
     const [editing, setEditing] = useState<Team | Partial<Team> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const handleSave = async (team: Team | Partial<Team> & { logoFile?: File }) => {
         setError(null);
+        setLoading(true);
         try {
             if ('id' in team && team.id) {
                 await updateTeam(team as Team & { logoFile?: File });
@@ -97,6 +99,8 @@ export const TeamsAdmin = () => {
             setEditing(null);
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -134,7 +138,7 @@ export const TeamsAdmin = () => {
             </div>
             {editing && (
                 <FormModal title={editing.id ? "Edit Team" : "Add Team"} onClose={() => { setEditing(null); setError(null); }}>
-                    <TeamForm team={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
+                    <TeamForm team={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} loading={loading} />
                 </FormModal>
             )}
         </AdminSection>

@@ -3,7 +3,7 @@ import { useSports } from '../../context/SportsDataContext';
 import type { Player, Team, PlayerRole } from '../../types';
 import { AdminSection, Button, Input, Select, Label, FormModal, ErrorMessage } from './AdminUI';
 
-const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) => void, onCancel: () => void, teams: Team[], error: string | null }> = ({ player, onSave, onCancel, teams, error }) => {
+const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) => void, onCancel: () => void, teams: Team[], error: string | null, loading: boolean }> = ({ player, onSave, onCancel, teams, error, loading }) => {
     const playerRoles: PlayerRole[] = ['Main Netty', 'Left Front', 'Right Front', 'Net Center', 'Back Center', 'Left Back', 'Right Back', 'Right Netty', 'Left Netty', 'Service Man'];
     
     const [formData, setFormData] = useState({
@@ -88,7 +88,7 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
             </fieldset>
             <div className="flex justify-end space-x-2">
                 <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
-                <Button type="submit">Save</Button>
+                <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
             </div>
         </form>
     );
@@ -98,9 +98,11 @@ export const PlayersAdmin = () => {
     const { players, teams, addPlayer, updatePlayer, deletePlayer } = useSports();
     const [editing, setEditing] = useState<Player | Partial<Player> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const handleSave = async (player: Player | Partial<Player> & { photoFile?: File }) => {
         setError(null);
+        setLoading(true);
         try {
             const payload = { ...player, stats: player.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 }};
             if ('id' in payload && payload.id) {
@@ -111,6 +113,8 @@ export const PlayersAdmin = () => {
             setEditing(null);
         } catch(err: any) {
             setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -153,7 +157,7 @@ export const PlayersAdmin = () => {
             </div>
             {editing && (
                 <FormModal title={editing.id ? "Edit Player" : "Add Player"} onClose={() => { setEditing(null); setError(null); }}>
-                    <PlayerForm player={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} teams={teams} error={error} />
+                    <PlayerForm player={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} teams={teams} error={error} loading={loading} />
                 </FormModal>
             )}
         </AdminSection>

@@ -3,7 +3,7 @@ import { useSports } from '../../context/SportsDataContext';
 import type { Sponsor } from '../../types';
 import { AdminSection, Button, Input, Label, FormModal, ErrorMessage } from './AdminUI';
 
-const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: any) => void, onCancel: () => void, error: string | null }> = ({ sponsor, onSave, onCancel, error }) => {
+const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: any) => void, onCancel: () => void, error: string | null, loading: boolean }> = ({ sponsor, onSave, onCancel, error, loading }) => {
     const [formData, setFormData] = useState({
         name: '',
         website: '',
@@ -85,7 +85,7 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
 
             <div className="flex justify-end space-x-2">
                 <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
-                <Button type="submit">Save</Button>
+                <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
             </div>
         </form>
     );
@@ -95,9 +95,11 @@ export const SponsorsAdmin = () => {
     const { sponsors, addSponsor, updateSponsor, deleteSponsor } = useSports();
     const [editing, setEditing] = useState<Sponsor | Partial<Sponsor> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const handleSave = async (sponsor: Sponsor | Partial<Sponsor> & { logoFile?: File }) => {
         setError(null);
+        setLoading(true);
         try {
             if (sponsor.id) {
                 await updateSponsor(sponsor as Sponsor & { logoFile?: File });
@@ -107,6 +109,8 @@ export const SponsorsAdmin = () => {
             setEditing(null);
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -144,7 +148,7 @@ export const SponsorsAdmin = () => {
             </div>
              {editing && (
                 <FormModal title={editing.id ? "Edit Sponsor" : "Add Sponsor"} onClose={() => { setEditing(null); setError(null); }}>
-                    <SponsorForm sponsor={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
+                    <SponsorForm sponsor={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} loading={loading} />
                 </FormModal>
             )}
         </AdminSection>

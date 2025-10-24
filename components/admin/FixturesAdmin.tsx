@@ -93,7 +93,7 @@ const ScoreUpdateModal: React.FC<{ fixture: Fixture, onSave: (f: Fixture) => Pro
     );
 };
 
-const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: any) => void, onCancel: () => void, teams: Team[], tournaments: Tournament[], error: string | null }> = ({ fixture, onSave, onCancel, teams, tournaments, error }) => {
+const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: any) => void, onCancel: () => void, teams: Team[], tournaments: Tournament[], error: string | null, loading: boolean }> = ({ fixture, onSave, onCancel, teams, tournaments, error, loading }) => {
     const toInputDateTimeString = (isoString?: string) => {
         if (!isoString) return '';
         const date = new Date(isoString);
@@ -164,7 +164,7 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
             <div><Label>Referee (Optional)</Label><Input name="referee" value={formData.referee || ''} onChange={handleChange} /></div>
             <div className="flex justify-end space-x-2">
                 <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
-                <Button type="submit">Save</Button>
+                <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
             </div>
         </form>
     )
@@ -175,9 +175,11 @@ export const FixturesAdmin = () => {
     const [editing, setEditing] = useState<Fixture | Partial<Omit<Fixture, 'score'>> | null>(null);
     const [scoringFixture, setScoringFixture] = useState<Fixture | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
     
     const handleSave = async (fixture: Fixture) => {
         setError(null);
+        setLoading(true);
         try {
             if (fixture.id) {
                 const existingFixture = fixtures.find(f => f.id === fixture.id)!;
@@ -188,6 +190,8 @@ export const FixturesAdmin = () => {
             setEditing(null);
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
     
@@ -234,7 +238,7 @@ export const FixturesAdmin = () => {
             </div>
              {editing && (
                 <FormModal title={editing.id ? "Edit Fixture" : "Add Fixture"} onClose={() => { setEditing(null); setError(null); }}>
-                    <FixtureForm fixture={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} teams={teams} tournaments={tournaments} error={error} />
+                    <FixtureForm fixture={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} teams={teams} tournaments={tournaments} error={error} loading={loading} />
                 </FormModal>
             )}
             {scoringFixture && (
