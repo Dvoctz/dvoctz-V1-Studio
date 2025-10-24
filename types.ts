@@ -54,7 +54,6 @@ export interface Sponsor {
   name: string;
   logoUrl: string | null;
   website: string;
-  isGlobal: boolean;
 }
 
 export interface TeamStanding {
