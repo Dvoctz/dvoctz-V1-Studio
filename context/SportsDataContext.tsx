@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { Tournament, Team, Player, Fixture, Sponsor, PlayerRole, TeamStanding, Score } from '../types';
@@ -81,16 +82,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const [tournamentSponsors, setTournamentSponsors] = useState<DbTournamentSponsor[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
-
-    // This function maps app-style camelCase objects to database-style snake_case objects
-    const toSnakeCase = (obj: any): any => {
-        const newObj: any = {};
-        for (const key in obj) {
-            const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-            newObj[snakeKey] = obj[key];
-        }
-        return newObj;
-    };
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -203,7 +194,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     
     // CRUD functions
     const addTournament = async (tournament: Omit<Tournament, 'id'>): Promise<Tournament> => {
-        const { data, error } = await supabase.from('tournaments').insert(tournament).select();
+        const payload = {
+            name: tournament.name,
+            division: tournament.division
+        };
+        const { data, error } = await supabase.from('tournaments').insert(payload).select();
         if (error) throw error;
         const newTournament = data[0] as Tournament;
         setTournaments(prev => [...prev, newTournament]);
@@ -211,7 +206,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     const updateTournament = async (tournament: Tournament): Promise<Tournament> => {
-        const { data, error } = await supabase.from('tournaments').update(tournament).eq('id', tournament.id).select();
+        const payload = {
+            name: tournament.name,
+            division: tournament.division
+        };
+        const { data, error } = await supabase.from('tournaments').update(payload).eq('id', tournament.id).select();
         if (error) throw error;
         const updatedTournament = data[0] as Tournament;
         setTournaments(prev => prev.map(t => t.id === updatedTournament.id ? updatedTournament : t));
@@ -335,7 +334,15 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     const addFixture = async (fixture: Omit<Fixture, 'id' | 'score'>): Promise<Fixture> => {
-        const payload = toSnakeCase(fixture);
+        const payload = {
+            tournament_id: fixture.tournamentId,
+            team1_id: fixture.team1Id,
+            team2_id: fixture.team2Id,
+            ground: fixture.ground,
+            date_time: fixture.dateTime,
+            status: fixture.status,
+            referee: fixture.referee,
+        };
         const { data, error } = await supabase.from('fixtures').insert(payload).select();
         if (error) throw error;
         const newFixture = data[0] as Fixture;
@@ -345,7 +352,16 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     
     const updateFixture = async (fixture: Fixture): Promise<Fixture> => {
         const { id, ...fixtureData } = fixture;
-        const payload = toSnakeCase(fixtureData);
+        const payload = {
+            tournament_id: fixtureData.tournamentId,
+            team1_id: fixtureData.team1Id,
+            team2_id: fixtureData.team2Id,
+            ground: fixtureData.ground,
+            date_time: fixtureData.dateTime,
+            status: fixtureData.status,
+            referee: fixtureData.referee,
+            score: fixtureData.score,
+        };
         const { data, error } = await supabase.from('fixtures').update(payload).eq('id', fixture.id).select();
         if (error) throw error;
         const updatedFixture = data[0] as Fixture;
