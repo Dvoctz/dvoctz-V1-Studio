@@ -84,7 +84,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const [error, setError] = useState<Error | null>(null);
 
     const fetchData = useCallback(async () => {
-        setLoading(true);
+        // Don't set loading to true on refetches, only on initial load.
+        // setLoading(true); 
         setError(null);
         try {
             const [
@@ -194,39 +195,29 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     
     // CRUD functions
     const addTournament = async (tournament: Omit<Tournament, 'id'>): Promise<Tournament> => {
-        const payload = {
-            name: tournament.name,
-            division: tournament.division
-        };
+        const payload = { name: tournament.name, division: tournament.division };
         const { data, error } = await supabase.from('tournaments').insert(payload).select();
         if (error) throw error;
-        const newTournament = data[0] as Tournament;
-        setTournaments(prev => [...prev, newTournament]);
-        return newTournament;
+        await fetchData();
+        return data[0] as Tournament;
     };
 
     const updateTournament = async (tournament: Tournament): Promise<Tournament> => {
-        const payload = {
-            name: tournament.name,
-            division: tournament.division
-        };
+        const payload = { name: tournament.name, division: tournament.division };
         const { data, error } = await supabase.from('tournaments').update(payload).eq('id', tournament.id).select();
         if (error) throw error;
-        const updatedTournament = data[0] as Tournament;
-        setTournaments(prev => prev.map(t => t.id === updatedTournament.id ? updatedTournament : t));
-        return updatedTournament;
+        await fetchData();
+        return data[0] as Tournament;
     };
 
     const deleteTournament = async (id: number): Promise<void> => {
-        const { error: fixtureError } = await supabase.from('fixtures').delete().eq('tournamentId', id);
+        const { error: fixtureError } = await supabase.from('fixtures').delete().eq('tournament_id', id);
         if (fixtureError) throw fixtureError;
         const { error: sponsorLinkError } = await supabase.from('tournament_sponsors').delete().eq('tournament_id', id);
         if (sponsorLinkError) throw sponsorLinkError;
         const { error } = await supabase.from('tournaments').delete().eq('id', id);
         if (error) throw error;
-        setTournaments(prev => prev.filter(t => t.id !== id));
-        setFixtures(prev => prev.filter(f => f.tournamentId !== id));
-        setTournamentSponsors(prev => prev.filter(ts => ts.tournament_id !== id));
+        await fetchData();
     };
 
     const addTeam = async (team: Omit<Team, 'id'> & { logoFile?: File }): Promise<Team> => {
@@ -236,17 +227,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const filePath = `public/${teamData.shortName}_${Date.now()}`;
             logoUrl = await uploadFile(logoFile, 'team-logos', filePath);
         }
-        const payload = {
-            name: teamData.name,
-            short_name: teamData.shortName,
-            division: teamData.division,
-            logo_url: logoUrl,
-        };
+        const payload = { name: teamData.name, short_name: teamData.shortName, division: teamData.division, logo_url: logoUrl };
         const { data, error } = await supabase.from('teams').insert(payload).select();
         if (error) throw error;
-        const newTeam = data[0] as Team;
-        setTeams(prev => [...prev, newTeam].sort((a,b) => a.name.localeCompare(b.name)));
-        return newTeam;
+        await fetchData();
+        return data[0] as Team;
     };
 
     const updateTeam = async (team: Team & { logoFile?: File }): Promise<Team> => {
@@ -258,29 +243,21 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         } else if (teamData.logoUrl === null) {
             newLogoUrl = null;
         }
-        const payload = {
-            name: teamData.name,
-            short_name: teamData.shortName,
-            division: teamData.division,
-            logo_url: newLogoUrl,
-        };
+        const payload = { name: teamData.name, short_name: teamData.shortName, division: teamData.division, logo_url: newLogoUrl };
         const { data, error } = await supabase.from('teams').update(payload).eq('id', team.id).select();
         if (error) throw error;
-        const updatedTeam = data[0] as Team;
-        setTeams(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
-        return updatedTeam;
+        await fetchData();
+        return data[0] as Team;
     };
     
     const deleteTeam = async (id: number): Promise<void> => {
-        const { error: playerError } = await supabase.from('players').delete().eq('teamId', id);
+        const { error: playerError } = await supabase.from('players').delete().eq('team_id', id);
         if (playerError) throw playerError;
-        const { error: fixtureError } = await supabase.from('fixtures').delete().or(`team1Id.eq.${id},team2Id.eq.${id}`);
+        const { error: fixtureError } = await supabase.from('fixtures').delete().or(`team1_id.eq.${id},team2_id.eq.${id}`);
         if (fixtureError) throw fixtureError;
         const { error } = await supabase.from('teams').delete().eq('id', id);
         if (error) throw error;
-        setTeams(prev => prev.filter(t => t.id !== id));
-        setPlayers(prev => prev.filter(p => p.teamId !== id));
-        setFixtures(prev => prev.filter(f => f.team1Id !== id && f.team2Id !== id));
+        await fetchData();
     };
     
     const addPlayer = async (player: Omit<Player, 'id'> & { photoFile?: File }): Promise<Player> => {
@@ -290,18 +267,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const filePath = `public/${playerData.name.replace(/\s+/g, '_')}_${Date.now()}`;
             photoUrl = await uploadFile(photoFile, 'player-photos', filePath);
         }
-        const payload = {
-            name: playerData.name,
-            team_id: playerData.teamId,
-            photo_url: photoUrl,
-            role: playerData.role,
-            stats: playerData.stats,
-        };
+        const payload = { name: playerData.name, team_id: playerData.teamId, photo_url: photoUrl, role: playerData.role, stats: playerData.stats };
         const { data, error } = await supabase.from('players').insert(payload).select();
         if (error) throw error;
-        const newPlayer = data[0] as Player;
-        setPlayers(prev => [...prev, newPlayer].sort((a, b) => a.name.localeCompare(b.name)));
-        return newPlayer;
+        await fetchData();
+        return data[0] as Player;
     };
 
     const updatePlayer = async (player: Player & { photoFile?: File }): Promise<Player> => {
@@ -313,66 +283,40 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         } else if (playerData.photoUrl === null) {
             newPhotoUrl = null;
         }
-        const payload = {
-            name: playerData.name,
-            team_id: playerData.teamId,
-            photo_url: newPhotoUrl,
-            role: playerData.role,
-            stats: playerData.stats,
-        };
+        const payload = { name: playerData.name, team_id: playerData.teamId, photo_url: newPhotoUrl, role: playerData.role, stats: playerData.stats };
         const { data, error } = await supabase.from('players').update(payload).eq('id', player.id).select();
         if (error) throw error;
-        const updatedPlayer = data[0] as Player;
-        setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
-        return updatedPlayer;
+        await fetchData();
+        return data[0] as Player;
     };
 
     const deletePlayer = async (id: number): Promise<void> => {
         const { error } = await supabase.from('players').delete().eq('id', id);
         if (error) throw error;
-        setPlayers(prev => prev.filter(p => p.id !== id));
+        await fetchData();
     };
 
     const addFixture = async (fixture: Omit<Fixture, 'id' | 'score'>): Promise<Fixture> => {
-        const payload = {
-            tournament_id: fixture.tournamentId,
-            team1_id: fixture.team1Id,
-            team2_id: fixture.team2Id,
-            ground: fixture.ground,
-            date_time: fixture.dateTime,
-            status: fixture.status,
-            referee: fixture.referee,
-        };
+        const payload = { tournament_id: fixture.tournamentId, team1_id: fixture.team1Id, team2_id: fixture.team2Id, ground: fixture.ground, date_time: fixture.dateTime, status: fixture.status, referee: fixture.referee };
         const { data, error } = await supabase.from('fixtures').insert(payload).select();
         if (error) throw error;
-        const newFixture = data[0] as Fixture;
-        setFixtures(prev => [...prev, newFixture]);
-        return newFixture;
+        await fetchData();
+        return data[0] as Fixture;
     };
     
     const updateFixture = async (fixture: Fixture): Promise<Fixture> => {
         const { id, ...fixtureData } = fixture;
-        const payload = {
-            tournament_id: fixtureData.tournamentId,
-            team1_id: fixtureData.team1Id,
-            team2_id: fixtureData.team2Id,
-            ground: fixtureData.ground,
-            date_time: fixtureData.dateTime,
-            status: fixtureData.status,
-            referee: fixtureData.referee,
-            score: fixtureData.score,
-        };
+        const payload = { tournament_id: fixtureData.tournamentId, team1_id: fixtureData.team1Id, team2_id: fixtureData.team2Id, ground: fixtureData.ground, date_time: fixtureData.dateTime, status: fixtureData.status, referee: fixtureData.referee, score: fixtureData.score };
         const { data, error } = await supabase.from('fixtures').update(payload).eq('id', fixture.id).select();
         if (error) throw error;
-        const updatedFixture = data[0] as Fixture;
-        setFixtures(prev => prev.map(f => f.id === updatedFixture.id ? { ...updatedFixture, score: updatedFixture.score || undefined } : f));
-        return updatedFixture;
+        await fetchData();
+        return { ...data[0], score: data[0].score || undefined } as Fixture;
     };
 
     const deleteFixture = async (id: number): Promise<void> => {
         const { error } = await supabase.from('fixtures').delete().eq('id', id);
         if (error) throw error;
-        setFixtures(prev => prev.filter(f => f.id !== id));
+        await fetchData();
     };
     
     const addSponsor = async (sponsor: Omit<Sponsor, 'id'> & { logoFile?: File }): Promise<Sponsor> => {
@@ -382,17 +326,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const filePath = `public/${sponsorData.name.replace(/\s+/g, '_')}_${Date.now()}`;
             logoUrl = await uploadFile(logoFile, 'sponsor-logos', filePath);
         }
-        const payload = {
-            name: sponsorData.name,
-            website: sponsorData.website,
-            is_global: !!sponsorData.isGlobal,
-            logo_url: logoUrl
-        };
+        const payload = { name: sponsorData.name, website: sponsorData.website, is_global: !!sponsorData.isGlobal, logo_url: logoUrl };
         const { data, error } = await supabase.from('sponsors').insert(payload).select();
         if (error) throw error;
-        const newSponsor = data[0] as Sponsor;
-        setSponsors(prev => [...prev, newSponsor].sort((a,b) => a.name.localeCompare(b.name)));
-        return newSponsor;
+        await fetchData();
+        return data[0] as Sponsor;
     };
 
     const updateSponsor = async (sponsor: Sponsor & { logoFile?: File }): Promise<Sponsor> => {
@@ -404,17 +342,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         } else if (sponsorData.logoUrl === null) {
             newLogoUrl = null;
         }
-        const payload = {
-            name: sponsorData.name,
-            website: sponsorData.website,
-            is_global: !!sponsorData.isGlobal,
-            logo_url: newLogoUrl
-        };
+        const payload = { name: sponsorData.name, website: sponsorData.website, is_global: !!sponsorData.isGlobal, logo_url: newLogoUrl };
         const { data, error } = await supabase.from('sponsors').update(payload).eq('id', sponsor.id).select();
         if (error) throw error;
-        const updatedSponsor = data[0] as Sponsor;
-        setSponsors(prev => prev.map(s => s.id === updatedSponsor.id ? updatedSponsor : s));
-        return updatedSponsor;
+        await fetchData();
+        return data[0] as Sponsor;
     };
     
     const deleteSponsor = async (id: number): Promise<void> => {
@@ -422,8 +354,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         if (sponsorLinkError) throw sponsorLinkError;
         const { error } = await supabase.from('sponsors').delete().eq('id', id);
         if (error) throw error;
-        setSponsors(prev => prev.filter(s => s.id !== id));
-        setTournamentSponsors(prev => prev.filter(ts => ts.sponsor_id !== id));
+        await fetchData();
     };
 
     const updateSponsorsForTournament = async (tournamentId: number, sponsorIds: number[]): Promise<void> => {
@@ -434,9 +365,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const { error: insertError } = await supabase.from('tournament_sponsors').insert(links);
             if (insertError) throw insertError;
         }
-        const { data, error } = await supabase.from('tournament_sponsors').select('*');
-        if (error) throw error;
-        setTournamentSponsors(data as DbTournamentSponsor[]);
+        await fetchData();
     };
 
     const bulkAddOrUpdateTeams = async (teamsData: CsvTeam[]): Promise<void> => {
@@ -487,7 +416,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers
     };
 
-    return <SportsDataContext.Provider value={value}>{!loading && children}</SportsDataContext.Provider>;
+    return <SportsDataContext.Provider value={value}>{children}</SportsDataContext.Provider>;
 };
 
 export const useSports = (): SportsDataContextType => {
