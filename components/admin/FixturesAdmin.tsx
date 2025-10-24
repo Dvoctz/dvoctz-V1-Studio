@@ -54,7 +54,7 @@ const ScoreUpdateModal: React.FC<{ fixture: Fixture, onSave: (f: Fixture) => Pro
             const finalScoreData = { ...scoreData, resultMessage };
             await onSave({ ...fixture, score: finalScoreData });
         } catch (err: any) {
-            setError(err.message);
+            setError(String(err));
         } finally {
             setLoading(false);
         }
@@ -189,7 +189,7 @@ export const FixturesAdmin = () => {
             }
             setEditing(null);
         } catch (err: any) {
-            setError(err.message);
+            setError(String(err));
         } finally {
             setLoading(false);
         }

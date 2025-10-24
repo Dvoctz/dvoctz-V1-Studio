@@ -108,7 +108,7 @@ export const SponsorsAdmin = () => {
             }
             setEditing(null);
         } catch (err: any) {
-            setError(err.message);
+            setError(String(err));
         } finally {
             setLoading(false);
         }

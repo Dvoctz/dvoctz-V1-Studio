@@ -112,7 +112,7 @@ export const PlayersAdmin = () => {
             }
             setEditing(null);
         } catch(err: any) {
-            setError(err.message);
+            setError(String(err));
         } finally {
             setLoading(false);
         }
