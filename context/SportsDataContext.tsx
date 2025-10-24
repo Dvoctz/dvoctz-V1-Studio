@@ -53,20 +53,21 @@ interface SportsContextType extends SportsState {
 
 const SportsDataContext = createContext<SportsContextType | undefined>(undefined);
 
-// MAPPING FUNCTIONS to convert snake_case from DB to camelCase for the app
+// MAPPING FUNCTIONS to ensure data conforms to the app's TypeScript types.
+// The Supabase V2 client automatically converts snake_case from the DB to camelCase.
 const mapTeam = (t: any): Team => ({
   id: t.id,
   name: t.name,
-  shortName: t.short_name,
-  logoUrl: t.logo_url,
+  shortName: t.shortName,
+  logoUrl: t.logoUrl,
   division: t.division,
 });
 
 const mapPlayer = (p: any): Player => ({
   id: p.id,
   name: p.name,
-  teamId: p.team_id,
-  photoUrl: p.photo_url,
+  teamId: p.teamId,
+  photoUrl: p.photoUrl,
   role: p.role,
   stats: p.stats,
 });
@@ -75,24 +76,24 @@ const mapSponsor = (s: any): Sponsor => ({
   id: s.id,
   name: s.name,
   website: s.website,
-  logoUrl: s.logo_url,
+  logoUrl: s.logoUrl,
 });
 
 const mapFixture = (f: any): Fixture => ({
   id: f.id,
-  tournamentId: f.tournament_id,
-  team1Id: f.team1_id,
-  team2Id: f.team2_id,
+  tournamentId: f.tournamentId,
+  team1Id: f.team1Id,
+  team2Id: f.team2Id,
   ground: f.ground,
-  dateTime: f.date_time,
+  dateTime: f.dateTime,
   status: f.status,
   referee: f.referee,
   score: f.score as Score | undefined,
 });
 
-const mapTournamentSponsorLink = (ts: DbTournamentSponsor): TournamentSponsorLink => ({
-    tournamentId: ts.tournament_id,
-    sponsorId: ts.sponsor_id,
+const mapTournamentSponsorLink = (ts: any): TournamentSponsorLink => ({
+    tournamentId: ts.tournamentId,
+    sponsorId: ts.sponsorId,
 });
 
 
