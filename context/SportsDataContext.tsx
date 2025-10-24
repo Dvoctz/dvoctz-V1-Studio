@@ -110,13 +110,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (sponsorsError) throw sponsorsError;
             if (tournamentSponsorsError) throw tournamentSponsorsError;
 
-            setTournaments(tournamentsData as Tournament[]);
-            setTeams(teamsData as Team[]);
-            setPlayers(playersData as Player[]);
-            const fixturesWithScores = (fixturesData as DbFixture[]).map(f => ({ ...f, score: f.score || undefined }));
+            setTournaments(tournamentsData || []);
+            setTeams(teamsData || []);
+            setPlayers(playersData || []);
+            const fixturesWithScores = (fixturesData || []).map(f => ({ ...f, score: f.score || undefined }));
             setFixtures(fixturesWithScores as Fixture[]);
-            setSponsors(sponsorsData as Sponsor[]);
-            setTournamentSponsors(tournamentSponsorsData as DbTournamentSponsor[]);
+            setSponsors(sponsorsData || []);
+            setTournamentSponsors(tournamentSponsorsData || []);
             
         } catch (err: any) {
             setError(err);
