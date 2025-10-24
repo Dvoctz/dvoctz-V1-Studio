@@ -47,6 +47,7 @@ interface SportsContextType extends SportsState {
     getFixturesByTournament: (tournamentId: number) => Fixture[];
     getTeamById: (teamId: number) => Team | undefined;
     getPlayersByTeam: (teamId: number) => Player[];
+    getGlobalSponsors: () => Sponsor[];
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getStandingsForTournament: (tournamentId: number) => TeamStanding[];
 }
@@ -77,6 +78,7 @@ const mapSponsor = (s: any): Sponsor => ({
   name: s.name,
   website: s.website,
   logoUrl: s.logoUrl,
+  isGlobal: s.isGlobal,
 });
 
 const mapFixture = (f: any): Fixture => ({
@@ -263,16 +265,16 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             addSponsor: async (sponsorData) => {
                 let finalLogoUrl = sponsorData.logoUrl;
                 if (sponsorData.logoFile) finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
-                const { name, website } = sponsorData;
-                const { data, error } = await supabase.from('sponsors').insert({ name, website, logo_url: finalLogoUrl }).select().single();
+                const { name, website, isGlobal } = sponsorData;
+                const { data, error } = await supabase.from('sponsors').insert({ name, website, is_global: isGlobal, logo_url: finalLogoUrl }).select().single();
                 if (error) throw error;
                 setState(s => ({...s, sponsors: [...s.sponsors, mapSponsor(data)].sort((a,b) => a.name.localeCompare(b.name))}));
             },
             updateSponsor: async (sponsorData) => {
                 let finalLogoUrl = sponsorData.logoUrl;
                 if (sponsorData.logoFile) finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
-                const { id, name, website } = sponsorData;
-                const { data, error } = await supabase.from('sponsors').update({ name, website, logo_url: finalLogoUrl }).eq('id', id).select().single();
+                const { id, name, website, isGlobal } = sponsorData;
+                const { data, error } = await supabase.from('sponsors').update({ name, website, is_global: isGlobal, logo_url: finalLogoUrl }).eq('id', id).select().single();
                 if (error) throw error;
                 setState(s => ({...s, sponsors: s.sponsors.map(i => i.id === id ? mapSponsor(data) : i)}));
             },
@@ -340,6 +342,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             },
             getPlayersByTeam: (teamId: number) => {
                 return state.players.filter(p => p.teamId === teamId);
+            },
+            getGlobalSponsors: () => {
+                return state.sponsors.filter(s => s.isGlobal);
             },
              getSponsorsForTournament: (tournamentId: number): Sponsor[] => {
                 const sponsorIds = state.tournamentSponsors

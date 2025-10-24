@@ -7,6 +7,7 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
     const [formData, setFormData] = useState({
         name: '',
         website: '',
+        isGlobal: false,
         ...sponsor
     });
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -32,7 +33,14 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
         if (fileInput) fileInput.value = '';
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSave({ ...formData, logoFile });
@@ -59,6 +67,22 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
                 </div>
             </div>
             <div><Label>Website</Label><Input name="website" type="url" value={formData.website || ''} onChange={handleChange} required /></div>
+            
+            <div className="flex items-center space-x-3 bg-primary p-3 rounded-md">
+                <input
+                    id="isGlobal"
+                    name="isGlobal"
+                    type="checkbox"
+                    checked={formData.isGlobal || false}
+                    onChange={handleChange}
+                    className="h-4 w-4 rounded border-accent bg-secondary text-highlight focus:ring-highlight"
+                />
+                <div>
+                    <Label htmlFor="isGlobal">Global Sponsor</Label>
+                    <p className="text-xs text-text-secondary">Show this sponsor in the footer on all pages.</p>
+                </div>
+            </div>
+
             <div className="flex justify-end space-x-2">
                 <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
                 <Button type="submit">Save</Button>
@@ -110,6 +134,7 @@ export const SponsorsAdmin = () => {
                              </div>
                         )}
                         <p className="font-bold text-sm">{s.name}</p>
+                        {s.isGlobal && <p className="text-xs text-highlight font-semibold">Global</p>}
                          <div className="mt-2 space-x-2">
                             <Button onClick={() => setEditing(s)} className="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1">Edit</Button>
                             <Button onClick={() => handleDelete(s.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>

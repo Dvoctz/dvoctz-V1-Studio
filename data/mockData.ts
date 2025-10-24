@@ -5,12 +5,13 @@
 import type { Tournament, Team, Player, Fixture, Sponsor } from '../types';
 
 export const sponsors: Sponsor[] = [
-  { id: 1, name: "Pro-Spike Gear", logoUrl: "https://picsum.photos/seed/sponsor1/200/100", website: "#" },
-  { id: 2, name: "Apex Performance", logoUrl: "https://picsum.photos/seed/sponsor2/200/100", website: "#" },
-  { id: 3, name: "Quantum Energy", logoUrl: "https://picsum.photos/seed/sponsor3/200/100", website: "#" },
-  { id: 4, name: "Strive Athletic Wear", logoUrl: "https://picsum.photos/seed/sponsor4/200/100", website: "#" },
-  { id: 5, name: "City Bank", logoUrl: "https://picsum.photos/seed/sponsor5/200/100", website: "#" },
-  { id: 6, name: "Horizon Motors", logoUrl: "https://picsum.photos/seed/sponsor6/200/100", website: "#" },
+  // FIX: Added the required 'isGlobal' property to each sponsor object.
+  { id: 1, name: "Pro-Spike Gear", logoUrl: "https://picsum.photos/seed/sponsor1/200/100", website: "#", isGlobal: true },
+  { id: 2, name: "Apex Performance", logoUrl: "https://picsum.photos/seed/sponsor2/200/100", website: "#", isGlobal: true },
+  { id: 3, name: "Quantum Energy", logoUrl: "https://picsum.photos/seed/sponsor3/200/100", website: "#", isGlobal: true },
+  { id: 4, name: "Strive Athletic Wear", logoUrl: "https://picsum.photos/seed/sponsor4/200/100", website: "#", isGlobal: false },
+  { id: 5, name: "City Bank", logoUrl: "https://picsum.photos/seed/sponsor5/200/100", website: "#", isGlobal: false },
+  { id: 6, name: "Horizon Motors", logoUrl: "https://picsum.photos/seed/sponsor6/200/100", website: "#", isGlobal: false },
 ];
 
 export const tournaments: Tournament[] = [
