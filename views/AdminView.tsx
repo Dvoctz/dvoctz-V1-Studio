@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { parse } from 'papaparse';
+import { parse, unparse } from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
-import type { Tournament, Team, Player, Fixture, Sponsor, Score } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole } from '../types';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -192,7 +192,7 @@ const TeamsAdmin = () => {
                             <img src={t.logoUrl} alt={t.name} className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary object-cover" />
                          ) : (
                             <div className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary bg-primary flex items-center justify-center text-text-secondary">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" /></svg>
                             </div>
                          )}
                         <p className="font-bold">{t.name} ({t.shortName})</p>
@@ -267,7 +267,7 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
                         <img src={previewUrl} alt="Logo preview" className="w-20 h-20 rounded-full object-cover bg-primary" />
                     ) : (
                          <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-text-secondary">
-                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" /></svg>
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" /></svg>
                          </div>
                     )}
                     <div className="flex-grow">
@@ -359,9 +359,11 @@ const PlayersAdmin = () => {
 };
 
 const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) => void, onCancel: () => void, teams: Team[], error: string | null }> = ({ player, onSave, onCancel, teams, error }) => {
+    const playerRoles: PlayerRole[] = ['Main Netty', 'Left Front', 'Right Front', 'Net Center', 'Back Center', 'Left Back', 'Right Back', 'Right Netty', 'Left Netty', 'Service Man'];
+    
     const [formData, setFormData] = useState({
         name: '',
-        role: 'Setter',
+        role: 'Main Netty' as PlayerRole,
         ...player
     });
     const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -426,12 +428,8 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
             </div>
              <div>
                 <Label htmlFor="role">Role</Label>
-                <Select id="role" name="role" value={formData.role || 'Setter'} onChange={handleChange} required>
-                    <option>Setter</option>
-                    <option>Outside Hitter</option>
-                    <option>Middle Blocker</option>
-                    <option>Opposite Hitter</option>
-                    <option>Libero</option>
+                <Select id="role" name="role" value={formData.role || 'Main Netty'} onChange={handleChange} required>
+                    {playerRoles.map(r => <option key={r} value={r}>{r}</option>)}
                 </Select>
             </div>
             <fieldset className="border border-accent p-4 rounded-md">
@@ -741,7 +739,7 @@ const SponsorsAdmin = () => {
                             <img src={s.logoUrl} alt={s.name} className="h-12 max-w-[150px] object-contain mx-auto mb-2" />
                         ) : (
                              <div className="h-12 w-full flex items-center justify-center text-text-secondary mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                              </div>
                         )}
                         <p className="font-bold text-sm">{s.name}</p>
@@ -807,7 +805,7 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
                         <img src={previewUrl} alt="Logo preview" className="w-20 h-20 rounded-md object-contain bg-primary" />
                     ) : (
                          <div className="w-20 h-20 rounded-md bg-primary flex items-center justify-center text-text-secondary">
-                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                          </div>
                     )}
                     <div className="flex-grow">
@@ -924,6 +922,78 @@ const BulkImportAdmin = () => {
     );
 };
 
+// Export Data
+const ExportAdmin = () => {
+    const { teams, players, getTeamById } = useSports();
+
+    const downloadCSV = (csvString: string, filename: string) => {
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportTeams = () => {
+        if (teams.length === 0) {
+            alert("No teams to export.");
+            return;
+        }
+        const data = teams.map(t => ({
+            name: t.name,
+            shortName: t.shortName,
+            division: t.division,
+            logoUrl: t.logoUrl || '',
+        }));
+        const csv = unparse(data);
+        downloadCSV(csv, `dvoc_teams_${new Date().toISOString().split('T')[0]}.csv`);
+    };
+
+    const handleExportPlayers = () => {
+        if (players.length === 0) {
+            alert("No players to export.");
+            return;
+        }
+        const data = players.map(p => {
+            const team = getTeamById(p.teamId);
+            return {
+                name: p.name,
+                teamName: team?.name || 'N/A',
+                role: p.role,
+                photoUrl: p.photoUrl || '',
+                matches: p.stats?.matches ?? 0,
+                aces: p.stats?.aces ?? 0,
+                kills: p.stats?.kills ?? 0,
+                blocks: p.stats?.blocks ?? 0,
+            };
+        });
+        const csv = unparse(data);
+        downloadCSV(csv, `dvoc_players_${new Date().toISOString().split('T')[0]}.csv`);
+    };
+
+    return (
+        <AdminSection title="Export Data">
+            <p className="text-text-secondary mb-4">Download your current team and player data as CSV files.</p>
+            <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-accent p-4 rounded-md">
+                    <h3 className="font-bold mb-2">Export All Teams</h3>
+                    <p className="text-xs text-text-secondary mb-3">Downloads a CSV file with all teams in the database. The format is compatible with the bulk import.</p>
+                    <Button onClick={handleExportTeams}>Export Teams CSV</Button>
+                </div>
+                <div className="bg-accent p-4 rounded-md">
+                    <h3 className="font-bold mb-2">Export All Players</h3>
+                    <p className="text-xs text-text-secondary mb-3">Downloads a CSV file with all players and their stats. The format is compatible with the bulk import.</p>
+                    <Button onClick={handleExportPlayers}>Export Players CSV</Button>
+                </div>
+            </div>
+        </AdminSection>
+    );
+};
 
 
 // Main View
@@ -938,6 +1008,7 @@ export const AdminView: React.FC = () => {
             case 'fixtures': return <FixturesAdmin />;
             case 'sponsors': return <SponsorsAdmin />;
             case 'bulk-import': return <BulkImportAdmin />;
+            case 'export': return <ExportAdmin />;
             default: return null;
         }
     };
@@ -965,6 +1036,7 @@ export const AdminView: React.FC = () => {
                     <TabButton tab="fixtures" label="Fixtures" />
                     <TabButton tab="sponsors" label="Sponsors" />
                     <TabButton tab="bulk-import" label="Bulk Import" />
+                    <TabButton tab="export" label="Export Data" />
                 </div>
             </div>
             <div>{renderContent()}</div>

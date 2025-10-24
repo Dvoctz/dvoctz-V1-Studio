@@ -1,11 +1,13 @@
 export type View = 'home' | 'tournaments' | 'teams' | 'players' | 'tournament-detail' | 'team-detail' | 'admin' | 'login';
 
+export type PlayerRole = 'Main Netty' | 'Left Front' | 'Right Front' | 'Net Center' | 'Back Center' | 'Left Back' | 'Right Back' | 'Right Netty' | 'Left Netty' | 'Service Man';
+
 export interface Player {
   id: number;
   name: string;
   teamId: number;
   photoUrl: string | null;
-  role: 'Setter' | 'Outside Hitter' | 'Middle Blocker' | 'Opposite Hitter' | 'Libero';
+  role: PlayerRole;
   stats?: {
     matches: number;
     aces: number;

@@ -35,23 +35,23 @@ export const teams: Team[] = [
 
 export const players: Player[] = [
   // Team 1
-  { id: 1, name: 'Alex Johnson', teamId: 1, photoUrl: 'https://picsum.photos/seed/player1/200/200', role: 'Setter', stats: { matches: 50, aces: 30, kills: 40, blocks: 15 } },
-  { id: 2, name: 'Ben Carter', teamId: 1, photoUrl: 'https://picsum.photos/seed/player2/200/200', role: 'Outside Hitter', stats: { matches: 45, aces: 20, kills: 250, blocks: 30 } },
+  { id: 1, name: 'Alex Johnson', teamId: 1, photoUrl: 'https://picsum.photos/seed/player1/200/200', role: 'Main Netty', stats: { matches: 50, aces: 30, kills: 40, blocks: 15 } },
+  { id: 2, name: 'Ben Carter', teamId: 1, photoUrl: 'https://picsum.photos/seed/player2/200/200', role: 'Left Front', stats: { matches: 45, aces: 20, kills: 250, blocks: 30 } },
   // Team 2
-  { id: 3, name: 'Chris Davis', teamId: 2, photoUrl: 'https://picsum.photos/seed/player3/200/200', role: 'Middle Blocker', stats: { matches: 60, aces: 10, kills: 180, blocks: 120 } },
-  { id: 4, name: 'David Evans', teamId: 2, photoUrl: 'https://picsum.photos/seed/player4/200/200', role: 'Libero', stats: { matches: 55, aces: 5, kills: 10, blocks: 5 } },
+  { id: 3, name: 'Chris Davis', teamId: 2, photoUrl: 'https://picsum.photos/seed/player3/200/200', role: 'Right Front', stats: { matches: 60, aces: 10, kills: 180, blocks: 120 } },
+  { id: 4, name: 'David Evans', teamId: 2, photoUrl: 'https://picsum.photos/seed/player4/200/200', role: 'Back Center', stats: { matches: 55, aces: 5, kills: 10, blocks: 5 } },
   // Team 3
-  { id: 5, name: 'Ethan Foster', teamId: 3, photoUrl: 'https://picsum.photos/seed/player5/200/200', role: 'Opposite Hitter', stats: { matches: 40, aces: 45, kills: 220, blocks: 25 } },
+  { id: 5, name: 'Ethan Foster', teamId: 3, photoUrl: 'https://picsum.photos/seed/player5/200/200', role: 'Net Center', stats: { matches: 40, aces: 45, kills: 220, blocks: 25 } },
   // Team 4
-  { id: 6, name: 'Frank Green', teamId: 4, photoUrl: 'https://picsum.photos/seed/player6/200/200', role: 'Outside Hitter', stats: { matches: 52, aces: 28, kills: 280, blocks: 40 } },
+  { id: 6, name: 'Frank Green', teamId: 4, photoUrl: 'https://picsum.photos/seed/player6/200/200', role: 'Left Front', stats: { matches: 52, aces: 28, kills: 280, blocks: 40 } },
   // Team 5
-  { id: 7, name: 'George Harris', teamId: 5, photoUrl: 'https://picsum.photos/seed/player7/200/200', role: 'Setter', stats: { matches: 30, aces: 22, kills: 30, blocks: 10 } },
+  { id: 7, name: 'George Harris', teamId: 5, photoUrl: 'https://picsum.photos/seed/player7/200/200', role: 'Main Netty', stats: { matches: 30, aces: 22, kills: 30, blocks: 10 } },
   // Team 6
-  { id: 8, name: 'Henry Irving', teamId: 6, photoUrl: 'https://picsum.photos/seed/player8/200/200', role: 'Middle Blocker', stats: { matches: 35, aces: 15, kills: 150, blocks: 90 } },
+  { id: 8, name: 'Henry Irving', teamId: 6, photoUrl: 'https://picsum.photos/seed/player8/200/200', role: 'Right Front', stats: { matches: 35, aces: 15, kills: 150, blocks: 90 } },
   // Team 7
-  { id: 9, name: 'Ian Jackson', teamId: 7, photoUrl: 'https://picsum.photos/seed/player9/200/200', role: 'Outside Hitter', stats: { matches: 28, aces: 18, kills: 190, blocks: 20 } },
+  { id: 9, name: 'Ian Jackson', teamId: 7, photoUrl: 'https://picsum.photos/seed/player9/200/200', role: 'Left Front', stats: { matches: 28, aces: 18, kills: 190, blocks: 20 } },
   // Team 8
-  { id: 10, name: 'Jack King', teamId: 8, photoUrl: 'https://picsum.photos/seed/player10/200/200', role: 'Libero', stats: { matches: 32, aces: 8, kills: 5, blocks: 3 } },
+  { id: 10, name: 'Jack King', teamId: 8, photoUrl: 'https://picsum.photos/seed/player10/200/200', role: 'Back Center', stats: { matches: 32, aces: 8, kills: 5, blocks: 3 } },
 ];
 
 const tomorrow = new Date();
