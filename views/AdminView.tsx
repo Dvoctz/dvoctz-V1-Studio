@@ -22,9 +22,10 @@ const Button: React.FC<{ onClick?: () => void; children: React.ReactNode; classN
     </button>
 );
 
-const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight" />
+const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input {...props} className={`w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight ${className || ''}`} />
 );
+
 
 const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     <select {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight" />
@@ -67,6 +68,7 @@ const TournamentsAdmin = () => {
     const { tournaments, addTournament, updateTournament, deleteTournament } = useSports();
     const [editing, setEditing] = useState<Tournament | Partial<Tournament> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleSave = async (tournament: Tournament | Partial<Tournament>) => {
         setError(null);
@@ -92,11 +94,27 @@ const TournamentsAdmin = () => {
         }
     };
 
+    const filteredTournaments = tournaments.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
     return (
         <AdminSection title="Manage Tournaments">
-            <Button onClick={() => setEditing({})}>Add New Tournament</Button>
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                    </span>
+                    <Input
+                        type="text"
+                        placeholder="Search tournaments..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 !mt-0"
+                    />
+                </div>
+                <Button onClick={() => setEditing({})}>Add New Tournament</Button>
+            </div>
             <div className="mt-4 space-y-2">
-                {tournaments.map(t => (
+                {filteredTournaments.length > 0 ? filteredTournaments.map(t => (
                     <div key={t.id} className="flex items-center justify-between p-3 bg-accent rounded-md">
                         <div>
                             <p className="font-bold">{t.name}</p>
@@ -107,7 +125,7 @@ const TournamentsAdmin = () => {
                             <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
                     </div>
-                ))}
+                )) : <p className="text-text-secondary text-center py-4">No tournaments found.</p>}
             </div>
             {editing && (
                 <FormModal title={editing.id ? "Edit Tournament" : "Add Tournament"} onClose={() => { setEditing(null); setError(null); }}>
@@ -157,6 +175,7 @@ const TeamsAdmin = () => {
     const { teams, addTeam, updateTeam, deleteTeam } = useSports();
     const [editing, setEditing] = useState<Team | Partial<Team> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleSave = async (team: Team | Partial<Team> & { logoFile?: File }) => {
         setError(null);
@@ -182,11 +201,30 @@ const TeamsAdmin = () => {
         }
     };
 
+    const filteredTeams = teams.filter(t =>
+        t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.shortName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
         <AdminSection title="Manage Teams">
-            <Button onClick={() => setEditing({})}>Add New Team</Button>
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
+                     <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                    </span>
+                    <Input
+                        type="text"
+                        placeholder="Search by name or short name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 !mt-0"
+                    />
+                </div>
+                <Button onClick={() => setEditing({})}>Add New Team</Button>
+            </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {teams.map(t => (
+                {filteredTeams.length > 0 ? filteredTeams.map(t => (
                     <div key={t.id} className="p-3 bg-accent rounded-md text-center">
                          {t.logoUrl ? (
                             <img src={t.logoUrl} alt={t.name} className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary object-cover" />
@@ -202,7 +240,7 @@ const TeamsAdmin = () => {
                             <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
                         </div>
                     </div>
-                ))}
+                )) : <p className="text-text-secondary text-center py-4 md:col-span-2 lg:col-span-3">No teams found.</p>}
             </div>
             {editing && (
                 <FormModal title={editing.id ? "Edit Team" : "Add Team"} onClose={() => { setEditing(null); setError(null); }}>
@@ -293,9 +331,10 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
 
 // Players
 const PlayersAdmin = () => {
-    const { players, teams, addPlayer, updatePlayer, deletePlayer } = useSports();
+    const { players, teams, addPlayer, updatePlayer, deletePlayer, getTeamById } = useSports();
     const [editing, setEditing] = useState<Player | Partial<Player> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleSave = async (player: Player | Partial<Player> & { photoFile?: File }) => {
         setError(null);
@@ -322,12 +361,36 @@ const PlayersAdmin = () => {
         }
     };
 
+    const filteredPlayers = players.filter(p => {
+        const team = getTeamById(p.teamId);
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return (
+            p.name.toLowerCase().includes(lowerSearchTerm) ||
+            (team && team.name.toLowerCase().includes(lowerSearchTerm))
+        );
+    });
+
     return (
         <AdminSection title="Manage Players">
-            <Button onClick={() => setEditing({})} disabled={teams.length === 0}>Add New Player</Button>
+             <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                    </span>
+                    <Input
+                        type="text"
+                        placeholder="Search by player or team name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 !mt-0"
+                    />
+                </div>
+                <Button onClick={() => setEditing({})} disabled={teams.length === 0}>Add New Player</Button>
+            </div>
+
             {teams.length === 0 && <p className="text-sm text-yellow-400 mt-2">Please add a team before adding players.</p>}
             <div className="mt-4 space-y-2">
-                {players.map(p => (
+                {filteredPlayers.length > 0 ? filteredPlayers.map(p => (
                     <div key={p.id} className="flex items-center justify-between p-3 bg-accent rounded-md">
                         <div className="flex items-center">
                             {p.photoUrl ? (
@@ -347,7 +410,7 @@ const PlayersAdmin = () => {
                             <Button onClick={() => handleDelete(p.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
                     </div>
-                ))}
+                )) : <p className="text-text-secondary text-center py-4">No players found.</p>}
             </div>
             {editing && (
                 <FormModal title={editing.id ? "Edit Player" : "Add Player"} onClose={() => { setEditing(null); setError(null); }}>
@@ -548,6 +611,7 @@ const FixturesAdmin = () => {
     const [editing, setEditing] = useState<Fixture | Partial<Omit<Fixture, 'score'>> | null>(null);
     const [scoringFixture, setScoringFixture] = useState<Fixture | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
     
     const handleSave = async (fixture: Fixture) => {
         setError(null);
@@ -579,12 +643,40 @@ const FixturesAdmin = () => {
         }
     };
 
+    const filteredFixtures = fixtures.filter(f => {
+        const team1 = getTeamById(f.team1Id);
+        const team2 = getTeamById(f.team2Id);
+        const tournament = tournaments.find(t => t.id === f.tournamentId);
+        const lowerSearchTerm = searchTerm.toLowerCase();
+
+        return (
+            (team1 && team1.name.toLowerCase().includes(lowerSearchTerm)) ||
+            (team2 && team2.name.toLowerCase().includes(lowerSearchTerm)) ||
+            (tournament && tournament.name.toLowerCase().includes(lowerSearchTerm)) ||
+            f.ground.toLowerCase().includes(lowerSearchTerm)
+        );
+    });
+
     return (
         <AdminSection title="Manage Fixtures">
-            <Button onClick={() => setEditing({})} disabled={teams.length < 2 || tournaments.length === 0}>Add New Fixture</Button>
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                    </span>
+                    <Input
+                        type="text"
+                        placeholder="Search by team, tournament, ground..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 !mt-0"
+                    />
+                </div>
+                <Button onClick={() => setEditing({})} disabled={teams.length < 2 || tournaments.length === 0}>Add New Fixture</Button>
+            </div>
             {(teams.length < 2 || tournaments.length === 0) && <p className="text-sm text-yellow-400 mt-2">Add at least 2 teams and 1 tournament to create fixtures.</p>}
             <div className="mt-4 space-y-2">
-                {fixtures.map(f => (
+                {filteredFixtures.length > 0 ? filteredFixtures.map(f => (
                     <div key={f.id} className="p-3 bg-accent rounded-md">
                         <div className="flex items-center justify-between">
                             <p className="font-bold">{getTeamById(f.team1Id)?.shortName || 'N/A'} vs {getTeamById(f.team2Id)?.shortName || 'N/A'}</p>
@@ -603,7 +695,7 @@ const FixturesAdmin = () => {
                             <Button onClick={() => handleDelete(f.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
                     </div>
-                ))}
+                )) : <p className="text-text-secondary text-center py-4">No fixtures found.</p>}
             </div>
              {editing && (
                 <FormModal title={editing.id ? "Edit Fixture" : "Add Fixture"} onClose={() => { setEditing(null); setError(null); }}>
@@ -704,6 +796,7 @@ const SponsorsAdmin = () => {
     const { sponsors, addSponsor, updateSponsor, deleteSponsor } = useSports();
     const [editing, setEditing] = useState<Sponsor | Partial<Sponsor> | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleSave = async (sponsor: Sponsor | Partial<Sponsor> & { logoFile?: File }) => {
         setError(null);
@@ -729,11 +822,27 @@ const SponsorsAdmin = () => {
         }
     };
 
+    const filteredSponsors = sponsors.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
     return (
         <AdminSection title="Manage Sponsors">
-            <Button onClick={() => setEditing({})}>Add New Sponsor</Button>
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                    </span>
+                    <Input
+                        type="text"
+                        placeholder="Search sponsors..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 !mt-0"
+                    />
+                </div>
+                <Button onClick={() => setEditing({})}>Add New Sponsor</Button>
+            </div>
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                {sponsors.map(s => (
+                {filteredSponsors.length > 0 ? filteredSponsors.map(s => (
                     <div key={s.id} className="p-3 bg-accent rounded-md text-center">
                         {s.logoUrl ? (
                             <img src={s.logoUrl} alt={s.name} className="h-12 max-w-[150px] object-contain mx-auto mb-2" />
@@ -748,7 +857,7 @@ const SponsorsAdmin = () => {
                             <Button onClick={() => handleDelete(s.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
                         </div>
                     </div>
-                ))}
+                )) : <p className="text-text-secondary text-center py-4 md:col-span-2 lg:col-span-4">No sponsors found.</p>}
             </div>
              {editing && (
                 <FormModal title={editing.id ? "Edit Sponsor" : "Add Sponsor"} onClose={() => { setEditing(null); setError(null); }}>
