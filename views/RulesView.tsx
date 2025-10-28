@@ -52,7 +52,7 @@ export const RulesView: React.FC = () => {
         setAskError('');
         
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: `Here are the official rules:\n---\n${rules}\n---\nBased ONLY on the rules provided, please answer the following question: "${question}"`,
@@ -66,7 +66,7 @@ export const RulesView: React.FC = () => {
         } catch (err: any) {
             console.error("Error calling Gemini API:", err);
             if (err.message && (err.message.includes("API Key must be set") || err.message.includes("API key not valid"))) {
-                setAskError("The Gemini API key is missing or invalid. An administrator must set the `API_KEY` environment variable in the application's hosting settings (e.g., Vercel). The app may need to be redeployed for the change to take effect.");
+                setAskError("The Gemini API key is missing or invalid. An administrator must set the `VITE_API_KEY` environment variable in the application's hosting settings (e.g., Vercel). The app may need to be redeployed for the change to take effect.");
             } else {
                 setAskError(err.message || "An unexpected error occurred. Please try again.");
             }
