@@ -13,7 +13,8 @@
     "react-dom": "^19.2.0",
     "@supabase/supabase-js": "^2.75.1",
     "tslib": "2.6.3",
-    "papaparse": "5.4.1"
+    "papaparse": "5.4.1",
+    "@vercel/analytics": "^1.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -17,6 +17,7 @@ import { SupabaseSetupView } from './views/SupabaseSetupView';
 import { initializeSupabase } from './supabaseClient';
 import { SupabaseProvider } from './context/SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { Analytics } from '@vercel/analytics/react';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
@@ -113,13 +114,16 @@ const App: React.FC = () => {
     }
 
     return (
-        <SupabaseProvider client={supabaseClient}>
-            <AuthProvider>
-                <SportsDataProvider>
-                    <AppContent />
-                </SportsDataProvider>
-            </AuthProvider>
-        </SupabaseProvider>
+        <>
+            <SupabaseProvider client={supabaseClient}>
+                <AuthProvider>
+                    <SportsDataProvider>
+                        <AppContent />
+                    </SportsDataProvider>
+                </AuthProvider>
+            </SupabaseProvider>
+            <Analytics />
+        </>
     );
 };
 
