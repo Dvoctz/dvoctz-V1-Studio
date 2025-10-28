@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import { GoogleGenAI } from '@google/genai';
@@ -16,8 +16,6 @@ export const RulesView: React.FC = () => {
     const [answer, setAnswer] = useState('');
     const [isAsking, setIsAsking] = useState(false);
     const [askError, setAskError] = useState('');
-
-    const isAiConfigured = useMemo(() => !!process.env.API_KEY, []);
 
     useEffect(() => {
         if (rules) {
@@ -47,17 +45,11 @@ export const RulesView: React.FC = () => {
     
     const handleAskQuestion = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!question.trim() || !isAiConfigured) return;
+        if (!question.trim()) return;
 
         setIsAsking(true);
         setAnswer('');
         setAskError('');
-        
-        if (!process.env.API_KEY) {
-            setAskError("The AI assistant is not available at the moment. Please try again later.");
-            setIsAsking(false);
-            return;
-        }
         
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -73,7 +65,7 @@ export const RulesView: React.FC = () => {
 
         } catch (err: any) {
             console.error("Error calling Gemini API:", err);
-            setAskError(err.message || "An error occurred while getting the answer.");
+            setAskError(err.message || "An error occurred while getting the answer. Please ensure the API key is configured correctly.");
         } finally {
             setIsAsking(false);
         }
@@ -107,35 +99,29 @@ export const RulesView: React.FC = () => {
             <div className="mb-12">
                  <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
                      <h2 className="text-2xl font-bold mb-4 text-white">Ask a Question</h2>
-                     {isAiConfigured ? (
-                         <>
-                            <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text below.</p>
-                            <form onSubmit={handleAskQuestion} className="space-y-4">
-                                <textarea
-                                    value={question}
-                                    onChange={(e) => setQuestion(e.target.value)}
-                                    className="w-full h-24 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight transition-colors"
-                                    placeholder="e.g., How many players are allowed on the court at one time?"
-                                    aria-label="Ask a question about the rules"
-                                    disabled={isAsking}
-                                />
-                                <div className="flex items-center justify-end space-x-4">
-                                    {(answer || askError) && (
-                                        <button type="button" onClick={handleClear} disabled={isAsking} className="text-sm text-text-secondary hover:text-white transition-colors">Clear</button>
-                                    )}
-                                    <button
-                                        type="submit"
-                                        disabled={!question.trim() || isAsking}
-                                        className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
-                                    >
-                                        {isAsking ? 'Thinking...' : 'Ask Question'}
-                                    </button>
-                                </div>
-                            </form>
-                         </>
-                     ) : (
-                        <p className="text-text-secondary">The AI assistant is not configured. An administrator needs to provide an API key in the environment configuration to enable this feature.</p>
-                     )}
+                    <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text below.</p>
+                    <form onSubmit={handleAskQuestion} className="space-y-4">
+                        <textarea
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            className="w-full h-24 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight transition-colors"
+                            placeholder="e.g., How many players are allowed on the court at one time?"
+                            aria-label="Ask a question about the rules"
+                            disabled={isAsking}
+                        />
+                        <div className="flex items-center justify-end space-x-4">
+                            {(answer || askError) && (
+                                <button type="button" onClick={handleClear} disabled={isAsking} className="text-sm text-text-secondary hover:text-white transition-colors">Clear</button>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={!question.trim() || isAsking}
+                                className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+                            >
+                                {isAsking ? 'Thinking...' : 'Ask Question'}
+                            </button>
+                        </div>
+                    </form>
                      
                      {isAsking && (
                         <div className="text-center p-4 mt-4 text-text-secondary">
