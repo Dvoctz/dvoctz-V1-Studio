@@ -4,8 +4,7 @@
   "description": "DVOC Tanzania Volleyball Association App",
   "private": true,
   "scripts": {
-    "prebuild": "node ./build-env.js",
-    "build": "echo 'Build step complete. Vercel will handle the rest.'"
+    "prebuild": "node ./build-env.js"
   },
   "author": "",
   "license": "ISC",
