@@ -1111,7 +1111,7 @@ const ConfigStatusCheck = () => {
     useEffect(() => {
         // This check runs on the client-side.
         // If the environment variable isn't exposed by the build tool/hosting, it will be undefined.
-        if (!process.env.VITE_API_KEY) {
+        if (!process.env.API_KEY) {
             setIsApiKeyMissing(true);
         }
     }, []);
@@ -1132,7 +1132,7 @@ const ConfigStatusCheck = () => {
                         The AI assistant in the "Rules" section is not configured because the Gemini API key is missing.
                     </p>
                     <p className="mt-2">
-                        To fix this, an administrator must set the <code className="bg-yellow-800/50 px-1 py-0.5 rounded">VITE_API_KEY</code> environment variable in your hosting provider's settings (e.g., Vercel). The application will automatically use it once it's available.
+                        To fix this, an administrator must set the <code className="bg-yellow-800/50 px-1 py-0.5 rounded">API_KEY</code> environment variable in your hosting provider's settings (e.g., Vercel). The application will automatically use it once it's available.
                     </p>
                 </div>
             </div>
