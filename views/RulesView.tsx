@@ -51,7 +51,7 @@ export const RulesView: React.FC = () => {
         setAnswer('');
         setAskError('');
         
-        // FIX: Use process.env.API_KEY as per the guidelines.
+        // FIX: Replaced `import.meta.env.VITE_API_KEY` with `process.env.API_KEY` to align with coding guidelines and fix the TypeScript error.
         if (!process.env.API_KEY) {
             setAskError("The AI assistant is not available at the moment. Please try again later.");
             setIsAsking(false);
@@ -59,7 +59,6 @@ export const RulesView: React.FC = () => {
         }
         
         try {
-            // FIX: Initialize GoogleGenAI with process.env.API_KEY as per the guidelines.
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -104,57 +103,55 @@ export const RulesView: React.FC = () => {
                 )}
             </div>
             
-            {!isEditing && (
-                 <div className="mb-12">
-                     <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
-                         <h2 className="text-2xl font-bold mb-4 text-white">Ask a Question</h2>
-                         <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text below.</p>
-                         <form onSubmit={handleAskQuestion} className="space-y-4">
-                             <textarea
-                                value={question}
-                                onChange={(e) => setQuestion(e.target.value)}
-                                className="w-full h-24 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight transition-colors"
-                                placeholder="e.g., How many players are allowed on the court at one time?"
-                                aria-label="Ask a question about the rules"
-                                disabled={isAsking}
-                             />
-                             <div className="flex items-center justify-end space-x-4">
-                                 {(answer || askError) && (
-                                     <button type="button" onClick={handleClear} disabled={isAsking} className="text-sm text-text-secondary hover:text-white transition-colors">Clear</button>
-                                 )}
-                                 <button
-                                    type="submit"
-                                    disabled={!question.trim() || isAsking}
-                                    className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
-                                 >
-                                    {isAsking ? 'Thinking...' : 'Ask Question'}
-                                 </button>
-                             </div>
-                         </form>
-                         
-                         {isAsking && (
-                            <div className="text-center p-4 mt-4 text-text-secondary">
-                                <p>Generating answer, please wait...</p>
-                            </div>
-                         )}
-                         
-                         {askError && (
-                             <div className="mt-4 p-4 bg-red-900/50 border border-red-700 text-red-300 rounded-md">
-                                 <strong>Error:</strong> {askError}
-                             </div>
-                         )}
+            <div className="mb-12">
+                 <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
+                     <h2 className="text-2xl font-bold mb-4 text-white">Ask a Question</h2>
+                     <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text below.</p>
+                     <form onSubmit={handleAskQuestion} className="space-y-4">
+                         <textarea
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            className="w-full h-24 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight transition-colors"
+                            placeholder="e.g., How many players are allowed on the court at one time?"
+                            aria-label="Ask a question about the rules"
+                            disabled={isAsking}
+                         />
+                         <div className="flex items-center justify-end space-x-4">
+                             {(answer || askError) && (
+                                 <button type="button" onClick={handleClear} disabled={isAsking} className="text-sm text-text-secondary hover:text-white transition-colors">Clear</button>
+                             )}
+                             <button
+                                type="submit"
+                                disabled={!question.trim() || isAsking}
+                                className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+                             >
+                                {isAsking ? 'Thinking...' : 'Ask Question'}
+                             </button>
+                         </div>
+                     </form>
+                     
+                     {isAsking && (
+                        <div className="text-center p-4 mt-4 text-text-secondary">
+                            <p>Generating answer, please wait...</p>
+                        </div>
+                     )}
+                     
+                     {askError && (
+                         <div className="mt-4 p-4 bg-red-900/50 border border-red-700 text-red-300 rounded-md">
+                             <strong>Error:</strong> {askError}
+                         </div>
+                     )}
 
-                         {answer && !isAsking && (
-                             <div className="mt-6 pt-6 border-t border-accent">
-                                 <h3 className="text-xl font-semibold text-white mb-2">Answer:</h3>
-                                 <div className="bg-primary p-4 rounded-md text-text-primary leading-relaxed whitespace-pre-line">
-                                     {answer}
-                                 </div>
+                     {answer && !isAsking && (
+                         <div className="mt-6 pt-6 border-t border-accent">
+                             <h3 className="text-xl font-semibold text-white mb-2">Answer:</h3>
+                             <div className="bg-primary p-4 rounded-md text-text-primary leading-relaxed whitespace-pre-line">
+                                 {answer}
                              </div>
-                         )}
-                     </div>
+                         </div>
+                     )}
                  </div>
-             )}
+             </div>
 
             <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
                 {isEditing ? (
