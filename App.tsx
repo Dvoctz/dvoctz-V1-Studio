@@ -10,6 +10,7 @@ import { TournamentDetailView } from './views/TournamentDetailView';
 import { TeamDetailView } from './views/TeamDetailView';
 import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
+import { RulesView } from './views/RulesView';
 import type { View, Tournament, Team } from './types';
 import { SportsDataProvider } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -81,6 +82,8 @@ const AppContent: React.FC = () => {
         return <TeamsView onSelectTeam={handleSelectTeam} />;
       case 'players':
         return <PlayersView />;
+      case 'rules':
+        return <RulesView />;
       case 'tournament-detail':
         return selectedTournament ? <TournamentDetailView tournament={selectedTournament} onBack={handleBackToTournaments} /> : <TournamentsView onSelectTournament={handleSelectTournament} />;
       case 'team-detail':

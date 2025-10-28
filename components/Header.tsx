@@ -59,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
             <NavLink view="tournaments" currentView={currentView} onNavigate={onNavigate}>Tournaments</NavLink>
             <NavLink view="teams" currentView={currentView} onNavigate={onNavigate}>Teams</NavLink>
             <NavLink view="players" currentView={currentView} onNavigate={onNavigate}>Players</NavLink>
+            <NavLink view="rules" currentView={currentView} onNavigate={onNavigate}>Rules</NavLink>
             <NavLink view="admin" currentView={currentView} onNavigate={onNavigate}>
               {currentUser ? 'Admin' : 'Admin Login'}
             </NavLink>
@@ -91,6 +92,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
             <NavLink view="tournaments" currentView={currentView} onNavigate={handleNavClick}>Tournaments</NavLink>
             <NavLink view="teams" currentView={currentView} onNavigate={handleNavClick}>Teams</NavLink>
             <NavLink view="players" currentView={currentView} onNavigate={handleNavClick}>Players</NavLink>
+            <NavLink view="rules" currentView={currentView} onNavigate={handleNavClick}>Rules</NavLink>
             <NavLink view="admin" currentView={currentView} onNavigate={handleNavClick}>
               {currentUser ? 'Admin' : 'Admin Login'}
             </NavLink>

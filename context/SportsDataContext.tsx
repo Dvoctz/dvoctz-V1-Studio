@@ -10,6 +10,7 @@ interface SportsState {
     players: Player[];
     fixtures: Fixture[];
     sponsors: Sponsor[];
+    rules: string;
     loading: boolean;
 }
 
@@ -33,6 +34,7 @@ interface SportsContextType extends SportsState {
     addSponsor: (sponsor: Omit<Sponsor, 'id'> & { logoFile?: File }) => Promise<void>;
     updateSponsor: (sponsor: Sponsor & { logoFile?: File }) => Promise<void>;
     deleteSponsor: (id: number) => Promise<void>;
+    updateRules: (content: string) => Promise<void>;
     bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
@@ -112,6 +114,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         players: [],
         fixtures: [],
         sponsors: [],
+        rules: '',
         loading: true,
     });
 
@@ -124,12 +127,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 { data: playersData, error: playersError },
                 { data: fixturesData, error: fixturesError },
                 { data: sponsorsData, error: sponsorsError },
+                { data: rulesData, error: rulesError },
             ] = await Promise.all([
                 supabase.from('tournaments').select('*').order('name'),
                 supabase.from('teams').select('*').order('name'),
                 supabase.from('players').select('*').order('name'),
                 supabase.from('fixtures').select('*'),
-                supabase.from('sponsors').select('*').order('name')
+                supabase.from('sponsors').select('*').order('name'),
+                supabase.from('game_rules').select('content').limit(1).maybeSingle()
             ]);
 
             if (tournamentsError) throw tournamentsError;
@@ -137,6 +142,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (playersError) throw playersError;
             if (fixturesError) throw fixturesError;
             if (sponsorsError) throw sponsorsError;
+            if (rulesError) {
+                 console.warn('Could not fetch game rules. This is non-critical.', rulesError);
+            }
 
             setState({
                 tournaments: (tournamentsData || []) as DbTournament[],
@@ -144,11 +152,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 players: (playersData || []).map(mapPlayer),
                 fixtures: (fixturesData || []).map(mapFixture),
                 sponsors: (sponsorsData || []).map(mapSponsor),
+                rules: rulesData?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.',
                 loading: false,
             });
         } catch (error) {
             console.error(
-                "Error fetching data from Supabase. This could be due to incorrect credentials, missing tables, or misconfigured Row Level Security policies. Please run the 'setup.sql' script in your Supabase SQL editor.",
+                "Error fetching data from Supabase. This could be due to incorrect credentials, missing tables (including `game_rules`), or misconfigured Row Level Security policies. Please check your Supabase setup.",
                 error
             );
             setState(s => ({...s, loading: false}));
@@ -305,6 +314,27 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 await fetchData();
             },
             deleteSponsor: deleteAction('sponsors'),
+
+            updateRules: async (content: string) => {
+                // Assumes a single row with id=1. If no rows exist, this will fail.
+                // An admin should ensure one row is created in the game_rules table.
+                const { error } = await supabase
+                    .from('game_rules')
+                    .update({ content, updated_at: new Date().toISOString() })
+                    .eq('id', 1);
+
+                if (error) {
+                    // Check if the error is because the row doesn't exist
+                    if (error.code === 'PGRST204') { // PostgREST code for "No rows found"
+                       const { error: insertError } = await supabase.from('game_rules').insert({ id: 1, content });
+                       if (insertError) throw insertError;
+                    } else {
+                        throw error;
+                    }
+                }
+                // Update local state for responsiveness instead of a full refetch
+                setState(s => ({ ...s, rules: content }));
+            },
             
             bulkAddOrUpdateTeams: async (teamsData: CsvTeam[]) => {
                 const teamsToUpsert = teamsData.map(t => ({
