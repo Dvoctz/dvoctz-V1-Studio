@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { parse, unparse } from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole } from '../types';
-import { GEMINI_API_KEY } from '../config/env';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -1107,8 +1106,9 @@ const ExportAdmin = () => {
 
 
 const ConfigStatusCheck = () => {
-    // The API key is now imported directly from the build-time generated file.
-    // If it's not present, the AI assistant features will be disabled.
+    // The API key is now read from the global window object.
+    const GEMINI_API_KEY = (window as any).GEMINI_API_KEY;
+
     if (GEMINI_API_KEY) {
         return null;
     }
