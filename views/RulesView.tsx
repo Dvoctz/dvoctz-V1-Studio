@@ -3,8 +3,9 @@ import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import { GoogleGenAI } from '@google/genai';
 
-// API_KEY is expected to be available in the execution environment.
-const API_KEY = process.env.API_KEY;
+// For deployment platforms like Vercel, client-side variables must be prefixed.
+// We use VITE_ as a standard prefix for framework-agnostic projects.
+const API_KEY = process.env.VITE_API_KEY;
 
 export const RulesView: React.FC = () => {
     const { rules, updateRules, loading } = useSports();
