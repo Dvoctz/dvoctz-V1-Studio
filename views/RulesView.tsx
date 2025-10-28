@@ -65,7 +65,11 @@ export const RulesView: React.FC = () => {
 
         } catch (err: any) {
             console.error("Error calling Gemini API:", err);
-            setAskError(err.message || "An error occurred while getting the answer. Please ensure the API key is configured correctly.");
+            if (err.message && (err.message.includes("API Key must be set") || err.message.includes("API key not valid"))) {
+                setAskError("The Gemini API key is missing or invalid. An administrator must set the `API_KEY` environment variable in the application's hosting settings (e.g., Vercel). The app may need to be redeployed for the change to take effect.");
+            } else {
+                setAskError(err.message || "An unexpected error occurred. Please try again.");
+            }
         } finally {
             setIsAsking(false);
         }
