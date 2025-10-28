@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAndSaveSupabaseClient } from '../supabaseClient';
+// FIX: The 'createAndSaveSupabaseClient' function does not exist in '../supabaseClient'.
+// Replaced with the standard 'createClient' from the supabase library.
+import { createClient } from '@supabase/supabase-js';
 
 interface SupabaseSetupViewProps {
   onSetupComplete: (client: SupabaseClient) => void;
@@ -21,7 +23,8 @@ export const SupabaseSetupView: React.FC<SupabaseSetupViewProps> = ({ onSetupCom
     }
     setLoading(true);
     try {
-        const client = createAndSaveSupabaseClient(url, anonKey);
+        // FIX: Using 'createClient' directly to create a supabase client instance.
+        const client = createClient(url, anonKey);
         onSetupComplete(client);
     } catch (err) {
         setError(err instanceof Error ? err.message : 'An unexpected error occurred.');

@@ -14,10 +14,8 @@ import { RulesView } from './views/RulesView';
 import type { View, Tournament, Team } from './types';
 import { SportsDataProvider } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { SupabaseSetupView } from './views/SupabaseSetupView';
 import { initializeSupabase } from './supabaseClient';
 import { SupabaseProvider } from './context/SupabaseContext';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 
 const AppContent: React.FC = () => {
@@ -110,11 +108,9 @@ const AppContent: React.FC = () => {
 
 
 const App: React.FC = () => {
-    const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(() => initializeSupabase());
-
-    if (!supabaseClient) {
-        return <SupabaseSetupView onSetupComplete={setSupabaseClient} />;
-    }
+    // Initialize the client directly. It will throw an error during development
+    // if credentials in supabaseClient.ts are not set, preventing a broken deployment.
+    const supabaseClient = initializeSupabase();
 
     return (
         <>
