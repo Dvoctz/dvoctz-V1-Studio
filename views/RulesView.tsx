@@ -3,10 +3,6 @@ import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import { GoogleGenAI } from '@google/genai';
 
-// For deployment platforms like Vercel, client-side variables must be prefixed.
-// We use VITE_ as a standard prefix for framework-agnostic projects.
-const API_KEY = process.env.VITE_API_KEY;
-
 export const RulesView: React.FC = () => {
     const { rules, updateRules, loading } = useSports();
     const { currentUser } = useAuth();
@@ -55,14 +51,16 @@ export const RulesView: React.FC = () => {
         setAnswer('');
         setAskError('');
         
-        if (!API_KEY) {
+        // FIX: Use process.env.API_KEY as per the guidelines.
+        if (!process.env.API_KEY) {
             setAskError("The AI assistant is not available at the moment. Please try again later.");
             setIsAsking(false);
             return;
         }
         
         try {
-            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            // FIX: Initialize GoogleGenAI with process.env.API_KEY as per the guidelines.
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: `Here are the official rules:\n---\n${rules}\n---\nBased ONLY on the rules provided, please answer the following question: "${question}"`,
@@ -105,47 +103,12 @@ export const RulesView: React.FC = () => {
                     </button>
                 )}
             </div>
-
-            <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
-                {isEditing ? (
-                    <div className="space-y-4">
-                        <textarea
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            className="w-full h-96 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight"
-                            placeholder="Enter the official game rules here. Use double newlines to create separate paragraphs."
-                            aria-label="Game rules editor"
-                        />
-                        {error && <p className="text-red-500 text-center mt-2">{error}</p>}
-                        <div className="flex justify-end space-x-4">
-                            <button
-                                onClick={handleCancel}
-                                disabled={isSaving}
-                                className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
-                            >
-                                {isSaving ? 'Saving...' : 'Save Rules'}
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="text-text-primary leading-relaxed whitespace-pre-line prose prose-invert max-w-none">
-                        {content}
-                    </div>
-                )}
-            </div>
             
             {!isEditing && (
-                 <div className="mt-12">
+                 <div className="mb-12">
                      <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
                          <h2 className="text-2xl font-bold mb-4 text-white">Ask a Question</h2>
-                         <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text above.</p>
+                         <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text below.</p>
                          <form onSubmit={handleAskQuestion} className="space-y-4">
                              <textarea
                                 value={question}
@@ -192,6 +155,41 @@ export const RulesView: React.FC = () => {
                      </div>
                  </div>
              )}
+
+            <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
+                {isEditing ? (
+                    <div className="space-y-4">
+                        <textarea
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            className="w-full h-96 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight"
+                            placeholder="Enter the official game rules here. Use double newlines to create separate paragraphs."
+                            aria-label="Game rules editor"
+                        />
+                        {error && <p className="text-red-500 text-center mt-2">{error}</p>}
+                        <div className="flex justify-end space-x-4">
+                            <button
+                                onClick={handleCancel}
+                                disabled={isSaving}
+                                className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
+                            >
+                                {isSaving ? 'Saving...' : 'Save Rules'}
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-text-primary leading-relaxed whitespace-pre-line prose prose-invert max-w-none">
+                        {content}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
