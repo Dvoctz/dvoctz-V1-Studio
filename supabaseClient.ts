@@ -1,16 +1,3 @@
-// FIX: Manually define `import.meta.env` to resolve TypeScript errors.
-// This is a workaround for environments where Vite's client types are not automatically available,
-// which was causing "Cannot find type definition file for 'vite/client'" and subsequent errors.
-declare global {
-  interface ImportMetaEnv {
-    readonly VITE_SUPABASE_URL: string;
-    readonly VITE_SUPABASE_ANON_KEY: string;
-  }
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }
-}
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Fixture, Player, Team, Tournament, Sponsor, Score } from './types';
 
@@ -20,13 +7,13 @@ const SUPABASE_ANON_KEY = 'dvoc_supabase_anon_key';
 
 /**
  * Initializes the Supabase client.
- * It first checks for Vite environment variables, then falls back to localStorage.
- * This supports both build-time configuration and user-provided credentials in the browser.
+ * It now exclusively checks localStorage for credentials.
+ * This supports the user-provided credentials from the setup screen.
  * @returns A SupabaseClient instance or null if credentials are not found.
  */
 export const initializeSupabase = (): SupabaseClient | null => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || localStorage.getItem(SUPABASE_URL_KEY);
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem(SUPABASE_ANON_KEY);
+    const supabaseUrl = localStorage.getItem(SUPABASE_URL_KEY);
+    const supabaseAnonKey = localStorage.getItem(SUPABASE_ANON_KEY);
 
     if (supabaseUrl && supabaseAnonKey) {
         return createClient(supabaseUrl, supabaseAnonKey);
