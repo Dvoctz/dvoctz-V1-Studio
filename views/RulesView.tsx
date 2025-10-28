@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
+import { GoogleGenAI } from '@google/genai';
+
+// This is a placeholder for the API key.
+// In a real application, this should be handled securely.
+const API_KEY = process.env.API_KEY;
 
 export const RulesView: React.FC = () => {
     const { rules, updateRules, loading } = useSports();
@@ -10,11 +15,24 @@ export const RulesView: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
 
+    // State for AI Q&A
+    const [ai, setAi] = useState<GoogleGenAI | null>(null);
+    const [question, setQuestion] = useState('');
+    const [answer, setAnswer] = useState('');
+    const [isAsking, setIsAsking] = useState(false);
+    const [askError, setAskError] = useState('');
+
     useEffect(() => {
         if (rules) {
             setContent(rules);
         }
     }, [rules]);
+    
+    useEffect(() => {
+        if (API_KEY) {
+            setAi(new GoogleGenAI({ apiKey: API_KEY }));
+        }
+    }, []);
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -34,6 +52,40 @@ export const RulesView: React.FC = () => {
         setIsEditing(false);
         setError('');
     };
+    
+    const handleAskQuestion = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!question.trim() || !ai) return;
+
+        setIsAsking(true);
+        setAnswer('');
+        setAskError('');
+        
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `Here are the official rules:\n---\n${rules}\n---\nBased ONLY on the rules provided, please answer the following question: "${question}"`,
+                config: {
+                    systemInstruction: "You are an expert on the rules of this sport. Your role is to answer questions based strictly and solely on the provided rules text. If the answer cannot be found in the text, you must state that the information is not available in the provided rules. Do not infer or invent information outside of the text.",
+                }
+            });
+            
+            setAnswer(response.text);
+
+        } catch (err: any) {
+            console.error("Error calling Gemini API:", err);
+            setAskError(err.message || "An error occurred while getting the answer.");
+        } finally {
+            setIsAsking(false);
+        }
+    };
+
+    const handleClear = () => {
+        setQuestion('');
+        setAnswer('');
+        setAskError('');
+    };
+
 
     if (loading) {
         return <div className="text-center text-text-secondary">Loading rules...</div>;
@@ -82,15 +134,62 @@ export const RulesView: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <div className="text-text-primary leading-relaxed whitespace-pre-line">
+                    <div className="text-text-primary leading-relaxed whitespace-pre-line prose prose-invert max-w-none">
                         {content}
                     </div>
                 )}
             </div>
-             {!isEditing && (
-                 <div className="mt-8 text-center text-sm text-text-secondary">
-                    <p>These are the official rules for all tournaments. For any clarifications, please contact the association officials.</p>
-                </div>
+            
+            {!isEditing && (
+                 <div className="mt-12">
+                     <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
+                         <h2 className="text-2xl font-bold mb-4 text-white">Ask a Question</h2>
+                         <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text above.</p>
+                         <form onSubmit={handleAskQuestion} className="space-y-4">
+                             <textarea
+                                value={question}
+                                onChange={(e) => setQuestion(e.target.value)}
+                                className="w-full h-24 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight transition-colors"
+                                placeholder="e.g., How many players are allowed on the court at one time?"
+                                aria-label="Ask a question about the rules"
+                                disabled={isAsking}
+                             />
+                             <div className="flex items-center justify-end space-x-4">
+                                 {(answer || askError) && (
+                                     <button type="button" onClick={handleClear} disabled={isAsking} className="text-sm text-text-secondary hover:text-white transition-colors">Clear</button>
+                                 )}
+                                 <button
+                                    type="submit"
+                                    disabled={!question.trim() || isAsking}
+                                    className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+                                 >
+                                    {isAsking ? 'Thinking...' : 'Ask Question'}
+                                 </button>
+                             </div>
+                         </form>
+                         
+                         {isAsking && (
+                            <div className="text-center p-4 mt-4 text-text-secondary">
+                                <p>Generating answer, please wait...</p>
+                            </div>
+                         )}
+                         
+                         {askError && (
+                             <div className="mt-4 p-4 bg-red-900/50 border border-red-700 text-red-300 rounded-md">
+                                 <strong>Error:</strong> {askError}
+                             </div>
+                         )}
+
+                         {answer && !isAsking && (
+                             <div className="mt-6 pt-6 border-t border-accent">
+                                 <h3 className="text-xl font-semibold text-white mb-2">Answer:</h3>
+                                 <div className="bg-primary p-4 rounded-md text-text-primary leading-relaxed whitespace-pre-line">
+                                     {answer}
+                                 </div>
+                             </div>
+                         )}
+                     </div>
+                 </div>
              )}
         </div>
     );
