@@ -3,8 +3,7 @@ import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import { GoogleGenAI } from '@google/genai';
 
-// This is a placeholder for the API key.
-// In a real application, this should be handled securely.
+// API_KEY is expected to be available in the execution environment.
 const API_KEY = process.env.API_KEY;
 
 export const RulesView: React.FC = () => {
@@ -16,7 +15,6 @@ export const RulesView: React.FC = () => {
     const [error, setError] = useState('');
 
     // State for AI Q&A
-    const [ai, setAi] = useState<GoogleGenAI | null>(null);
     const [question, setQuestion] = useState('');
     const [answer, setAnswer] = useState('');
     const [isAsking, setIsAsking] = useState(false);
@@ -28,11 +26,6 @@ export const RulesView: React.FC = () => {
         }
     }, [rules]);
     
-    useEffect(() => {
-        if (API_KEY) {
-            setAi(new GoogleGenAI({ apiKey: API_KEY }));
-        }
-    }, []);
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -55,13 +48,20 @@ export const RulesView: React.FC = () => {
     
     const handleAskQuestion = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!question.trim() || !ai) return;
+        if (!question.trim()) return;
 
         setIsAsking(true);
         setAnswer('');
         setAskError('');
         
+        if (!API_KEY) {
+            setAskError("The AI assistant is not available at the moment. Please try again later.");
+            setIsAsking(false);
+            return;
+        }
+        
         try {
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: `Here are the official rules:\n---\n${rules}\n---\nBased ONLY on the rules provided, please answer the following question: "${question}"`,
