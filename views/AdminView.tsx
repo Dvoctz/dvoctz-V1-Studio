@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { parse, unparse } from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole } from '../types';
+import { GEMINI_API_KEY } from '../config/env';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -1106,17 +1107,9 @@ const ExportAdmin = () => {
 
 
 const ConfigStatusCheck = () => {
-    const [isApiKeyMissing, setIsApiKeyMissing] = useState(false);
-
-    useEffect(() => {
-        // This check runs on the client-side.
-        // If the environment variable isn't exposed by the build tool/hosting, it will be undefined.
-        if (!process.env.VITE_API_KEY) {
-            setIsApiKeyMissing(true);
-        }
-    }, []);
-
-    if (!isApiKeyMissing) {
+    // The API key is now imported directly from the build-time generated file.
+    // If it's not present, the AI assistant features will be disabled.
+    if (GEMINI_API_KEY) {
         return null;
     }
 

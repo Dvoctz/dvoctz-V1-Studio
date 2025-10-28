@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import { GoogleGenAI } from '@google/genai';
+import { GEMINI_API_KEY } from '../config/env';
 
 export const RulesView: React.FC = () => {
     const { rules, updateRules, loading } = useSports();
@@ -52,7 +53,7 @@ export const RulesView: React.FC = () => {
         setAskError('');
         
         try {
-            const apiKey = process.env.VITE_API_KEY;
+            const apiKey = GEMINI_API_KEY;
             if (!apiKey) {
                 throw new Error("Missing API Key");
             }
