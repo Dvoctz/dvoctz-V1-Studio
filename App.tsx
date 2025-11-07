@@ -17,12 +17,14 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { initializeSupabase } from './supabaseClient';
 import { SupabaseProvider } from './context/SupabaseContext';
 import { Analytics } from '@vercel/analytics/react';
+import { AddToHomeScreenPrompt } from './components/AddToHomeScreenPrompt';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const { currentUser } = useAuth();
+  const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
 
   const handleNavigate = (view: View) => {
     if (view === 'admin' && !currentUser) {
@@ -56,6 +58,30 @@ const AppContent: React.FC = () => {
   const handleBackToTeams = () => {
     setSelectedTeam(null);
     setCurrentView('teams');
+  };
+
+  useEffect(() => {
+    // Logic to show the install prompt on iOS devices
+    const isIos = () => {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      return /iphone|ipad|ipod/.test(userAgent);
+    };
+    
+    // Detects if the app is in standalone mode (already on the home screen).
+    // The `standalone` property is a non-standard API supported by Safari on iOS.
+    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+    // Show the prompt only if it's an iOS device, not in standalone mode, and hasn't been dismissed this session.
+    if (isIos() && !isInStandaloneMode()) {
+      if (!sessionStorage.getItem('iosInstallPromptDismissed')) {
+        setShowIosInstallPrompt(true);
+      }
+    }
+  }, []);
+
+  const handleIosInstallPromptClose = () => {
+    sessionStorage.setItem('iosInstallPromptDismissed', 'true');
+    setShowIosInstallPrompt(false);
   };
   
   // Reset scroll on view change
@@ -102,6 +128,7 @@ const AppContent: React.FC = () => {
         {renderView()}
       </main>
       <Footer />
+      {showIosInstallPrompt && <AddToHomeScreenPrompt onClose={handleIosInstallPromptClose} />}
     </div>
   );
 };
