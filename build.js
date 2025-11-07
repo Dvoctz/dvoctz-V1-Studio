@@ -7,11 +7,13 @@ const distDir = 'dist';
 async function build() {
     console.log('--- Starting build process ---');
 
-    // 1. Create dist directory if it doesn't exist
-    if (!fs.existsSync(distDir)) {
-        fs.mkdirSync(distDir);
-        console.log(`Created directory: ${distDir}`);
+    // 1. Clean and create dist directory
+    if (fs.existsSync(distDir)) {
+        fs.rmSync(distDir, { recursive: true, force: true });
+        console.log(`Cleaned directory: ${distDir}`);
     }
+    fs.mkdirSync(distDir, { recursive: true });
+    console.log(`Created directory: ${distDir}`);
 
     // 2. Bundle the application using esbuild
     try {
@@ -38,7 +40,7 @@ async function build() {
         // Replace script tag to point to the bundled JS file
         html = html.replace(
             '<script type="module" src="/index.tsx"></script>',
-            '<script src="/bundle.js"></script>' // Changed to a standard script tag
+            '<script src="/bundle.js" defer></script>' // Use defer for better loading performance
         );
         console.log('Updated script tag in index.html to point to bundle.js');
 
@@ -64,6 +66,17 @@ async function build() {
     } catch (e) {
         console.error('Processing index.html failed:', e);
         process.exit(1);
+    }
+
+    // 4. Copy static PWA assets to dist
+    const staticAssets = ['manifest.json', 'sw.js', 'icon-192.svg', 'icon-512.svg'];
+    for (const asset of staticAssets) {
+        if (fs.existsSync(asset)) {
+            fs.copyFileSync(asset, path.join(distDir, asset));
+            console.log(`Copied ${asset} to ${distDir}`);
+        } else {
+            console.warn(`Static asset '${asset}' not found. Skipping.`);
+        }
     }
 
     console.log('--- Build process completed successfully! ---');
