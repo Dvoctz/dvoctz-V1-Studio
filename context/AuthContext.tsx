@@ -1,11 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useSupabase } from './SupabaseContext';
-// FIX: The User and Session types are not exported in some Supabase JS SDK versions,
-// causing build errors. Removing the explicit import and using `any` as a fallback.
-// import type { User, Session } from '@supabase/supabase-js';
+// The User and Session types are often part of the Supabase client, but to avoid potential
+// import issues with different SDK versions, we'll keep them flexible.
 import type { UserProfile } from '../types';
 
-// FIX: Define User and Session as `any` as a fallback for compatibility.
 type User = any;
 type Session = any;
 
@@ -30,10 +28,13 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     useEffect(() => {
         const getSessionAndProfile = async () => {
             try {
-                // FIX: Replaced async getSession with synchronous session() for older SDK compatibility.
-                const session = supabase.auth.session();
+                // Use the modern, async `getSession` for Supabase v2
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError) throw sessionError;
+                
                 setSession(session);
                 setCurrentUser(session?.user ?? null);
+                
                 if (session?.user) {
                     const { data: profile, error: profileError } = await supabase
                         .from('user_profiles')
@@ -41,9 +42,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                         .eq('id', session.user.id)
                         .single();
                     
-                    // A missing profile isn't a critical error (e.g., for a new user).
-                    // We only throw if it's a real database error.
-                    if (profileError && profileError.code !== 'PGRST116') {
+                    if (profileError && profileError.code !== 'PGRST116') { // Ignore "user not found" errors
                         throw profileError;
                     }
 
@@ -57,25 +56,22 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 }
             } catch(error) {
                 console.error("Error during initial session load:", error);
-                // Ensure we clear state on error
                 setSession(null);
                 setCurrentUser(null);
                 setUserProfile(null);
             } finally {
-                // Crucially, always mark loading as false so the app can render.
+                // This is critical to prevent a blank screen. It ensures the app always renders.
                 setLoading(false);
             }
         };
 
         getSessionAndProfile();
 
-        // FIX: Adapted onAuthStateChange to match older SDK versions where the
-        // subscription is returned in `data`, not `data.subscription`.
-        const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        // Correctly destructure the subscription object for Supabase v2
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             setSession(session);
             setCurrentUser(session?.user ?? null);
             if (session?.user) {
-                // Also be robust here, though it's less likely to cause a blank screen.
                 try {
                     const { data: profile } = await supabase
                         .from('user_profiles')
@@ -102,15 +98,16 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }, [supabase]);
 
     const login = async (email: string, password_one: string) => {
-        // FIX: Replaced `signInWithPassword` with `signIn` for compatibility with older SDKs.
-        const { error } = await supabase.auth.signIn({ email, password: password_one });
+        // Use `signInWithPassword` for Supabase v2 email/password login
+        const { error } = await supabase.auth.signInWithPassword({ email, password: password_one });
         return { success: !error, error: error?.message || null };
     };
 
     const logout = async () => {
-        // FIX: `signOut` is generally compatible, but this change aligns with other v1 API calls.
         await supabase.auth.signOut();
+        setCurrentUser(null);
         setUserProfile(null);
+        setSession(null);
     };
 
     return (
