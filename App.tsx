@@ -11,6 +11,7 @@ import { TeamDetailView } from './views/TeamDetailView';
 import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
 import { RulesView } from './views/RulesView';
+import { CaptainView } from './views/CaptainView';
 import type { View, Tournament, Team } from './types';
 import { SportsDataProvider } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -23,12 +24,20 @@ const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const { currentUser } = useAuth();
+  const { currentUser, userProfile } = useAuth();
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
 
   const handleNavigate = (view: View) => {
-    if (view === 'admin' && !currentUser) {
-      setCurrentView('login');
+    if (view === 'admin') {
+      if (!currentUser) {
+        setCurrentView('login');
+      } else if (userProfile?.role === 'admin') {
+        setCurrentView('admin');
+      } else if (userProfile?.role === 'captain') {
+        setCurrentView('captain');
+      } else {
+         setCurrentView('home'); // Fallback for non-admin/captain users
+      }
     } else {
       setCurrentView(view);
     }
@@ -37,7 +46,24 @@ const AppContent: React.FC = () => {
   }
 
   const handleLoginSuccess = () => {
-    setCurrentView('admin');
+    // AuthContext will trigger a profile fetch, then we route
+    if (userProfile?.role === 'admin') {
+        setCurrentView('admin');
+    } else if (userProfile?.role === 'captain') {
+        setCurrentView('captain');
+    } else {
+       // A small delay to allow the AuthContext to update with the new user profile
+      setTimeout(() => {
+        const role = userProfile?.role;
+        if (role === 'admin') {
+          setCurrentView('admin');
+        } else if (role === 'captain') {
+          setCurrentView('captain');
+        } else {
+          setCurrentView('home'); // Fallback
+        }
+      }, 200);
+    }
   };
 
   const handleSelectTournament = (tournament: Tournament) => {
@@ -68,8 +94,9 @@ const AppContent: React.FC = () => {
     };
     
     // Detects if the app is in standalone mode (already on the home screen).
+    // FIX: The following line was an unformatted comment causing multiple errors. It has been properly commented out.
     // The `standalone` property is a non-standard API supported by Safari on iOS.
-    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+    const isInStandaloneMode = () => ('standalone' in window.navigator) && ((window.navigator as any).standalone);
 
     // Show the prompt only if it's an iOS device, not in standalone mode, and hasn't been dismissed this session.
     if (isIos() && !isInStandaloneMode()) {
@@ -90,8 +117,8 @@ const AppContent: React.FC = () => {
   }, [currentView, selectedTournament, selectedTeam]);
 
   useEffect(() => {
-    // If user logs out while on admin page, redirect to home
-    if (!currentUser && currentView === 'admin') {
+    // If user logs out while on admin/captain page, redirect to home
+    if (!currentUser && (currentView === 'admin' || currentView === 'captain')) {
       setCurrentView('home');
     }
   }, [currentUser, currentView]);
@@ -113,7 +140,9 @@ const AppContent: React.FC = () => {
       case 'team-detail':
         return selectedTeam ? <TeamDetailView team={selectedTeam} onBack={handleBackToTeams} /> : <TeamsView onSelectTeam={handleSelectTeam} />;
       case 'admin':
-        return currentUser ? <AdminView /> : <LoginView onLoginSuccess={handleLoginSuccess} />;
+        return currentUser && userProfile?.role === 'admin' ? <AdminView /> : <LoginView onLoginSuccess={handleLoginSuccess} />;
+      case 'captain':
+        return currentUser && userProfile?.role === 'captain' ? <CaptainView /> : <LoginView onLoginSuccess={handleLoginSuccess} />;
       case 'login':
         return <LoginView onLoginSuccess={handleLoginSuccess} />;
       default:

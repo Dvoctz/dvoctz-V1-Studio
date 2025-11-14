@@ -13,7 +13,7 @@ const NavLink: React.FC<{
   onNavigate: (view: View) => void;
   children: React.ReactNode;
 }> = ({ view, currentView, onNavigate, children }) => {
-  const isActive = currentView === view || (view === 'admin' && currentView === 'login');
+  const isActive = currentView === view || (view === 'admin' && (currentView === 'login' || currentView === 'captain'));
   return (
     <button
       onClick={() => onNavigate(view)}
@@ -31,7 +31,7 @@ const NavLink: React.FC<{
 
 export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { currentUser, logout } = useAuth();
+  const { currentUser, userProfile, logout } = useAuth();
 
   const handleNavClick = (view: View) => {
     onNavigate(view);
@@ -42,6 +42,13 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
     logout();
     setIsMenuOpen(false);
     onNavigate('home');
+  }
+
+  const getAdminLinkText = () => {
+    if (!currentUser) return 'Admin Login';
+    if (userProfile?.role === 'admin') return 'Admin Panel';
+    if (userProfile?.role === 'captain') return 'Captain Dashboard';
+    return 'Dashboard';
   }
 
   return (
@@ -61,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
             <NavLink view="players" currentView={currentView} onNavigate={onNavigate}>Players</NavLink>
             <NavLink view="rules" currentView={currentView} onNavigate={onNavigate}>Rules</NavLink>
             <NavLink view="admin" currentView={currentView} onNavigate={onNavigate}>
-              {currentUser ? 'Admin' : 'Admin Login'}
+              {getAdminLinkText()}
             </NavLink>
              {currentUser && (
               <button onClick={handleLogout} className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-300 text-text-secondary hover:bg-accent hover:text-text-primary">
@@ -94,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
             <NavLink view="players" currentView={currentView} onNavigate={handleNavClick}>Players</NavLink>
             <NavLink view="rules" currentView={currentView} onNavigate={handleNavClick}>Rules</NavLink>
             <NavLink view="admin" currentView={currentView} onNavigate={handleNavClick}>
-              {currentUser ? 'Admin' : 'Admin Login'}
+              {getAdminLinkText()}
             </NavLink>
              {currentUser && (
               <button onClick={handleLogout} className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-300 w-full text-left text-text-secondary hover:bg-accent hover:text-text-primary">

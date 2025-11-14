@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { parse, unparse } from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
-import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, Club, UserProfile, UserRole } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -252,10 +253,12 @@ const TeamsAdmin = () => {
 };
 
 const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ team, onSave, onCancel, error }) => {
+    const { clubs } = useSports();
     const [formData, setFormData] = useState({
         name: '',
         shortName: '',
         division: 'Division 1',
+        clubId: null,
         ...team
     });
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -281,7 +284,11 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
         if (fileInput) fileInput.value = '';
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: name === 'clubId' ? (value ? parseInt(value, 10) : null) : value });
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSave({ ...formData, logoFile });
@@ -319,6 +326,13 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
                 <Select id="division" name="division" value={formData.division || 'Division 1'} onChange={handleChange} required>
                     <option>Division 1</option>
                     <option>Division 2</option>
+                </Select>
+            </div>
+            <div>
+                <Label htmlFor="clubId">Club (Optional)</Label>
+                <Select id="clubId" name="clubId" value={formData.clubId || ''} onChange={handleChange}>
+                    <option value="">No Club</option>
+                    {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
             </div>
             <div className="flex justify-end space-x-2">
@@ -1133,6 +1147,192 @@ const ConfigStatusCheck = () => {
     );
 };
 
+// Clubs
+const ClubsAdmin = () => {
+    const { clubs, addClub, updateClub, deleteClub } = useSports();
+    const [editing, setEditing] = useState<Club | Partial<Club> | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSave = async (club: Club | Partial<Club>) => {
+        setError(null);
+        try {
+            if ('id' in club && club.id) {
+                await updateClub(club as Club);
+            } else {
+                await addClub(club as Omit<Club, 'id'>);
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this club? All teams will be un-assigned from it.')) {
+            try {
+                await deleteClub(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
+    };
+
+    return (
+        <AdminSection title="Manage Clubs">
+            <div className="text-right mb-4">
+                <Button onClick={() => setEditing({})}>Add New Club</Button>
+            </div>
+            <div className="mt-4 space-y-2">
+                {clubs.map(c => (
+                    <div key={c.id} className="flex items-center justify-between p-3 bg-accent rounded-md">
+                        <p className="font-bold">{c.name}</p>
+                        <div className="space-x-2">
+                            <Button onClick={() => setEditing(c)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
+                            <Button onClick={() => handleDelete(c.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {editing && (
+                <FormModal title={editing.id ? "Edit Club" : "Add Club"} onClose={() => { setEditing(null); setError(null); }}>
+                    <ClubForm club={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
+                </FormModal>
+            )}
+        </AdminSection>
+    );
+};
+
+const ClubForm: React.FC<{ club: Club | Partial<Club>, onSave: (c: any) => void, onCancel: () => void, error: string | null }> = ({ club, onSave, onCancel, error }) => {
+    const [formData, setFormData] = useState({ name: '', ...club });
+    const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(formData); };
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div>
+                <Label htmlFor="name">Club Name</Label>
+                <Input id="name" name="name" type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+            </div>
+            <div className="flex justify-end space-x-2">
+                <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                <Button type="submit">Save</Button>
+            </div>
+        </form>
+    );
+};
+
+// User Management
+const UsersAdmin = () => {
+    const { allUserProfiles, updateUserProfile, assignTeamsToCaptain, teams, captainTeams } = useSports();
+    const { currentUser } = useAuth();
+    const [editing, setEditing] = useState<UserProfile | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSave = async (profile: UserProfile, assignedTeamIds: number[]) => {
+        setError(null);
+        try {
+            await updateUserProfile(profile);
+            if (profile.role === 'captain') {
+                await assignTeamsToCaptain(profile.id, assignedTeamIds);
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+    
+    // Filter out the current admin from the list to prevent self-lockout
+    const usersToList = allUserProfiles.filter(p => p.id !== currentUser?.id);
+
+    return (
+        <AdminSection title="Manage Users & Captains">
+            <p className="text-text-secondary mb-4 text-sm">Assign roles and manage team assignments for captains.</p>
+             <div className="mt-4 space-y-2">
+                {usersToList.map(p => (
+                    <div key={p.id} className="flex items-center justify-between p-3 bg-accent rounded-md">
+                        <div>
+                            <p className="font-bold">{p.fullName || 'No Name Provided'}</p>
+                            <p className="text-xs text-text-secondary">{p.email}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <span className="text-sm font-semibold uppercase bg-primary px-2 py-1 rounded-md">{p.role}</span>
+                            <Button onClick={() => setEditing(p)} className="bg-blue-600 hover:bg-blue-500">Manage</Button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {editing && (
+                 <FormModal title={`Manage User: ${editing.fullName}`} onClose={() => { setEditing(null); setError(null); }}>
+                    <UserForm 
+                        profile={editing} 
+                        onSave={handleSave} 
+                        onCancel={() => { setEditing(null); setError(null); }} 
+                        error={error} 
+                        allTeams={teams}
+                        captainTeams={captainTeams}
+                    />
+                </FormModal>
+            )}
+        </AdminSection>
+    );
+};
+
+const UserForm: React.FC<{ profile: UserProfile, onSave: (p: UserProfile, teamIds: number[]) => void, onCancel: () => void, error: string | null, allTeams: Team[], captainTeams: any[] }> = ({ profile, onSave, onCancel, error, allTeams, captainTeams }) => {
+    const [formData, setFormData] = useState<UserProfile>(profile);
+    const [assignedTeamIds, setAssignedTeamIds] = useState<number[]>(
+        captainTeams.filter(ct => ct.user_id === profile.id).map(ct => ct.team_id)
+    );
+
+    const handleTeamAssignmentChange = (teamId: number, checked: boolean) => {
+        if (checked) {
+            setAssignedTeamIds(prev => [...prev, teamId]);
+        } else {
+            setAssignedTeamIds(prev => prev.filter(id => id !== teamId));
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(formData, assignedTeamIds);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            {error && <ErrorMessage message={error} />}
+             <div>
+                <Label htmlFor="role">User Role</Label>
+                <Select id="role" name="role" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})}>
+                    <option value="user">User</option>
+                    <option value="captain">Captain</option>
+                    <option value="admin">Admin</option>
+                </Select>
+            </div>
+            {formData.role === 'captain' && (
+                <fieldset className="border border-accent p-4 rounded-md">
+                    <legend className="px-2 text-text-secondary font-semibold">Assign Teams to Captain</legend>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {allTeams.length > 0 ? allTeams.map(team => (
+                            <div key={team.id} className="flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id={`team-${team.id}`}
+                                    checked={assignedTeamIds.includes(team.id)}
+                                    onChange={(e) => handleTeamAssignmentChange(team.id, e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-highlight focus:ring-highlight"
+                                />
+                                <label htmlFor={`team-${team.id}`} className="ml-3 text-sm text-text-primary">{team.name}</label>
+                            </div>
+                        )) : <p className="text-text-secondary text-sm">No teams available to assign.</p>}
+                    </div>
+                </fieldset>
+            )}
+            <div className="flex justify-end space-x-2 pt-4">
+                <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                <Button type="submit">Save Changes</Button>
+            </div>
+        </form>
+    );
+};
+
 // Main View
 export const AdminView: React.FC = () => {
     const [activeTab, setActiveTab] = useState('tournaments');
@@ -1141,8 +1341,10 @@ export const AdminView: React.FC = () => {
         switch (activeTab) {
             case 'tournaments': return <TournamentsAdmin />;
             case 'teams': return <TeamsAdmin />;
+            case 'clubs': return <ClubsAdmin />;
             case 'players': return <PlayersAdmin />;
             case 'fixtures': return <FixturesAdmin />;
+            case 'users': return <UsersAdmin />;
             case 'sponsors': return <SponsorsAdmin />;
             case 'bulk-import': return <BulkImportAdmin />;
             case 'export': return <ExportAdmin />;
@@ -1170,8 +1372,10 @@ export const AdminView: React.FC = () => {
                 <div className="flex overflow-x-auto">
                     <TabButton tab="tournaments" label="Tournaments" />
                     <TabButton tab="teams" label="Teams" />
+                    <TabButton tab="clubs" label="Clubs" />
                     <TabButton tab="players" label="Players" />
                     <TabButton tab="fixtures" label="Fixtures" />
+                    <TabButton tab="users" label="Users" />
                     <TabButton tab="sponsors" label="Sponsors" />
                     <TabButton tab="bulk-import" label="Bulk Import" />
                     <TabButton tab="export" label="Export Data" />
