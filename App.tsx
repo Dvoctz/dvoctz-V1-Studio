@@ -24,48 +24,56 @@ const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, loading: authLoading } = useAuth();
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
+  const [viewBeforeLogin, setViewBeforeLogin] = useState<View | null>(null);
 
+  // This is the primary effect for handling auth-based navigation and redirects.
+  // It ensures the user is on the correct page based on their login status and role.
   useEffect(() => {
-    // This effect handles navigation after login. When the userProfile is populated
-    // (meaning onAuthStateChange has fired and fetched the profile) and the user
-    // is on the login screen, we redirect them to their appropriate dashboard.
-    if (userProfile && currentView === 'login') {
-        if (userProfile.role === 'admin') {
-            setCurrentView('admin');
-        } else if (userProfile.role === 'captain') {
-            setCurrentView('captain');
-        } else {
-            setCurrentView('home');
-        }
-    }
-  }, [userProfile, currentView]);
+    // Don't make decisions until the initial auth check is complete.
+    if (authLoading) return;
 
-
-  const handleNavigate = (view: View) => {
-    if (view === 'admin') {
-      if (!currentUser) {
+    // --- Handle Logged-Out Users ---
+    if (!currentUser) {
+      // If a logged-out user tries to access a protected page, redirect them to login.
+      if (currentView === 'admin' || currentView === 'captain') {
+        setViewBeforeLogin(currentView); // Remember where they wanted to go
         setCurrentView('login');
-      } else if (userProfile?.role === 'admin') {
-        setCurrentView('admin');
-      } else if (userProfile?.role === 'captain') {
-        setCurrentView('captain');
-      } else {
-         setCurrentView('home'); // Fallback for non-admin/captain users
       }
-    } else {
-      setCurrentView(view);
+      return;
     }
+
+    // --- Handle Logged-In Users ---
+    if (userProfile) {
+      // Don't show the login page to an already logged-in user. Redirect them.
+      if (currentView === 'login') {
+        const targetView = viewBeforeLogin || (userProfile.role === 'admin' ? 'admin' : userProfile.role === 'captain' ? 'captain' : 'home');
+        setCurrentView(targetView);
+        setViewBeforeLogin(null);
+      }
+      // If a user with the wrong role is on a protected page, send them home.
+      else if (currentView === 'admin' && userProfile.role !== 'admin') {
+        setCurrentView('home');
+      } else if (currentView === 'captain' && userProfile.role !== 'captain') {
+        setCurrentView('home');
+      }
+    }
+  }, [currentUser, userProfile, currentView, authLoading, viewBeforeLogin]);
+
+
+  // Simplified navigation handler. It just sets the user's intended view.
+  // The useEffect above handles the logic of whether they are allowed to see it.
+  const handleNavigate = (view: View) => {
+    setCurrentView(view);
     setSelectedTournament(null);
     setSelectedTeam(null);
   }
 
   const handleLoginSuccess = () => {
-    // This function is intentionally left empty.
-    // The login action triggers an onAuthStateChange event in AuthContext.
-    // That event updates the userProfile, which is then caught by the useEffect above
-    // to handle navigation. This is more reliable than trying to navigate immediately.
+    // This function is now primarily handled by the main useEffect.
+    // When login is successful, onAuthStateChange fires, userProfile is updated,
+    // and the effect redirects the user from the 'login' view.
   };
 
   const handleSelectTournament = (tournament: Tournament) => {
@@ -89,22 +97,11 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    // Logic to show the install prompt on iOS devices
-    const isIos = () => {
-      const userAgent = window.navigator.userAgent.toLowerCase();
-      return /iphone|ipad|ipod/.test(userAgent);
-    };
-    
-    // Detects if the app is in standalone mode (already on the home screen).
-    // FIX: The following line was an unformatted comment causing multiple errors. It has been properly commented out.
-    // The `standalone` property is a non-standard API supported by Safari on iOS.
+    const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
     const isInStandaloneMode = () => ('standalone' in window.navigator) && ((window.navigator as any).standalone);
 
-    // Show the prompt only if it's an iOS device, not in standalone mode, and hasn't been dismissed this session.
-    if (isIos() && !isInStandaloneMode()) {
-      if (!sessionStorage.getItem('iosInstallPromptDismissed')) {
-        setShowIosInstallPrompt(true);
-      }
+    if (isIos() && !isInStandaloneMode() && !sessionStorage.getItem('iosInstallPromptDismissed')) {
+      setShowIosInstallPrompt(true);
     }
   }, []);
 
@@ -113,22 +110,19 @@ const AppContent: React.FC = () => {
     setShowIosInstallPrompt(false);
   };
   
-  // Reset scroll on view change
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [currentView, selectedTournament, selectedTeam]);
 
-  useEffect(() => {
-    // If user logs out while on admin/captain page, redirect to home
-    if (!currentUser && (currentView === 'admin' || currentView === 'captain')) {
-      setCurrentView('home');
-    }
-  }, [currentUser, currentView]);
-
   const renderView = () => {
+    // Show a loading indicator for protected routes while auth is being checked.
+    if (authLoading && (currentView === 'admin' || currentView === 'captain' || currentView === 'login')) {
+      return <div className="text-center p-8 text-text-secondary">Checking authentication...</div>;
+    }
+
     switch (currentView) {
       case 'home':
-        return <HomeView onNavigate={setCurrentView} onSelectTournament={handleSelectTournament} />;
+        return <HomeView onNavigate={handleNavigate} onSelectTournament={handleSelectTournament} />;
       case 'tournaments':
         return <TournamentsView onSelectTournament={handleSelectTournament} />;
       case 'teams':
@@ -142,13 +136,15 @@ const AppContent: React.FC = () => {
       case 'team-detail':
         return selectedTeam ? <TeamDetailView team={selectedTeam} onBack={handleBackToTeams} /> : <TeamsView onSelectTeam={handleSelectTeam} />;
       case 'admin':
-        return currentUser && userProfile?.role === 'admin' ? <AdminView /> : <LoginView onLoginSuccess={handleLoginSuccess} />;
+        // The redirect effect handles unauthorized access, so if we reach here, the user should be an admin.
+        // Rendering null prevents flashing content during the brief redirect period.
+        return userProfile?.role === 'admin' ? <AdminView /> : null;
       case 'captain':
-        return currentUser && userProfile?.role === 'captain' ? <CaptainView /> : <LoginView onLoginSuccess={handleLoginSuccess} />;
+        return userProfile?.role === 'captain' ? <CaptainView /> : null;
       case 'login':
         return <LoginView onLoginSuccess={handleLoginSuccess} />;
       default:
-        return <HomeView onNavigate={setCurrentView} onSelectTournament={handleSelectTournament} />;
+        return <HomeView onNavigate={handleNavigate} onSelectTournament={handleSelectTournament} />;
     }
   };
 
@@ -166,8 +162,6 @@ const AppContent: React.FC = () => {
 
 
 const App: React.FC = () => {
-    // Initialize the client directly. It will throw an error during development
-    // if credentials in supabaseClient.ts are not set, preventing a broken deployment.
     const supabaseClient = initializeSupabase();
 
     return (
