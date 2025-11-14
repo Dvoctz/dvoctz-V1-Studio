@@ -27,6 +27,22 @@ const AppContent: React.FC = () => {
   const { currentUser, userProfile } = useAuth();
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
 
+  useEffect(() => {
+    // This effect handles navigation after login. When the userProfile is populated
+    // (meaning onAuthStateChange has fired and fetched the profile) and the user
+    // is on the login screen, we redirect them to their appropriate dashboard.
+    if (userProfile && currentView === 'login') {
+        if (userProfile.role === 'admin') {
+            setCurrentView('admin');
+        } else if (userProfile.role === 'captain') {
+            setCurrentView('captain');
+        } else {
+            setCurrentView('home');
+        }
+    }
+  }, [userProfile, currentView]);
+
+
   const handleNavigate = (view: View) => {
     if (view === 'admin') {
       if (!currentUser) {
@@ -46,24 +62,10 @@ const AppContent: React.FC = () => {
   }
 
   const handleLoginSuccess = () => {
-    // AuthContext will trigger a profile fetch, then we route
-    if (userProfile?.role === 'admin') {
-        setCurrentView('admin');
-    } else if (userProfile?.role === 'captain') {
-        setCurrentView('captain');
-    } else {
-       // A small delay to allow the AuthContext to update with the new user profile
-      setTimeout(() => {
-        const role = userProfile?.role;
-        if (role === 'admin') {
-          setCurrentView('admin');
-        } else if (role === 'captain') {
-          setCurrentView('captain');
-        } else {
-          setCurrentView('home'); // Fallback
-        }
-      }, 200);
-    }
+    // This function is intentionally left empty.
+    // The login action triggers an onAuthStateChange event in AuthContext.
+    // That event updates the userProfile, which is then caught by the useEffect above
+    // to handle navigation. This is more reliable than trying to navigate immediately.
   };
 
   const handleSelectTournament = (tournament: Tournament) => {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
@@ -5,7 +6,7 @@ import { GoogleGenAI } from '@google/genai';
 
 export const RulesView: React.FC = () => {
     const { rules, updateRules, loading } = useSports();
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [content, setContent] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -94,7 +95,7 @@ export const RulesView: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                 <h1 className="text-4xl font-extrabold">Official Game Rules</h1>
-                {currentUser && !isEditing && (
+                {userProfile?.role === 'admin' && !isEditing && (
                     <button
                         onClick={() => setIsEditing(true)}
                         className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors"
