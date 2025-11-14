@@ -1111,7 +1111,6 @@ const ExportAdmin = () => {
 
 
 const ConfigStatusCheck = () => {
-    // The API key is now read from the global window object.
     const GEMINI_API_KEY = (window as any).GEMINI_API_KEY;
 
     if (GEMINI_API_KEY) {

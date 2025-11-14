@@ -87,7 +87,6 @@ const mapFixture = (f: any): Fixture => ({
 
 
 // Helper function to upload a file to Supabase Storage.
-// NOTE: This requires a public bucket named 'assets' to be created in your Supabase project.
 const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;

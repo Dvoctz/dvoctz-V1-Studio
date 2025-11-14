@@ -27,40 +27,28 @@ const AppContent: React.FC = () => {
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
   const [viewBeforeLogin, setViewBeforeLogin] = useState<View | null>(null);
 
-  // This is the primary effect for handling auth-based navigation and redirects.
-  // It ensures the user is on the correct page based on their login status and role.
   useEffect(() => {
-    // Don't make decisions until the initial auth check is complete.
     if (authLoading) return;
 
-    // --- Handle Logged-Out Users ---
     if (!currentUser) {
-      // If a logged-out user tries to access a protected page, redirect them to login.
       if (currentView === 'admin') {
-        setViewBeforeLogin(currentView); // Remember where they wanted to go
+        setViewBeforeLogin(currentView);
         setCurrentView('login');
       }
       return;
     }
 
-    // --- Handle Logged-In Users ---
     if (userProfile) {
-      // Don't show the login page to an already logged-in user. Redirect them.
       if (currentView === 'login') {
         const targetView = viewBeforeLogin || (userProfile.role === 'admin' ? 'admin' : 'home');
         setCurrentView(targetView);
         setViewBeforeLogin(null);
-      }
-      // If a user with the wrong role is on a protected page, send them home.
-      else if (currentView === 'admin' && userProfile.role !== 'admin') {
+      } else if (currentView === 'admin' && userProfile.role !== 'admin') {
         setCurrentView('home');
       }
     }
   }, [currentUser, userProfile, currentView, authLoading, viewBeforeLogin]);
 
-
-  // Simplified navigation handler. It just sets the user's intended view.
-  // The useEffect above handles the logic of whether they are allowed to see it.
   const handleNavigate = (view: View) => {
     setCurrentView(view);
     setSelectedTournament(null);
@@ -68,9 +56,7 @@ const AppContent: React.FC = () => {
   }
 
   const handleLoginSuccess = () => {
-    // This function is now primarily handled by the main useEffect.
-    // When login is successful, onAuthStateChange fires, userProfile is updated,
-    // and the effect redirects the user from the 'login' view.
+    // This is handled by the main useEffect now.
   };
 
   const handleSelectTournament = (tournament: Tournament) => {
@@ -112,7 +98,6 @@ const AppContent: React.FC = () => {
   }, [currentView, selectedTournament, selectedTeam]);
 
   const renderView = () => {
-    // Show a loading indicator for protected routes while auth is being checked.
     if (authLoading && (currentView === 'admin' || currentView === 'login')) {
       return <div className="text-center p-8 text-text-secondary">Checking authentication...</div>;
     }
@@ -133,8 +118,6 @@ const AppContent: React.FC = () => {
       case 'team-detail':
         return selectedTeam ? <TeamDetailView team={selectedTeam} onBack={handleBackToTeams} /> : <TeamsView onSelectTeam={handleSelectTeam} />;
       case 'admin':
-        // The redirect effect handles unauthorized access, so if we reach here, the user should be an admin.
-        // Rendering null prevents flashing content during the brief redirect period.
         return userProfile?.role === 'admin' ? <AdminView /> : null;
       case 'login':
         return <LoginView onLoginSuccess={handleLoginSuccess} />;
@@ -154,7 +137,6 @@ const AppContent: React.FC = () => {
     </div>
   );
 };
-
 
 const App: React.FC = () => {
     const supabaseClient = initializeSupabase();
