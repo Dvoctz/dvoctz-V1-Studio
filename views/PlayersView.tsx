@@ -29,19 +29,19 @@ const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
                 <p className="text-sm text-text-secondary">Team: <span className="font-semibold text-text-primary">{team?.name || 'N/A'}</span></p>
                  <div className="grid grid-cols-4 gap-2 mt-3 text-xs text-text-secondary">
                     <div>
-                        <span className="font-bold text-white block">{player.stats.matches}</span>
+                        <span className="font-bold text-white block">{player.stats?.matches ?? 0}</span>
                         <span>Matches</span>
                     </div>
                     <div>
-                        <span className="font-bold text-white block">{player.stats.aces}</span>
+                        <span className="font-bold text-white block">{player.stats?.aces ?? 0}</span>
                         <span>Aces</span>
                     </div>
                      <div>
-                        <span className="font-bold text-white block">{player.stats.kills}</span>
+                        <span className="font-bold text-white block">{player.stats?.kills ?? 0}</span>
                         <span>Kills</span>
                     </div>
                     <div>
-                        <span className="font-bold text-white block">{player.stats.blocks}</span>
+                        <span className="font-bold text-white block">{player.stats?.blocks ?? 0}</span>
                         <span>Blocks</span>
                     </div>
                 </div>

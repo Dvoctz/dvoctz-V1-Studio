@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -81,7 +82,7 @@ const mapPlayer = (p: any): Player => ({
   teamId: p.team_id,
   photoUrl: p.photo_url,
   role: p.role,
-  stats: p.stats,
+  stats: p.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 },
 });
 
 const mapSponsor = (s: any): Sponsor => ({

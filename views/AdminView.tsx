@@ -441,7 +441,8 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
     const [formData, setFormData] = useState({
         name: '',
         role: 'Main Netty' as PlayerRole,
-        ...player
+        ...player,
+        stats: player.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 },
     });
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState(player.photoUrl);
