@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { parse, unparse } from 'papaparse';
+import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, Club, UserProfile, UserRole } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -956,7 +956,7 @@ const BulkImportAdmin = () => {
 
     const parseCSV = (file: File): Promise<any[]> => {
         return new Promise((resolve, reject) => {
-            parse(file, {
+            Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
@@ -1073,7 +1073,7 @@ const ExportAdmin = () => {
             division: t.division,
             logoUrl: t.logoUrl || '',
         }));
-        const csv = unparse(data);
+        const csv = Papa.unparse(data);
         downloadCSV(csv, `dvoc_teams_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
@@ -1095,7 +1095,7 @@ const ExportAdmin = () => {
                 blocks: p.stats?.blocks ?? 0,
             };
         });
-        const csv = unparse(data);
+        const csv = Papa.unparse(data);
         downloadCSV(csv, `dvoc_players_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
