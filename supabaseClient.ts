@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Fixture, Player, Team, Tournament, Sponsor, Score, Club, UserProfile, CaptainTeam, TournamentRoster } from './types';
+import type { Fixture, Player, Team, Tournament, Sponsor, Score } from './types';
 
 // --- IMPORTANT ACTION REQUIRED ---
 // Replace these placeholder values with your actual Supabase credentials.
@@ -32,7 +32,3 @@ export type DbTeam = Omit<Team, 'id'> & { id: number };
 export type DbPlayer = Omit<Player, 'id'> & { id: number };
 export type DbFixture = Omit<Fixture, 'id' | 'score'> & { id: number; score: Score | null };
 export type DbSponsor = Omit<Sponsor, 'id'> & { id: number };
-export type DbClub = Omit<Club, 'id'> & { id: number };
-export type DbUserProfile = Omit<UserProfile, 'id'> & { id: string };
-export type DbCaptainTeam = CaptainTeam;
-export type DbTournamentRoster = Omit<TournamentRoster, 'id'> & { id: number };

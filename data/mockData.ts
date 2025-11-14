@@ -20,18 +20,17 @@ export const tournaments: Tournament[] = [
   { id: 4, name: 'Rising Stars Invitational', division: 'Division 2' },
 ];
 
-// FIX: Added `clubId: null` to all team objects to satisfy the 'Team' type.
 export const teams: Team[] = [
   // Division 1
-  { id: 1, name: 'Stallions', shortName: 'STL', logoUrl: 'https://picsum.photos/seed/team1/100/100', division: 'Division 1', clubId: null },
-  { id: 2, name: 'Panthers', shortName: 'PAN', logoUrl: 'https://picsum.photos/seed/team2/100/100', division: 'Division 1', clubId: null },
-  { id: 3, name: 'Titans', shortName: 'TTN', logoUrl: 'https://picsum.photos/seed/team3/100/100', division: 'Division 1', clubId: null },
-  { id: 4, name: 'Wolverines', shortName: 'WLV', logoUrl: 'https://picsum.photos/seed/team4/100/100', division: 'Division 1', clubId: null },
+  { id: 1, name: 'Stallions', shortName: 'STL', logoUrl: 'https://picsum.photos/seed/team1/100/100', division: 'Division 1' },
+  { id: 2, name: 'Panthers', shortName: 'PAN', logoUrl: 'https://picsum.photos/seed/team2/100/100', division: 'Division 1' },
+  { id: 3, name: 'Titans', shortName: 'TTN', logoUrl: 'https://picsum.photos/seed/team3/100/100', division: 'Division 1' },
+  { id: 4, name: 'Wolverines', shortName: 'WLV', logoUrl: 'https://picsum.photos/seed/team4/100/100', division: 'Division 1' },
   // Division 2
-  { id: 5, name: 'Cobras', shortName: 'COB', logoUrl: 'https://picsum.photos/seed/team5/100/100', division: 'Division 2', clubId: null },
-  { id: 6, name: 'Eagles', shortName: 'EAG', logoUrl: 'https://picsum.photos/seed/team6/100/100', division: 'Division 2', clubId: null },
-  { id: 7, name: 'Sharks', shortName: 'SHK', logoUrl: 'https://picsum.photos/seed/team7/100/100', division: 'Division 2', clubId: null },
-  { id: 8, name: 'Rhinos', shortName: 'RHI', logoUrl: 'https://picsum.photos/seed/team8/100/100', division: 'Division 2', clubId: null },
+  { id: 5, name: 'Cobras', shortName: 'COB', logoUrl: 'https://picsum.photos/seed/team5/100/100', division: 'Division 2' },
+  { id: 6, name: 'Eagles', shortName: 'EAG', logoUrl: 'https://picsum.photos/seed/team6/100/100', division: 'Division 2' },
+  { id: 7, name: 'Sharks', shortName: 'SHK', logoUrl: 'https://picsum.photos/seed/team7/100/100', division: 'Division 2' },
+  { id: 8, name: 'Rhinos', shortName: 'RHI', logoUrl: 'https://picsum.photos/seed/team8/100/100', division: 'Division 2' },
 ];
 
 export const players: Player[] = [

@@ -1,4 +1,4 @@
-export type View = 'home' | 'tournaments' | 'teams' | 'players' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules' | 'captain';
+export type View = 'home' | 'tournaments' | 'teams' | 'players' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules';
 
 export type PlayerRole = 'Main Netty' | 'Left Front' | 'Right Front' | 'Net Center' | 'Back Center' | 'Left Back' | 'Right Back' | 'Right Netty' | 'Left Netty' | 'Service Man';
 
@@ -16,18 +16,12 @@ export interface Player {
   };
 }
 
-export interface Club {
-  id: number;
-  name: string;
-}
-
 export interface Team {
   id: number;
   name: string;
   shortName: string;
   logoUrl: string | null;
   division: 'Division 1' | 'Division 2';
-  clubId: number | null;
 }
 
 export interface Score {
@@ -76,23 +70,11 @@ export interface TeamStanding {
   points: number;
 }
 
-export type UserRole = 'user' | 'captain' | 'admin';
+export type UserRole = 'user' | 'admin';
 
 export interface UserProfile {
   id: string;
   fullName: string | null;
   email?: string;
   role: UserRole;
-}
-
-export interface CaptainTeam {
-  user_id: string;
-  team_id: number;
-}
-
-export interface TournamentRoster {
-  id: number;
-  tournamentId: number;
-  teamId: number;
-  player_ids: number[];
 }

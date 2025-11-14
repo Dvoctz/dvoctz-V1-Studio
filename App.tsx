@@ -11,7 +11,6 @@ import { TeamDetailView } from './views/TeamDetailView';
 import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
 import { RulesView } from './views/RulesView';
-import { CaptainView } from './views/CaptainView';
 import type { View, Tournament, Team } from './types';
 import { SportsDataProvider } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -37,7 +36,7 @@ const AppContent: React.FC = () => {
     // --- Handle Logged-Out Users ---
     if (!currentUser) {
       // If a logged-out user tries to access a protected page, redirect them to login.
-      if (currentView === 'admin' || currentView === 'captain') {
+      if (currentView === 'admin') {
         setViewBeforeLogin(currentView); // Remember where they wanted to go
         setCurrentView('login');
       }
@@ -48,14 +47,12 @@ const AppContent: React.FC = () => {
     if (userProfile) {
       // Don't show the login page to an already logged-in user. Redirect them.
       if (currentView === 'login') {
-        const targetView = viewBeforeLogin || (userProfile.role === 'admin' ? 'admin' : userProfile.role === 'captain' ? 'captain' : 'home');
+        const targetView = viewBeforeLogin || (userProfile.role === 'admin' ? 'admin' : 'home');
         setCurrentView(targetView);
         setViewBeforeLogin(null);
       }
       // If a user with the wrong role is on a protected page, send them home.
       else if (currentView === 'admin' && userProfile.role !== 'admin') {
-        setCurrentView('home');
-      } else if (currentView === 'captain' && userProfile.role !== 'captain') {
         setCurrentView('home');
       }
     }
@@ -116,7 +113,7 @@ const AppContent: React.FC = () => {
 
   const renderView = () => {
     // Show a loading indicator for protected routes while auth is being checked.
-    if (authLoading && (currentView === 'admin' || currentView === 'captain' || currentView === 'login')) {
+    if (authLoading && (currentView === 'admin' || currentView === 'login')) {
       return <div className="text-center p-8 text-text-secondary">Checking authentication...</div>;
     }
 
@@ -139,8 +136,6 @@ const AppContent: React.FC = () => {
         // The redirect effect handles unauthorized access, so if we reach here, the user should be an admin.
         // Rendering null prevents flashing content during the brief redirect period.
         return userProfile?.role === 'admin' ? <AdminView /> : null;
-      case 'captain':
-        return userProfile?.role === 'captain' ? <CaptainView /> : null;
       case 'login':
         return <LoginView onLoginSuccess={handleLoginSuccess} />;
       default:
