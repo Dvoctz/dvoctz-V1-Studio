@@ -29,7 +29,7 @@ const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputEleme
 
 
 const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-    <select {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight" />
+    <select {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight disabled:bg-gray-800 disabled:cursor-not-allowed" />
 );
 
 const Label: React.FC<{ children: React.ReactNode; htmlFor?: string }> = ({ children, htmlFor }) => (
@@ -727,27 +727,49 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
         return (new Date(date.getTime() - tzoffset)).toISOString().slice(0, 16);
     };
     
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<Partial<Fixture & { dateTime: string }>>({
         status: 'upcoming',
         ...fixture,
         dateTime: toInputDateTimeString(fixture.dateTime)
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const eligibleTeams = React.useMemo(() => {
+        if (!formData.tournamentId) {
+            return [];
+        }
+        const selectedTournament = tournaments.find(t => t.id === formData.tournamentId);
+        return selectedTournament ? teams.filter(team => team.division === selectedTournament.division) : [];
+    }, [formData.tournamentId, tournaments, teams]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => {
+            const newState = { ...prev, [name]: value };
+            if (name === 'tournamentId') {
+                newState.team1Id = undefined;
+                newState.team2Id = undefined;
+            }
+            return newState;
+        });
+    };
     
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const payload = {
-            ...formData,
-            dateTime: new Date(formData.dateTime!).toISOString(),
-            tournamentId: parseInt(formData.tournamentId as any, 10),
-            team1Id: parseInt(formData.team1Id as any, 10),
-            team2Id: parseInt(formData.team2Id as any, 10),
-        };
-        if (payload.team1Id === payload.team2Id) {
+        if (!formData.team1Id || !formData.team2Id) {
+            alert("Please select both teams.");
+            return;
+        }
+        if (formData.team1Id === formData.team2Id) {
             alert("A team cannot play against itself.");
             return;
         }
+        const payload = {
+            ...formData,
+            dateTime: new Date(formData.dateTime!).toISOString(),
+            tournamentId: Number(formData.tournamentId),
+            team1Id: Number(formData.team1Id),
+            team2Id: Number(formData.team2Id),
+        };
         onSave(payload);
     };
     
@@ -758,22 +780,24 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
                 <Label>Tournament</Label>
                 <Select name="tournamentId" value={formData.tournamentId || ''} onChange={handleChange} required>
                     <option value="" disabled>Select tournament</option>
-                    {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {tournaments
+                        .sort((a,b) => a.name.localeCompare(b.name))
+                        .map(t => <option key={t.id} value={t.id}>{t.name} ({t.division})</option>)}
                 </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
                  <div>
                     <Label>Team 1</Label>
-                    <Select name="team1Id" value={formData.team1Id || ''} onChange={handleChange} required>
+                    <Select name="team1Id" value={formData.team1Id || ''} onChange={handleChange} required disabled={!formData.tournamentId}>
                         <option value="" disabled>Select Team 1</option>
-                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {eligibleTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </Select>
                 </div>
                  <div>
                     <Label>Team 2</Label>
-                    <Select name="team2Id" value={formData.team2Id || ''} onChange={handleChange} required>
+                    <Select name="team2Id" value={formData.team2Id || ''} onChange={handleChange} required disabled={!formData.tournamentId}>
                         <option value="" disabled>Select Team 2</option>
-                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {eligibleTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </Select>
                 </div>
             </div>
