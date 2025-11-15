@@ -60,12 +60,19 @@ export const RulesView: React.FC = () => {
                 body: JSON.stringify({ question, rules }),
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(data.error?.message || 'An error occurred while fetching the answer.');
+                let errorMessage = `An error occurred: ${response.status} ${response.statusText}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error?.message || JSON.stringify(errorData);
+                } catch (e) {
+                    const textError = await response.text();
+                    errorMessage = textError || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
             
+            const data = await response.json();
             setAnswer(data.answer);
 
         } catch (err: any) {

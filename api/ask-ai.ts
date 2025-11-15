@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 
 // This is a standard Node.js serverless function.
@@ -8,10 +9,11 @@ export default async function handler(request, response) {
     return response.status(405).end('Method Not Allowed');
   }
 
-  const apiKey = process.env.VITE_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("VITE_API_KEY is not set in the server environment.");
-    return response.status(500).json({ error: { message: 'The AI assistant is not configured on the server. The API key is missing.' } });
+    console.error("GEMINI_API_KEY is not set in the server environment.");
+    const errorMessage = 'The AI assistant is not configured correctly on the server. The `GEMINI_API_KEY` environment variable is missing. Please add it in your hosting provider\'s settings.';
+    return response.status(500).json({ error: { message: errorMessage } });
   }
 
   try {
