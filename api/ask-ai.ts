@@ -17,8 +17,14 @@ export default async function handler(request, response) {
   }
 
   try {
-    const { question, rules } = typeof request.body === 'string' ? JSON.parse(request.body) : request.body;
+    // Vercel automatically parses JSON bodies. Add a check to ensure the body exists.
+    if (!request.body) {
+      return response.status(400).json({ error: { message: 'Missing request body.' } });
+    }
+    
+    const { question, rules } = request.body;
 
+    // Validate that the required properties exist and are of the correct type.
     if (!question || typeof question !== 'string' || !rules || typeof rules !== 'string') {
       return response.status(400).json({ error: { message: 'Request body must be a JSON object with "question" and "rules" strings.' } });
     }
