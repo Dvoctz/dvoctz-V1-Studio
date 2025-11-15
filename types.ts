@@ -54,6 +54,7 @@ export interface Sponsor {
   name: string;
   logoUrl: string | null;
   website: string;
+  showInFooter: boolean;
 }
 
 export interface TournamentSponsor {

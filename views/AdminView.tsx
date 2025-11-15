@@ -32,8 +32,9 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     <select {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight disabled:bg-gray-800 disabled:cursor-not-allowed" />
 );
 
-const Label: React.FC<{ children: React.ReactNode; htmlFor?: string }> = ({ children, htmlFor }) => (
-    <label htmlFor={htmlFor} className="block text-sm font-medium text-text-secondary">{children}</label>
+// FIX: Updated the Label component to accept a `className` prop to resolve the type error.
+const Label: React.FC<{ children: React.ReactNode; htmlFor?: string; className?: string; }> = ({ children, htmlFor, className }) => (
+    <label htmlFor={htmlFor} className={`block text-sm font-medium text-text-secondary ${className || ''}`.trim()}>{children}</label>
 );
 
 const FormModal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => {
@@ -888,7 +889,7 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
 
 // Sponsors
 const SponsorsAdmin = () => {
-    const { sponsors, addSponsor, updateSponsor, deleteSponsor } = useSports();
+    const { sponsors, addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter } = useSports();
     const [editing, setEditing] = useState<Sponsor | Partial<Sponsor> | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -936,23 +937,29 @@ const SponsorsAdmin = () => {
                 </div>
                 <Button onClick={() => setEditing({})}>Add New Sponsor</Button>
             </div>
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="mt-4 space-y-2">
                 {filteredSponsors.length > 0 ? filteredSponsors.map(s => (
-                    <div key={s.id} className="p-3 bg-accent rounded-md text-center">
-                        {s.logoUrl ? (
-                            <img src={s.logoUrl} alt={s.name} className="h-12 max-w-[150px] object-contain mx-auto mb-2" />
-                        ) : (
-                             <div className="h-12 w-full flex items-center justify-center text-text-secondary mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                             </div>
-                        )}
-                        <p className="font-bold text-sm">{s.name}</p>
-                         <div className="mt-2 space-x-2">
-                            <Button onClick={() => setEditing(s)} className="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1">Edit</Button>
-                            <Button onClick={() => handleDelete(s.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
+                     <div key={s.id} className="flex items-center justify-between p-3 bg-accent rounded-md flex-wrap gap-2">
+                        <div className="flex items-center gap-3">
+                            {s.logoUrl && <img src={s.logoUrl} alt={s.name} className="h-8 object-contain" />}
+                            <p className="font-bold">{s.name}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <label htmlFor={`footer-toggle-${s.id}`} className="flex items-center cursor-pointer">
+                                <span className="text-xs text-text-secondary mr-2">Show in Footer</span>
+                                <div className="relative">
+                                    <input id={`footer-toggle-${s.id}`} type="checkbox" className="sr-only" checked={s.showInFooter} onChange={() => toggleSponsorShowInFooter(s)} />
+                                    <div className="block bg-primary w-10 h-6 rounded-full"></div>
+                                    <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${s.showInFooter ? 'transform translate-x-full bg-highlight' : ''}`}></div>
+                                </div>
+                            </label>
+                            <div className="space-x-2">
+                                <Button onClick={() => setEditing(s)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
+                                <Button onClick={() => handleDelete(s.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
+                            </div>
                         </div>
                     </div>
-                )) : <p className="text-text-secondary text-center py-4 md:col-span-2 lg:col-span-4">No sponsors found.</p>}
+                )) : <p className="text-text-secondary text-center py-4">No sponsors found.</p>}
             </div>
              {editing && (
                 <FormModal title={editing.id ? "Edit Sponsor" : "Add Sponsor"} onClose={() => { setEditing(null); setError(null); }}>
@@ -967,6 +974,7 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
     const [formData, setFormData] = useState({
         name: '',
         website: '',
+        showInFooter: false,
         ...sponsor
     });
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -1024,6 +1032,19 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
             <div>
                 <Label htmlFor="sponsor-website">Website</Label>
                 <Input id="sponsor-website" name="website" type="text" value={formData.website || ''} onChange={handleChange} required />
+            </div>
+            <div>
+                <div className="flex items-center mt-4">
+                    <input
+                        id="showInFooter"
+                        name="showInFooter"
+                        type="checkbox"
+                        checked={!!formData.showInFooter}
+                        onChange={(e) => setFormData({ ...formData, showInFooter: e.target.checked })}
+                        className="h-4 w-4 rounded border-accent bg-primary text-highlight focus:ring-highlight"
+                    />
+                    <Label htmlFor="showInFooter" className="ml-3 !block">Show in main site footer</Label>
+                </div>
             </div>
             <div className="flex justify-end space-x-2">
                 <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>

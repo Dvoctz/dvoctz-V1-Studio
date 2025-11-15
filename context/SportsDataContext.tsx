@@ -37,6 +37,7 @@ interface SportsContextType extends SportsState {
     addSponsor: (sponsor: Omit<Sponsor, 'id'> & { logoFile?: File }) => Promise<void>;
     updateSponsor: (sponsor: Sponsor & { logoFile?: File }) => Promise<void>;
     deleteSponsor: (id: number) => Promise<void>;
+    toggleSponsorShowInFooter: (sponsor: Sponsor) => Promise<void>;
     updateRules: (content: string) => Promise<void>;
     bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
@@ -74,6 +75,7 @@ const mapSponsor = (s: any): Sponsor => ({
   name: s.name,
   website: s.website,
   logoUrl: s.logo_url,
+  showInFooter: s.show_in_footer || false,
 });
 
 const mapFixture = (f: any): Fixture => ({
@@ -299,11 +301,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (sponsorData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
                 }
-                const { name, website } = sponsorData;
+                const { name, website, showInFooter } = sponsorData;
                 const { error } = await supabase.from('sponsors').insert({
                     name,
                     website,
                     logo_url: finalLogoUrl,
+                    show_in_footer: showInFooter || false,
                 });
                 if (error) throw error;
                 await fetchData();
@@ -313,16 +316,26 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (sponsorData.logoFile) {
                     finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
                 }
-                const { id, name, website } = sponsorData;
+                const { id, name, website, showInFooter } = sponsorData;
                 const { error } = await supabase.from('sponsors').update({
                     name,
                     website,
                     logo_url: finalLogoUrl,
+                    show_in_footer: showInFooter,
                 }).eq('id', id);
                 if (error) throw error;
                 await fetchData();
             },
             deleteSponsor: deleteAction('sponsors'),
+
+            toggleSponsorShowInFooter: async (sponsor: Sponsor) => {
+                const { error } = await supabase
+                    .from('sponsors')
+                    .update({ show_in_footer: !sponsor.showInFooter })
+                    .eq('id', sponsor.id);
+                if (error) throw error;
+                await fetchData();
+            },
 
             updateRules: async (content: string) => {
                 const { error } = await supabase
