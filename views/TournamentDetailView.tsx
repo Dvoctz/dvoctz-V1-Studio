@@ -224,7 +224,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
       {sponsors.length > 0 && (
           <div className="mb-8">
               <h3 className="text-center text-md font-semibold text-text-secondary mb-4">Sponsored By</h3>
-              <div className="bg-secondary p-1 sm:p-2 rounded-lg shadow-lg relative aspect-[4/3] max-w-4xl mx-auto overflow-hidden">
+              <div className="bg-secondary p-1 sm:p-2 rounded-lg shadow-lg relative aspect-[21/9] max-w-4xl mx-auto overflow-hidden">
                 {sponsors.map((sponsor, index) => (
                     <a 
                         key={sponsor.id} 
