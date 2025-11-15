@@ -580,7 +580,7 @@ const ScoreUpdateModal: React.FC<{ fixture: Fixture, onSave: (f: Fixture) => Pro
     if (!team1 || !team2) return null;
 
     return (
-        <FormModal title={`Update Score: ${team1.shortName} vs ${team2.shortName}`} onClose={onClose}>
+        <FormModal title={`Update Score: ${team1.name} vs ${team2.name}`} onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {error && <ErrorMessage message={error} />}
                 <div className="bg-accent p-4 rounded-lg text-center">
@@ -685,7 +685,7 @@ const FixturesAdmin = () => {
                 {filteredFixtures.length > 0 ? filteredFixtures.map(f => (
                     <div key={f.id} className="p-3 bg-accent rounded-md">
                         <div className="flex items-center justify-between">
-                            <p className="font-bold">{getTeamById(f.team1Id)?.shortName || 'N/A'} vs {getTeamById(f.team2Id)?.shortName || 'N/A'}</p>
+                            <p className="font-bold">{getTeamById(f.team1Id)?.name || 'N/A'} vs {getTeamById(f.team2Id)?.name || 'N/A'}</p>
                             <span className="text-xs font-semibold uppercase">{f.status}</span>
                         </div>
                         <p className="text-sm text-text-secondary">{new Date(f.dateTime).toLocaleString()}</p>
