@@ -33,12 +33,9 @@ async function build() {
     // 2. Process and copy index.html
     let htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
     
-    // Inject environment variables (specifically for Gemini API key)
-    // It reads VITE_API_KEY from the Vercel environment.
-    const geminiApiKey = process.env.VITE_API_KEY || '';
-    const envScript = `<script>window.GEMINI_API_KEY = "${geminiApiKey}";</script>`;
-    htmlContent = htmlContent.replace('<!-- INJECT_ENV -->', envScript);
-    console.log('✅ Environment variables injected.');
+    // Remove environment variable injection placeholder for security
+    htmlContent = htmlContent.replace('<!-- INJECT_ENV -->', '');
+    console.log('✅ Environment variable injection removed for security.');
 
     // Update the script tag to point to the compiled bundle.js
     htmlContent = htmlContent.replace(

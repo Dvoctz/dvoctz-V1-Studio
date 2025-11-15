@@ -1,7 +1,5 @@
 
-
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Player } from '../types';
 
@@ -54,9 +52,9 @@ export const PlayersView: React.FC = () => {
   const { players } = useSports();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredPlayers = players.filter(player => 
-    player.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPlayers = useMemo(() => players.filter(player => {
+    return player.name.toLowerCase().includes(searchTerm.toLowerCase());
+  }), [players, searchTerm]);
 
   return (
     <div>

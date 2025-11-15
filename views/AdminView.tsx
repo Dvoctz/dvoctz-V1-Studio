@@ -1109,34 +1109,6 @@ const ExportAdmin = () => {
     );
 };
 
-
-const ConfigStatusCheck = () => {
-    const GEMINI_API_KEY = (window as any).GEMINI_API_KEY;
-
-    if (GEMINI_API_KEY) {
-        return null;
-    }
-
-    return (
-        <div className="bg-yellow-900/50 border border-yellow-700 text-yellow-300 p-4 rounded-lg mb-8 text-sm">
-            <div className="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.636-1.21 2.27-1.21 2.906 0l4.205 8.026c.54 1.03-.21 2.28-1.39 2.28H5.442c-1.18 0-1.93-1.25-1.39-2.28L8.257 3.099zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-4a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-                <div>
-                    <h3 className="font-bold text-base text-yellow-200">Configuration Warning: AI Assistant Disabled</h3>
-                    <p className="mt-1">
-                        The AI assistant in the "Rules" section is not configured because the Gemini API key is missing.
-                    </p>
-                    <p className="mt-2">
-                        To fix this, an administrator must set the <code className="bg-yellow-800/50 px-1 py-0.5 rounded">VITE_API_KEY</code> environment variable in your hosting provider's settings (e.g., Vercel). The application will automatically use it once it's available.
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 // Main View
 export const AdminView: React.FC = () => {
     const [activeTab, setActiveTab] = useState('tournaments');
@@ -1169,7 +1141,6 @@ export const AdminView: React.FC = () => {
     return (
         <div>
             <h1 className="text-4xl font-extrabold text-center mb-8">Admin Panel</h1>
-            <ConfigStatusCheck />
             <div className="border-b border-accent mb-6">
                 <div className="flex overflow-x-auto">
                     <TabButton tab="tournaments" label="Tournaments" />

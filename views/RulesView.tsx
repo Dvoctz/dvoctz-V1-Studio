@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
-import { GoogleGenAI } from '@google/genai';
 
 export const RulesView: React.FC = () => {
     const { rules, updateRules, loading } = useSports();
@@ -53,28 +52,25 @@ export const RulesView: React.FC = () => {
         setAskError('');
         
         try {
-            const apiKey = (window as any).GEMINI_API_KEY;
-            if (!apiKey) {
-                throw new Error("Missing API Key");
-            }
-            const ai = new GoogleGenAI({ apiKey });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: `Here are the official rules:\n---\n${rules}\n---\nBased ONLY on the rules provided, please answer the following question: "${question}"`,
-                config: {
-                    systemInstruction: "You are an expert on the rules of this sport. Your role is to answer questions based strictly and solely on the provided rules text. If the answer cannot be found in the text, you must state that the information is not available in the provided rules. Do not infer or invent information outside of the text.",
-                }
+            const response = await fetch('/api/ask-ai', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question, rules }),
             });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error?.message || 'An error occurred while fetching the answer.');
+            }
             
-            setAnswer(response.text);
+            setAnswer(data.answer);
 
         } catch (err: any) {
-            console.error("Error calling Gemini API:", err);
-            if (err.message && (err.message.includes("API Key must be set") || err.message.includes("API key not valid") || err.message.includes("Missing API Key"))) {
-                setAskError("The Gemini API key is missing or invalid. An administrator must set the `VITE_API_KEY` environment variable in the application's hosting settings (e.g., Vercel). The app may need to be redeployed for the change to take effect.");
-            } else {
-                setAskError(err.message || "An unexpected error occurred. Please try again.");
-            }
+            console.error("Error asking AI assistant:", err);
+            setAskError(err.message || "An unexpected error occurred. Please try again.");
         } finally {
             setIsAsking(false);
         }
