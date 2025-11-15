@@ -937,7 +937,10 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             {error && <ErrorMessage message={error} />}
-            <div><Label>Sponsor Name</Label><Input name="name" value={formData.name || ''} onChange={handleChange} required /></div>
+            <div>
+                <Label htmlFor="sponsor-name">Sponsor Name</Label>
+                <Input id="sponsor-name" name="name" value={formData.name || ''} onChange={handleChange} required />
+            </div>
             <div>
                 <Label>Logo Image (Optional)</Label>
                 <div className="mt-2 flex items-center gap-4">
@@ -954,7 +957,10 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
                     </div>
                 </div>
             </div>
-            <div><Label>Website</Label><Input name="website" type="url" value={formData.website || ''} onChange={handleChange} required /></div>
+            <div>
+                <Label htmlFor="sponsor-website">Website</Label>
+                <Input id="sponsor-website" name="website" type="url" value={formData.website || ''} onChange={handleChange} required />
+            </div>
             <div className="flex justify-end space-x-2">
                 <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
                 <Button type="submit">Save</Button>
