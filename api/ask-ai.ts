@@ -1,21 +1,24 @@
-
+// FIX: Using ES Module syntax to align with modern TypeScript projects.
 import { GoogleGenAI } from '@google/genai';
 
-// This is a standard Node.js serverless function.
-// Vercel will automatically pick it up when placed in the /api directory.
-export default async function handler(request, response) {
+// It's good practice to type request and response objects.
+// In a real project, you would use types from a framework like Express or from @vercel/node.
+// For this fix, we will use `any` to avoid adding new dependencies.
+// FIX: Changed from CommonJS `module.exports` to ES Module `export default`.
+export default async (request: any, response: any) => {
   // Wrap the entire logic in a try-catch block for maximum robustness.
   // This prevents the function from crashing and ensures a proper JSON error is always returned.
   try {
     if (request.method !== 'POST') {
       response.setHeader('Allow', ['POST']);
-      return response.status(405).end('Method Not Allowed');
+      // Using .json() for consistency in error responses
+      return response.status(405).json({ error: { message: 'Method Not Allowed' }});
     }
 
-    // Check for the recommended GEMINI_API_KEY, but fall back to VITE_API_KEY for compatibility.
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_API_KEY;
+    // FIX: Adhering to the coding guidelines to exclusively use `process.env.API_KEY`.
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      const errorMessage = 'The AI assistant is not configured correctly on the server. An API key environment variable (`GEMINI_API_KEY` or `VITE_API_KEY`) is missing. Please add it in your hosting provider\'s settings.';
+      const errorMessage = 'The AI assistant is not configured correctly on the server. The `API_KEY` environment variable is missing. Please add it in your hosting provider\'s settings.';
       console.error("Authentication Error: " + errorMessage);
       return response.status(500).json({ error: { message: errorMessage } });
     }
@@ -51,4 +54,4 @@ export default async function handler(request, response) {
     const message = error instanceof Error ? error.message : 'An unknown server error occurred.';
     return response.status(500).json({ error: { message: `An internal server error occurred: ${message}` } });
   }
-}
+};
