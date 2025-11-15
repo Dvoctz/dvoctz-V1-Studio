@@ -16,45 +16,66 @@ self.addEventListener('install', event => {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
+      .catch(error => {
+        console.error('Failed to cache during install:', error);
+      })
   );
 });
 
 self.addEventListener('fetch', event => {
+  const { request } = event;
+  const url = new URL(request.url);
+
   // We only want to handle GET requests.
-  if (event.request.method !== 'GET') {
+  if (request.method !== 'GET') {
     return;
   }
 
+  // Network First strategy for HTML and the main JS bundle.
+  // This ensures users always get the latest app code when online.
+  if (request.mode === 'navigate' || url.pathname.endsWith('/bundle.js')) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          // If fetch is successful, clone it and cache it for offline use.
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => {
+          // If the network fails, try to serve the response from the cache.
+          return caches.match(request);
+        })
+    );
+    return;
+  }
+
+  // Cache First strategy for all other static assets (fonts, icons, etc.) for performance.
   event.respondWith(
-    caches.match(event.request)
+    caches.match(request)
       .then(response => {
-        // Cache hit - return response
+        // If we have a cached response, return it.
         if (response) {
           return response;
         }
 
-        const fetchRequest = event.request.clone();
-
-        return fetch(fetchRequest).then(
-          response => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || !isCacheable(event.request)) {
-              return response;
-            }
-
-            const responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
+        // Otherwise, fetch from the network.
+        return fetch(request).then(networkResponse => {
+          // Check if we received a valid response and if it's a cacheable asset.
+          if (networkResponse && networkResponse.status === 200 && isCacheable(request)) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, responseToCache);
+            });
           }
-        );
+          return networkResponse;
+        });
       })
-    );
+  );
 });
+
 
 // Clean up old caches when a new service worker is activated
 self.addEventListener('activate', event => {
@@ -78,6 +99,6 @@ function isCacheable(request) {
     if (url.hostname.includes('supabase.co')) {
         return false;
     }
-    // Cache local assets and the CDN font file
+    // Cache local assets and known CDN assets
     return url.origin === self.location.origin || url.hostname === 'rsms.me';
 }
