@@ -62,12 +62,16 @@ export const RulesView: React.FC = () => {
 
             if (!response.ok) {
                 let errorMessage = `An error occurred: ${response.status} ${response.statusText}`;
+                // Read the body as text first, as this is a safe operation that won't fail
+                // on non-JSON responses and only consumes the stream once.
+                const responseText = await response.text();
                 try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.error?.message || JSON.stringify(errorData);
+                    // Try to parse the text as JSON. If it works, we get a structured error.
+                    const errorData = JSON.parse(responseText);
+                    errorMessage = errorData.error?.message || responseText;
                 } catch (e) {
-                    const textError = await response.text();
-                    errorMessage = textError || errorMessage;
+                    // If parsing fails, it means the error was not JSON. Use the raw text.
+                    errorMessage = responseText || errorMessage;
                 }
                 throw new Error(errorMessage);
             }
