@@ -1023,7 +1023,7 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
             </div>
             <div>
                 <Label htmlFor="sponsor-website">Website</Label>
-                <Input id="sponsor-website" name="website" type="url" value={formData.website || ''} onChange={handleChange} required />
+                <Input id="sponsor-website" name="website" type="text" value={formData.website || ''} onChange={handleChange} required />
             </div>
             <div className="flex justify-end space-x-2">
                 <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
