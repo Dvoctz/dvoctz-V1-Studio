@@ -224,7 +224,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
       {sponsors.length > 0 && (
           <div className="mb-8">
               <h3 className="text-center text-md font-semibold text-text-secondary mb-4">Sponsored By</h3>
-              <div className="bg-secondary p-1 sm:p-2 rounded-lg shadow-lg relative aspect-[4/3] max-w-4xl mx-auto flex items-center justify-center overflow-hidden">
+              <div className="bg-secondary p-1 sm:p-2 rounded-lg shadow-lg relative aspect-[4/3] max-w-4xl mx-auto overflow-hidden">
                 {sponsors.map((sponsor, index) => (
                     <a 
                         key={sponsor.id} 
@@ -254,7 +254,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     </button>
                     <button onClick={handleNextSponsor} className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors z-10" aria-label="Next sponsor">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                     </button>
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
                         {sponsors.map((_, index) => (
