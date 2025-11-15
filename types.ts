@@ -56,6 +56,11 @@ export interface Sponsor {
   website: string;
 }
 
+export interface TournamentSponsor {
+  tournament_id: number;
+  sponsor_id: number;
+}
+
 export interface TeamStanding {
   teamId: number;
   teamName: string;

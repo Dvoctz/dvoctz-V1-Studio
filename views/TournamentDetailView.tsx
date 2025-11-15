@@ -172,12 +172,13 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
 
 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament, onBack }) => {
-  const { getFixturesByTournament, getTeamById, getStandingsForTournament } = useSports();
+  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament } = useSports();
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings'>('fixtures');
 
   const fixtures = getFixturesByTournament(tournament.id);
   const standings = getStandingsForTournament(tournament.id);
+  const sponsors = getSponsorsForTournament(tournament.id);
 
   const team1 = selectedFixture ? getTeamById(selectedFixture.team1Id) : null;
   const team2 = selectedFixture ? getTeamById(selectedFixture.team2Id) : null;
@@ -194,13 +195,28 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   return (
     <div>
         <button onClick={onBack} className="flex items-center space-x-2 text-text-secondary hover:text-highlight mb-6 transition-colors">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             <span>Back to Tournaments</span>
         </button>
       <h1 className="text-4xl font-extrabold text-center mb-2">{tournament.name}</h1>
       <p className="text-center text-highlight font-semibold mb-8">{tournament.division}</p>
+
+      {sponsors.length > 0 && (
+          <div className="mb-8 bg-secondary p-4 rounded-lg">
+              <h3 className="text-center text-md font-semibold text-text-secondary mb-4">Sponsored By</h3>
+              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
+                  {sponsors.map((sponsor) => (
+                      sponsor.logoUrl ? (
+                          <a key={sponsor.id} href={sponsor.website} target="_blank" rel="noopener noreferrer" title={sponsor.name}>
+                              <img src={sponsor.logoUrl} alt={sponsor.name} className="h-12 max-w-[150px] object-contain grayscale hover:grayscale-0 transition-all duration-300" />
+                          </a>
+                      ) : null
+                  ))}
+              </div>
+          </div>
+      )}
       
       <div className="flex border-b border-accent mb-6 justify-center">
             <TabButton tab="fixtures">Fixtures</TabButton>

@@ -68,6 +68,7 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 const TournamentsAdmin = () => {
     const { tournaments, addTournament, updateTournament, deleteTournament } = useSports();
     const [editing, setEditing] = useState<Tournament | Partial<Tournament> | null>(null);
+    const [managingSponsorsFor, setManagingSponsorsFor] = useState<Tournament | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -122,6 +123,7 @@ const TournamentsAdmin = () => {
                             <p className="text-sm text-highlight">{t.division}</p>
                         </div>
                         <div className="space-x-2">
+                            <Button onClick={() => setManagingSponsorsFor(t)} className="bg-green-600 hover:bg-green-500">Sponsors</Button>
                             <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
                             <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
                         </div>
@@ -132,6 +134,9 @@ const TournamentsAdmin = () => {
                 <FormModal title={editing.id ? "Edit Tournament" : "Add Tournament"} onClose={() => { setEditing(null); setError(null); }}>
                     <TournamentForm tournament={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
                 </FormModal>
+            )}
+            {managingSponsorsFor && (
+                <TournamentSponsorsModal tournament={managingSponsorsFor} onClose={() => setManagingSponsorsFor(null)} />
             )}
         </AdminSection>
     );
@@ -168,6 +173,65 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
                 <Button type="submit">Save</Button>
             </div>
         </form>
+    );
+};
+
+
+const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
+    const { sponsors, getSponsorsForTournament, updateSponsorsForTournament } = useSports();
+    const currentSponsorIds = getSponsorsForTournament(tournament.id).map(s => s.id);
+    const [selectedSponsorIds, setSelectedSponsorIds] = useState<Set<number>>(new Set(currentSponsorIds));
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleToggle = (sponsorId: number) => {
+        const newSet = new Set(selectedSponsorIds);
+        if (newSet.has(sponsorId)) {
+            newSet.delete(sponsorId);
+        } else {
+            newSet.add(sponsorId);
+        }
+        setSelectedSponsorIds(newSet);
+    };
+
+    const handleSave = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            await updateSponsorsForTournament(tournament.id, Array.from(selectedSponsorIds));
+            onClose();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <FormModal title={`Manage Sponsors for ${tournament.name}`} onClose={onClose}>
+            <div className="space-y-4">
+                {error && <ErrorMessage message={error} />}
+                <p className="text-text-secondary">Select the sponsors for this tournament.</p>
+                <div className="max-h-64 overflow-y-auto space-y-2 border border-accent p-3 rounded-md">
+                    {sponsors.length > 0 ? sponsors.map(sponsor => (
+                        <div key={sponsor.id} className="flex items-center bg-primary p-2 rounded-md">
+                            <input
+                                type="checkbox"
+                                id={`sponsor-${sponsor.id}`}
+                                checked={selectedSponsorIds.has(sponsor.id)}
+                                onChange={() => handleToggle(sponsor.id)}
+                                className="h-4 w-4 rounded border-gray-300 text-highlight focus:ring-highlight"
+                            />
+                            <label htmlFor={`sponsor-${sponsor.id}`} className="ml-3 text-sm text-text-primary">{sponsor.name}</label>
+                        </div>
+                    )) : <p className="text-center text-text-secondary">No sponsors have been added to the master list yet.</p>}
+                </div>
+                <div className="flex justify-end space-x-2">
+                    <Button onClick={onClose} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                    <Button onClick={handleSave} disabled={loading}>{loading ? "Saving..." : "Save Associations"}</Button>
+                </div>
+            </div>
+        </FormModal>
     );
 };
 
@@ -856,7 +920,7 @@ const SponsorsAdmin = () => {
     const filteredSponsors = sponsors.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <AdminSection title="Manage Sponsors">
+        <AdminSection title="Manage Master Sponsor List">
             <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3">
