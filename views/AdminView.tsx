@@ -737,7 +737,8 @@ const FixtureForm: React.FC<{ fixture: Fixture | Partial<Fixture>, onSave: (f: a
         if (!formData.tournamentId) {
             return [];
         }
-        const selectedTournament = tournaments.find(t => t.id === formData.tournamentId);
+        const selectedTournamentId = Number(formData.tournamentId);
+        const selectedTournament = tournaments.find(t => t.id === selectedTournamentId);
         return selectedTournament ? teams.filter(team => team.division === selectedTournament.division) : [];
     }, [formData.tournamentId, tournaments, teams]);
 
