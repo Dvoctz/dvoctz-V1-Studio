@@ -40,6 +40,10 @@ const AppContent: React.FC = () => {
 
     if (userProfile) {
       if (currentView === 'login') {
+        // Temporary diagnostic alert to confirm user role after login
+        if (userProfile.role !== 'admin') {
+            alert(`Login successful, but you are not registered as an admin.\n\nYour current role is: '${userProfile.role}'.\n\nPlease run the provided SQL script to fix your permissions.`);
+        }
         const targetView = viewBeforeLogin || (userProfile.role === 'admin' ? 'admin' : 'home');
         setCurrentView(targetView);
         setViewBeforeLogin(null);
@@ -98,6 +102,7 @@ const AppContent: React.FC = () => {
   }, [currentView, selectedTournament, selectedTeam]);
 
   const renderView = () => {
+    // FIX: Corrected typo from `currentV` to `currentView`.
     if (authLoading && (currentView === 'admin' || currentView === 'login')) {
       return <div className="text-center p-8 text-text-secondary">Checking authentication...</div>;
     }
