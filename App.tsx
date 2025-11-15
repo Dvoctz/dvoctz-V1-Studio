@@ -39,15 +39,12 @@ const AppContent: React.FC = () => {
     }
 
     if (userProfile) {
+      const isAdminTypeUser = userProfile.role !== 'user';
       if (currentView === 'login') {
-        // Temporary diagnostic alert to confirm user role after login
-        if (userProfile.role !== 'admin') {
-            alert(`Login successful, but you are not registered as an admin.\n\nYour current role is: '${userProfile.role}'.\n\nPlease run the provided SQL script to fix your permissions.`);
-        }
-        const targetView = viewBeforeLogin || (userProfile.role === 'admin' ? 'admin' : 'home');
+        const targetView = viewBeforeLogin || (isAdminTypeUser ? 'admin' : 'home');
         setCurrentView(targetView);
         setViewBeforeLogin(null);
-      } else if (currentView === 'admin' && userProfile.role !== 'admin') {
+      } else if (currentView === 'admin' && !isAdminTypeUser) {
         setCurrentView('home');
       }
     }
@@ -106,6 +103,8 @@ const AppContent: React.FC = () => {
     if (authLoading && (currentView === 'admin' || currentView === 'login')) {
       return <div className="text-center p-8 text-text-secondary">Checking authentication...</div>;
     }
+    
+    const isAdminTypeUser = userProfile && userProfile.role !== 'user';
 
     switch (currentView) {
       case 'home':
@@ -123,7 +122,7 @@ const AppContent: React.FC = () => {
       case 'team-detail':
         return selectedTeam ? <TeamDetailView team={selectedTeam} onBack={handleBackToTeams} /> : <TeamsView onSelectTeam={handleSelectTeam} />;
       case 'admin':
-        return userProfile?.role === 'admin' ? <AdminView /> : null;
+        return isAdminTypeUser ? <AdminView /> : null;
       case 'login':
         return <LoginView onLoginSuccess={handleLoginSuccess} />;
       default:

@@ -70,7 +70,7 @@ export interface TeamStanding {
   points: number;
 }
 
-export type UserRole = 'user' | 'admin';
+export type UserRole = 'user' | 'admin' | 'fixture_manager' | 'team_manager' | 'content_editor';
 
 export interface UserProfile {
   id: string;

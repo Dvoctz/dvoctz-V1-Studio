@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
-import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole } from '../types';
+import { useAuth } from '../context/AuthContext';
+import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole } from '../types';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -1109,9 +1110,43 @@ const ExportAdmin = () => {
     );
 };
 
+interface AdminTab {
+    id: string;
+    label: string;
+    roles: UserRole[];
+}
+
+const availableTabs: AdminTab[] = [
+    { id: 'tournaments', label: 'Tournaments', roles: ['admin'] },
+    { id: 'teams', label: 'Teams', roles: ['admin', 'team_manager'] },
+    { id: 'players', label: 'Players', roles: ['admin', 'team_manager'] },
+    { id: 'fixtures', label: 'Fixtures', roles: ['admin', 'fixture_manager'] },
+    { id: 'sponsors', label: 'Sponsors', roles: ['admin', 'content_editor'] },
+    { id: 'bulk-import', label: 'Bulk Import', roles: ['admin', 'team_manager'] },
+    { id: 'export', label: 'Export Data', roles: ['admin'] },
+];
+
 // Main View
 export const AdminView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState('tournaments');
+    const { userProfile } = useAuth();
+    const userRole = userProfile?.role;
+
+    const accessibleTabs = availableTabs.filter(tab => userRole && tab.roles.includes(userRole));
+    
+    const [activeTab, setActiveTab] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Set the initial active tab or update it if the current one is no longer accessible
+        if (accessibleTabs.length > 0) {
+            const currentTabIsValid = accessibleTabs.some(t => t.id === activeTab);
+            if (!currentTabIsValid) {
+                setActiveTab(accessibleTabs[0].id);
+            }
+        } else {
+            setActiveTab(null);
+        }
+    }, [userRole, accessibleTabs, activeTab]);
+
 
     const renderContent = () => {
         switch (activeTab) {
@@ -1122,7 +1157,7 @@ export const AdminView: React.FC = () => {
             case 'sponsors': return <SponsorsAdmin />;
             case 'bulk-import': return <BulkImportAdmin />;
             case 'export': return <ExportAdmin />;
-            default: return null;
+            default: return <p className="text-center text-text-secondary">You do not have permission to view any sections.</p>;
         }
     };
 
@@ -1143,16 +1178,12 @@ export const AdminView: React.FC = () => {
             <h1 className="text-4xl font-extrabold text-center mb-8">Admin Panel</h1>
             <div className="border-b border-accent mb-6">
                 <div className="flex overflow-x-auto">
-                    <TabButton tab="tournaments" label="Tournaments" />
-                    <TabButton tab="teams" label="Teams" />
-                    <TabButton tab="players" label="Players" />
-                    <TabButton tab="fixtures" label="Fixtures" />
-                    <TabButton tab="sponsors" label="Sponsors" />
-                    <TabButton tab="bulk-import" label="Bulk Import" />
-                    <TabButton tab="export" label="Export Data" />
+                    {accessibleTabs.map(tab => (
+                        <TabButton key={tab.id} tab={tab.id} label={tab.label} />
+                    ))}
                 </div>
             </div>
-            <div>{renderContent()}</div>
+            {activeTab ? <div>{renderContent()}</div> : null}
         </div>
     );
 };

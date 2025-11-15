@@ -93,6 +93,7 @@ export const RulesView: React.FC = () => {
         setAskError('');
     };
 
+    const canEdit = userProfile?.role === 'admin' || userProfile?.role === 'content_editor';
 
     if (loading) {
         return <div className="text-center text-text-secondary">Loading rules...</div>;
@@ -102,7 +103,7 @@ export const RulesView: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                 <h1 className="text-4xl font-extrabold">Official Game Rules</h1>
-                {userProfile?.role === 'admin' && !isEditing && (
+                {canEdit && !isEditing && (
                     <button
                         onClick={() => setIsEditing(true)}
                         className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors"
