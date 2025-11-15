@@ -21,7 +21,9 @@ async function build() {
       outfile: 'dist/bundle.js',
       minify: true,
       sourcemap: true,
-      target: ['chrome58', 'firefox57', 'safari11', 'edge16'],
+      // FIX: Target modern environments that support ES2020 features.
+      // This resolves the "destructuring is not supported" error.
+      target: 'es2020',
       define: {
         'process.env.NODE_ENV': '"production"',
       },
