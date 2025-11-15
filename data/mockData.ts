@@ -2,7 +2,7 @@
 // ALL DATA IS NOW FETCHED FROM THE SUPABASE DATABASE.
 // You can use this file for reference or safely delete it.
 
-import type { Tournament, Team, Player, Fixture, Sponsor } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, Club } from '../types';
 
 export const sponsors: Sponsor[] = [
   // FIX: Added missing 'showInFooter' property to satisfy the Sponsor type.
@@ -21,17 +21,24 @@ export const tournaments: Tournament[] = [
   { id: 4, name: 'Rising Stars Invitational', division: 'Division 2' },
 ];
 
+export const clubs: Club[] = [
+    { id: 1, name: 'City Volleyball Club', logoUrl: 'https://picsum.photos/seed/club1/100/100' },
+    { id: 2, name: 'Coastal Spikers', logoUrl: 'https://picsum.photos/seed/club2/100/100' },
+    { id: 3, name: 'Mountain Volley', logoUrl: 'https://picsum.photos/seed/club3/100/100' },
+    { id: 4, name: 'Savanna Smashers', logoUrl: 'https://picsum.photos/seed/club4/100/100' },
+];
+
 export const teams: Team[] = [
   // Division 1
-  { id: 1, name: 'Stallions', shortName: 'STL', logoUrl: 'https://picsum.photos/seed/team1/100/100', division: 'Division 1' },
-  { id: 2, name: 'Panthers', shortName: 'PAN', logoUrl: 'https://picsum.photos/seed/team2/100/100', division: 'Division 1' },
-  { id: 3, name: 'Titans', shortName: 'TTN', logoUrl: 'https://picsum.photos/seed/team3/100/100', division: 'Division 1' },
-  { id: 4, name: 'Wolverines', shortName: 'WLV', logoUrl: 'https://picsum.photos/seed/team4/100/100', division: 'Division 1' },
+  { id: 1, name: 'Stallions', shortName: 'STL', logoUrl: 'https://picsum.photos/seed/team1/100/100', division: 'Division 1', clubId: 1 },
+  { id: 2, name: 'Panthers', shortName: 'PAN', logoUrl: 'https://picsum.photos/seed/team2/100/100', division: 'Division 1', clubId: 1 },
+  { id: 3, name: 'Titans', shortName: 'TTN', logoUrl: 'https://picsum.photos/seed/team3/100/100', division: 'Division 1', clubId: 2 },
+  { id: 4, name: 'Wolverines', shortName: 'WLV', logoUrl: 'https://picsum.photos/seed/team4/100/100', division: 'Division 1', clubId: 2 },
   // Division 2
-  { id: 5, name: 'Cobras', shortName: 'COB', logoUrl: 'https://picsum.photos/seed/team5/100/100', division: 'Division 2' },
-  { id: 6, name: 'Eagles', shortName: 'EAG', logoUrl: 'https://picsum.photos/seed/team6/100/100', division: 'Division 2' },
-  { id: 7, name: 'Sharks', shortName: 'SHK', logoUrl: 'https://picsum.photos/seed/team7/100/100', division: 'Division 2' },
-  { id: 8, name: 'Rhinos', shortName: 'RHI', logoUrl: 'https://picsum.photos/seed/team8/100/100', division: 'Division 2' },
+  { id: 5, name: 'Cobras', shortName: 'COB', logoUrl: 'https://picsum.photos/seed/team5/100/100', division: 'Division 2', clubId: 3 },
+  { id: 6, name: 'Eagles', shortName: 'EAG', logoUrl: 'https://picsum.photos/seed/team6/100/100', division: 'Division 2', clubId: 3 },
+  { id: 7, name: 'Sharks', shortName: 'SHK', logoUrl: 'https://picsum.photos/seed/team7/100/100', division: 'Division 2', clubId: 4 },
+  { id: 8, name: 'Rhinos', shortName: 'RHI', logoUrl: 'https://picsum.photos/seed/team8/100/100', division: 'Division 2', clubId: 4 },
 ];
 
 export const players: Player[] = [

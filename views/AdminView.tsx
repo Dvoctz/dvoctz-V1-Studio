@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
-import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club } from '../types';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -236,9 +236,150 @@ const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () =>
     );
 };
 
+// Clubs
+const ClubsAdmin = () => {
+    const { clubs, addClub, updateClub, deleteClub } = useSports();
+    const [editing, setEditing] = useState<Club | Partial<Club> | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const handleSave = async (club: Club | Partial<Club> & { logoFile?: File }) => {
+        setError(null);
+        try {
+            if ('id' in club && club.id) {
+                await updateClub(club as Club & { logoFile?: File });
+            } else {
+                await addClub(club as Omit<Club, 'id'> & { logoFile?: File });
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this club? This will not delete its teams but will unlink them.')) {
+            try {
+                await deleteClub(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
+    };
+
+    const filteredClubs = clubs.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    return (
+        <AdminSection title="Manage Clubs">
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                 <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                    </span>
+                    <Input
+                        type="text"
+                        placeholder="Search clubs..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 !mt-0"
+                    />
+                </div>
+                <Button onClick={() => setEditing({})}>Add New Club</Button>
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredClubs.map(c => (
+                    <div key={c.id} className="p-3 bg-accent rounded-md text-center">
+                         {c.logoUrl ? (
+                            <img src={c.logoUrl} alt={c.name} className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary object-cover" />
+                         ) : (
+                            <div className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-primary bg-primary flex items-center justify-center text-text-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                            </div>
+                         )}
+                        <p className="font-bold">{c.name}</p>
+                        <div className="mt-2 space-x-2">
+                            <Button onClick={() => setEditing(c)} className="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1">Edit</Button>
+                            <Button onClick={() => handleDelete(c.id)} className="bg-red-600 hover:bg-red-500 text-xs px-3 py-1">Delete</Button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {editing && (
+                <FormModal title={editing.id ? "Edit Club" : "Add Club"} onClose={() => { setEditing(null); setError(null); }}>
+                    <ClubForm club={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
+                </FormModal>
+            )}
+        </AdminSection>
+    );
+};
+
+const ClubForm: React.FC<{ club: Club | Partial<Club>, onSave: (c: any) => void, onCancel: () => void, error: string | null }> = ({ club, onSave, onCancel, error }) => {
+    const [formData, setFormData] = useState({ name: '', ...club });
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState(club.logoUrl);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setLogoFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => setPreviewUrl(reader.result as string);
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleRemoveLogo = () => {
+        setPreviewUrl(null);
+        setLogoFile(null);
+        setFormData({ ...formData, logoUrl: null });
+        const fileInput = document.getElementById('logoFile') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave({ ...formData, logoFile });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div>
+                <Label htmlFor="name">Club Name</Label>
+                <Input id="name" name="name" type="text" value={formData.name || ''} onChange={handleChange} required />
+            </div>
+            <div>
+                <Label>Logo Image (Optional)</Label>
+                <div className="mt-2 flex items-center gap-4">
+                    {previewUrl ? (
+                        <img src={previewUrl} alt="Logo preview" className="w-20 h-20 rounded-full object-cover bg-primary" />
+                    ) : (
+                         <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-text-secondary">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                         </div>
+                    )}
+                    <div className="flex-grow">
+                        <Input id="logoFile" name="logoFile" type="file" accept="image/png, image/jpeg" onChange={handleFileChange} className="text-sm" />
+                        {previewUrl && <Button type="button" onClick={handleRemoveLogo} className="bg-gray-600 hover:bg-gray-500 text-xs mt-2">Remove Logo</Button>}
+                    </div>
+                </div>
+            </div>
+            <div className="flex justify-end space-x-2">
+                <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                <Button type="submit">Save</Button>
+            </div>
+        </form>
+    );
+};
+
+
 // Teams
 const TeamsAdmin = () => {
-    const { teams, addTeam, updateTeam, deleteTeam } = useSports();
+    const { teams, clubs, addTeam, updateTeam, deleteTeam } = useSports();
     const [editing, setEditing] = useState<Team | Partial<Team> | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -287,8 +428,9 @@ const TeamsAdmin = () => {
                         className="pl-10 !mt-0"
                     />
                 </div>
-                <Button onClick={() => setEditing({})}>Add New Team</Button>
+                <Button onClick={() => setEditing({})} disabled={clubs.length === 0}>Add New Team</Button>
             </div>
+            {clubs.length === 0 && <p className="text-sm text-yellow-400 mt-2">Please add a club before adding teams.</p>}
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredTeams.length > 0 ? filteredTeams.map(t => (
                     <div key={t.id} className="p-3 bg-accent rounded-md text-center">
@@ -318,6 +460,7 @@ const TeamsAdmin = () => {
 };
 
 const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ team, onSave, onCancel, error }) => {
+    const { clubs } = useSports();
     const [formData, setFormData] = useState({
         name: '',
         shortName: '',
@@ -354,12 +497,19 @@ const TeamForm: React.FC<{ team: Team | Partial<Team>, onSave: (t: any) => void,
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave({ ...formData, logoFile });
+        onSave({ ...formData, clubId: parseInt(formData.clubId as any, 10), logoFile });
     };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             {error && <ErrorMessage message={error} />}
+            <div>
+                <Label htmlFor="clubId">Club</Label>
+                <Select id="clubId" name="clubId" value={formData.clubId || ''} onChange={handleChange} required>
+                    <option value="" disabled>Select a club</option>
+                    {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+            </div>
             <div>
                 <Label htmlFor="name">Team Name</Label>
                 <Input id="name" name="name" type="text" value={formData.name || ''} onChange={handleChange} required />
@@ -1094,7 +1244,7 @@ const BulkImportAdmin = () => {
             const data = await parseCSV(file);
 
             if (type === 'teams') {
-                const requiredColumns = ['name', 'shortName', 'division'];
+                const requiredColumns = ['name', 'shortName', 'division', 'clubName'];
                 for (let i = 0; i < data.length; i++) {
                     const row = data[i] as CsvTeam;
                     for (const col of requiredColumns) {
@@ -1131,13 +1281,13 @@ const BulkImportAdmin = () => {
 
     return (
         <AdminSection title="Bulk Import Data">
-            <p className="text-text-secondary mb-4">Upload CSV files to add or update teams and players in bulk. Ensure column headers match the required format.</p>
+            <p className="text-text-secondary mb-4">Upload CSV files to add or update clubs, teams, and players in bulk. Ensure column headers match the required format. Clubs must exist before you can import teams that belong to them.</p>
             {error && <p className="text-red-500 mb-4 p-3 bg-red-900/50 rounded-md"><strong>Error:</strong> {error}</p>}
             {success && <p className="text-green-500 mb-4 p-3 bg-green-900/50 rounded-md"><strong>Success:</strong> {success}</p>}
             <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-accent p-4 rounded-md">
                     <h3 className="font-bold mb-2">Import Teams</h3>
-                    <p className="text-xs text-text-secondary mb-2">Required columns: `name`, `shortName`, `division`. Optional: `logoUrl`</p>
+                    <p className="text-xs text-text-secondary mb-2">Required columns: `name`, `shortName`, `division`, `clubName`. Optional: `logoUrl`</p>
                     <Label htmlFor="teams-csv">Upload Teams CSV</Label>
                     <Input id="teams-csv" type="file" accept=".csv" onChange={handleFileUpload('teams')} disabled={loading} />
                 </div>
@@ -1155,7 +1305,7 @@ const BulkImportAdmin = () => {
 
 // Export Data
 const ExportAdmin = () => {
-    const { teams, players, getTeamById } = useSports();
+    const { teams, players, getTeamById, getClubById } = useSports();
 
     const downloadCSV = (csvString: string, filename: string) => {
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
@@ -1175,12 +1325,16 @@ const ExportAdmin = () => {
             alert("No teams to export.");
             return;
         }
-        const data = teams.map(t => ({
-            name: t.name,
-            shortName: t.shortName,
-            division: t.division,
-            logoUrl: t.logoUrl || '',
-        }));
+        const data = teams.map(t => {
+            const club = getClubById(t.clubId);
+            return {
+                name: t.name,
+                shortName: t.shortName,
+                division: t.division,
+                clubName: club?.name || 'N/A',
+                logoUrl: t.logoUrl || '',
+            }
+        });
         const csv = Papa.unparse(data);
         downloadCSV(csv, `dvoc_teams_${new Date().toISOString().split('T')[0]}.csv`);
     };
@@ -1234,6 +1388,7 @@ interface AdminTab {
 
 const availableTabs: AdminTab[] = [
     { id: 'tournaments', label: 'Tournaments', roles: ['admin'] },
+    { id: 'clubs', label: 'Clubs', roles: ['admin', 'team_manager', 'content_editor'] },
     { id: 'teams', label: 'Teams', roles: ['admin', 'team_manager'] },
     { id: 'players', label: 'Players', roles: ['admin', 'team_manager'] },
     { id: 'fixtures', label: 'Fixtures', roles: ['admin', 'fixture_manager'] },
@@ -1267,6 +1422,7 @@ export const AdminView: React.FC = () => {
     const renderContent = () => {
         switch (activeTab) {
             case 'tournaments': return <TournamentsAdmin />;
+            case 'clubs': return <ClubsAdmin />;
             case 'teams': return <TeamsAdmin />;
             case 'players': return <PlayersAdmin />;
             case 'fixtures': return <FixturesAdmin />;

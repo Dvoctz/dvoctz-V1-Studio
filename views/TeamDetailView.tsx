@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Team, Player } from '../types';
@@ -35,7 +33,7 @@ export const TeamDetailView: React.FC<TeamDetailViewProps> = ({ team, onBack }) 
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        <span>Back to Teams</span>
+        <span>Back to Clubs</span>
       </button>
 
       <div className="flex flex-col items-center text-center mb-8">

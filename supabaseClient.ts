@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Fixture, Player, Team, Tournament, Sponsor, Score } from './types';
+import type { Fixture, Player, Team, Tournament, Sponsor, Score, Club } from './types';
 
 // --- IMPORTANT ACTION REQUIRED ---
 // Replace these placeholder values with your actual Supabase credentials.
@@ -28,6 +28,7 @@ export const initializeSupabase = (): SupabaseClient => {
 // Helper types for Supabase data to match app types
 // The Supabase client automatically maps snake_case (in DB) to camelCase (in JS)
 export type DbTournament = Omit<Tournament, 'id'> & { id: number };
+export type DbClub = Omit<Club, 'id'> & { id: number };
 export type DbTeam = Omit<Team, 'id'> & { id: number };
 export type DbPlayer = Omit<Player, 'id'> & { id: number };
 export type DbFixture = Omit<Fixture, 'id' | 'score'> & { id: number; score: Score | null };

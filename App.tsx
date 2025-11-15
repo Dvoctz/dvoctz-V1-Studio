@@ -1,17 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomeView } from './views/HomeView';
 import { TournamentsView } from './views/TournamentsView';
-import { TeamsView } from './views/TeamsView';
+import { ClubsView } from './views/ClubsView';
 import { PlayersView } from './views/PlayersView';
 import { TournamentDetailView } from './views/TournamentDetailView';
+import { ClubDetailView } from './views/ClubDetailView';
 import { TeamDetailView } from './views/TeamDetailView';
 import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
 import { RulesView } from './views/RulesView';
-import type { View, Tournament, Team } from './types';
+import type { View, Tournament, Team, Club } from './types';
 import { SportsDataProvider } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { initializeSupabase } from './supabaseClient';
@@ -22,6 +22,7 @@ import { AddToHomeScreenPrompt } from './components/AddToHomeScreenPrompt';
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+  const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const { currentUser, userProfile, loading: authLoading } = useAuth();
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
@@ -53,6 +54,7 @@ const AppContent: React.FC = () => {
   const handleNavigate = (view: View) => {
     setCurrentView(view);
     setSelectedTournament(null);
+    setSelectedClub(null);
     setSelectedTeam(null);
   }
 
@@ -65,6 +67,11 @@ const AppContent: React.FC = () => {
     setCurrentView('tournament-detail');
   };
 
+  const handleSelectClub = (club: Club) => {
+    setSelectedClub(club);
+    setCurrentView('club-detail');
+  };
+
   const handleSelectTeam = (team: Team) => {
     setSelectedTeam(team);
     setCurrentView('team-detail');
@@ -74,11 +81,13 @@ const AppContent: React.FC = () => {
     setSelectedTournament(null);
     setCurrentView('tournaments');
   };
-
-  const handleBackToTeams = () => {
+  
+  const handleBackToClubs = () => {
+    setSelectedClub(null);
     setSelectedTeam(null);
-    setCurrentView('teams');
+    setCurrentView('clubs');
   };
+
 
   useEffect(() => {
     const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
@@ -96,10 +105,9 @@ const AppContent: React.FC = () => {
   
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [currentView, selectedTournament, selectedTeam]);
+  }, [currentView, selectedTournament, selectedClub, selectedTeam]);
 
   const renderView = () => {
-    // FIX: Corrected typo from `currentV` to `currentView`.
     if (authLoading && (currentView === 'admin' || currentView === 'login')) {
       return <div className="text-center p-8 text-text-secondary">Checking authentication...</div>;
     }
@@ -111,16 +119,18 @@ const AppContent: React.FC = () => {
         return <HomeView onNavigate={handleNavigate} onSelectTournament={handleSelectTournament} />;
       case 'tournaments':
         return <TournamentsView onSelectTournament={handleSelectTournament} />;
-      case 'teams':
-        return <TeamsView onSelectTeam={handleSelectTeam} />;
+      case 'clubs':
+        return <ClubsView onSelectClub={handleSelectClub} />;
       case 'players':
         return <PlayersView />;
       case 'rules':
         return <RulesView />;
       case 'tournament-detail':
         return selectedTournament ? <TournamentDetailView tournament={selectedTournament} onBack={handleBackToTournaments} /> : <TournamentsView onSelectTournament={handleSelectTournament} />;
+      case 'club-detail':
+        return selectedClub ? <ClubDetailView club={selectedClub} onSelectTeam={handleSelectTeam} onBack={handleBackToClubs} /> : <ClubsView onSelectClub={handleSelectClub} />;
       case 'team-detail':
-        return selectedTeam ? <TeamDetailView team={selectedTeam} onBack={handleBackToTeams} /> : <TeamsView onSelectTeam={handleSelectTeam} />;
+        return selectedTeam ? <TeamDetailView team={selectedTeam} onBack={handleBackToClubs} /> : <ClubsView onSelectClub={handleSelectClub} />;
       case 'admin':
         return isAdminTypeUser ? <AdminView /> : null;
       case 'login':

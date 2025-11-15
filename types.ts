@@ -1,4 +1,4 @@
-export type View = 'home' | 'tournaments' | 'teams' | 'players' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules';
+export type View = 'home' | 'tournaments' | 'clubs' | 'players' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules' | 'club-detail';
 
 export type PlayerRole = 'Main Netty' | 'Left Front' | 'Right Front' | 'Net Center' | 'Back Center' | 'Left Back' | 'Right Back' | 'Right Netty' | 'Left Netty' | 'Service Man';
 
@@ -16,12 +16,19 @@ export interface Player {
   };
 }
 
+export interface Club {
+  id: number;
+  name: string;
+  logoUrl: string | null;
+}
+
 export interface Team {
   id: number;
   name: string;
   shortName: string;
   logoUrl: string | null;
   division: 'Division 1' | 'Division 2';
+  clubId: number;
 }
 
 export interface Score {

@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
           <nav className="hidden md:flex items-center space-x-2">
             <NavLink view="home" currentView={currentView} onNavigate={onNavigate}>Home</NavLink>
             <NavLink view="tournaments" currentView={currentView} onNavigate={onNavigate}>Tournaments</NavLink>
-            <NavLink view="teams" currentView={currentView} onNavigate={onNavigate}>Teams</NavLink>
+            <NavLink view="clubs" currentView={currentView} onNavigate={onNavigate}>Clubs</NavLink>
             <NavLink view="players" currentView={currentView} onNavigate={onNavigate}>Players</NavLink>
             <NavLink view="rules" currentView={currentView} onNavigate={onNavigate}>Rules</NavLink>
             <NavLink view="admin" currentView={currentView} onNavigate={onNavigate}>
@@ -95,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
           <nav className="px-2 pt-2 pb-4 space-y-1 sm:px-3 flex flex-col">
             <NavLink view="home" currentView={currentView} onNavigate={handleNavClick}>Home</NavLink>
             <NavLink view="tournaments" currentView={currentView} onNavigate={handleNavClick}>Tournaments</NavLink>
-            <NavLink view="teams" currentView={currentView} onNavigate={handleNavClick}>Teams</NavLink>
+            <NavLink view="clubs" currentView={currentView} onNavigate={handleNavClick}>Clubs</NavLink>
             <NavLink view="players" currentView={currentView} onNavigate={handleNavClick}>Players</NavLink>
             <NavLink view="rules" currentView={currentView} onNavigate={handleNavClick}>Rules</NavLink>
             <NavLink view="admin" currentView={currentView} onNavigate={handleNavClick}>
