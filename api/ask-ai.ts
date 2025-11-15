@@ -9,10 +9,11 @@ export default async function handler(request, response) {
     return response.status(405).end('Method Not Allowed');
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Check for the recommended GEMINI_API_KEY, but fall back to VITE_API_KEY for compatibility.
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_API_KEY;
   if (!apiKey) {
-    console.error("GEMINI_API_KEY is not set in the server environment.");
-    const errorMessage = 'The AI assistant is not configured correctly on the server. The `GEMINI_API_KEY` environment variable is missing. Please add it in your hosting provider\'s settings.';
+    console.error("GEMINI_API_KEY or VITE_API_KEY is not set in the server environment.");
+    const errorMessage = 'The AI assistant is not configured correctly on the server. An API key environment variable (`GEMINI_API_KEY` or `VITE_API_KEY`) is missing. Please add it in your hosting provider\'s settings.';
     return response.status(500).json({ error: { message: errorMessage } });
   }
 
