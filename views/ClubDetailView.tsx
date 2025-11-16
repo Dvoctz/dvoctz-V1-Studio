@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSports } from '../context/SportsDataContext';
-import type { Club, Team } from '../types';
+import type { Club, Team, Player } from '../types';
 
 interface ClubDetailViewProps {
   club: Club;
@@ -27,9 +27,50 @@ const TeamRow: React.FC<{ team: Team; onSelect: () => void }> = ({ team, onSelec
     </div>
 );
 
+const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
+    const { getTeamById } = useSports();
+    const team = getTeamById(player.teamId);
+
+    return (
+        <div className="flex items-center p-4 bg-secondary rounded-lg hover:bg-accent transition-colors duration-200">
+            {player.photoUrl ? (
+                <img src={player.photoUrl} alt={player.name} className="w-16 h-16 rounded-full object-cover mr-4" />
+            ) : (
+                <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center mr-4 text-text-secondary flex-shrink-0">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                </div>
+            )}
+            <div className="overflow-hidden">
+                <p className="font-bold text-white text-lg truncate">{player.name}</p>
+                <p className="text-sm text-highlight truncate">{player.role}</p>
+                {team && <p className="text-xs text-text-secondary mt-1 truncate">Team: {team.name}</p>}
+            </div>
+        </div>
+    );
+};
+
 export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onBack }) => {
-  const { getTeamsByClub } = useSports();
+  const { getTeamsByClub, getPlayersByClub } = useSports();
+  const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
+  const [searchTerm, setSearchTerm] = useState('');
+
   const clubTeams = useMemo(() => getTeamsByClub(club.id), [getTeamsByClub, club.id]);
+  const clubPlayers = useMemo(() => getPlayersByClub(club.id), [getPlayersByClub, club.id]);
+
+  const filteredPlayers = useMemo(() => {
+    if (!searchTerm) return clubPlayers;
+    return clubPlayers.filter(player => player.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [clubPlayers, searchTerm]);
+
+  const TabButton: React.FC<{ tab: 'teams' | 'players'; children: React.ReactNode }> = ({ tab, children }) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`px-6 py-3 text-lg font-semibold transition-colors duration-300 focus:outline-none ${activeTab === tab ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+    >
+      {children}
+    </button>
+  );
+
 
   return (
     <div>
@@ -52,16 +93,52 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
         )}
         <h1 className="text-4xl font-extrabold">{club.name}</h1>
       </div>
+      
+      <div className="flex border-b border-accent mb-6 justify-center">
+        <TabButton tab="teams">Teams</TabButton>
+        <TabButton tab="players">Players</TabButton>
+      </div>
 
       <div>
-        <h2 className="text-2xl font-bold mb-4">Teams</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {clubTeams.length > 0 ? (
-            clubTeams.map(team => <TeamRow key={team.id} team={team} onSelect={() => onSelectTeam(team)} />)
-          ) : (
-            <p className="text-center text-text-secondary md:col-span-2">No teams registered for this club yet.</p>
-          )}
-        </div>
+        {activeTab === 'teams' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {clubTeams.length > 0 ? (
+              clubTeams.map(team => <TeamRow key={team.id} team={team} onSelect={() => onSelectTeam(team)} />)
+            ) : (
+              <p className="text-center text-text-secondary md:col-span-2">No teams registered for this club yet.</p>
+            )}
+          </div>
+        )}
+        
+        {activeTab === 'players' && (
+            <div>
+                 <div className="mb-6 max-w-lg mx-auto">
+                    <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                        </svg>
+                    </span>
+                    <input
+                        type="text"
+                        placeholder="Search players by name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-secondary p-3 pl-10 rounded-lg border border-accent focus:ring-highlight focus:border-highlight transition-colors"
+                        aria-label="Search players"
+                    />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredPlayers.length > 0 ? (
+                        filteredPlayers.map(player => <PlayerCard key={player.id} player={player} />)
+                    ) : (
+                         <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players found for this club.</p>
+                    )}
+                </div>
+            </div>
+        )}
       </div>
     </div>
   );

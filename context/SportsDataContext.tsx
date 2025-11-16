@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -52,6 +53,7 @@ interface SportsContextType extends SportsState {
     getTeamById: (teamId: number) => Team | undefined;
     getTeamsByClub: (clubId: number) => Team[];
     getPlayersByTeam: (teamId: number) => Player[];
+    getPlayersByClub: (clubId: number) => Player[];
     getStandingsForTournament: (tournamentId: number) => TeamStanding[];
 }
 
@@ -508,6 +510,16 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         return state.players.filter(p => p.teamId === teamId);
     }, [state.players]);
 
+    const getPlayersByClub = useCallback((clubId: number): Player[] => {
+        const clubTeamIds = state.teams
+            .filter(t => t.clubId === clubId)
+            .map(t => t.id);
+        
+        return state.players
+            .filter(p => clubTeamIds.includes(p.teamId))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [state.teams, state.players]);
+
     const getStandingsForTournament = useCallback((tournamentId: number): TeamStanding[] => {
         const tournamentFixtures = state.fixtures.filter(
             f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0
@@ -623,6 +635,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         getTeamById,
         getTeamsByClub,
         getPlayersByTeam,
+        getPlayersByClub,
         getStandingsForTournament,
     }), [
         state, addTournament, updateTournament, deleteTournament, addClub,
@@ -632,7 +645,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         updateRules, bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
         updateSponsorsForTournament, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
-        getPlayersByTeam, getStandingsForTournament
+        getPlayersByTeam, getPlayersByClub, getStandingsForTournament
     ]);
 
     return (
