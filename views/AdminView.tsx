@@ -682,7 +682,8 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
     const handleStatsChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, stats: { ...formData.stats, [e.target.name]: parseInt(e.target.value, 10) || 0 }});
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave({...formData, teamId: parseInt(formData.teamId as any, 10), photoFile });
+        const teamIdValue = formData.teamId === '' ? null : parseInt(formData.teamId as string, 10);
+        onSave({...formData, teamId: teamIdValue, photoFile });
     };
 
     return (
@@ -710,8 +711,8 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
             </div>
              <div>
                 <Label htmlFor="teamId">Team</Label>
-                <Select id="teamId" name="teamId" value={formData.teamId || ''} onChange={handleChange} required>
-                    <option value="" disabled>Select a team</option>
+                <Select id="teamId" name="teamId" value={formData.teamId ?? ''} onChange={handleChange}>
+                    <option value="">-- Unassigned / Free Agent --</option>
                     {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </Select>
             </div>

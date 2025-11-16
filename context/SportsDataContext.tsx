@@ -310,17 +310,47 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const updatePlayer = useCallback(async (playerData: Player & { photoFile?: File }) => {
+        const originalPlayer = state.players.find(p => p.id === playerData.id);
+
         let finalPhotoUrl = playerData.photoUrl;
         if (playerData.photoFile) {
             finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
         }
+        
+        // Check for team change and log transfer if necessary
+        if (originalPlayer && originalPlayer.teamId !== playerData.teamId) {
+            const newTransfer = {
+                player_id: playerData.id,
+                from_team_id: originalPlayer.teamId,
+                to_team_id: playerData.teamId,
+                transfer_date: new Date().toISOString().split('T')[0],
+                is_automated: true,
+                notes: 'Player details updated via admin panel.'
+            };
+            
+            const { data: insertedTransfer, error: transferError } = await supabase
+                .from('player_transfers')
+                .insert(newTransfer)
+                .select()
+                .single();
+                
+            if (transferError) throw transferError;
+            
+            if (insertedTransfer) {
+                setState(s => ({
+                    ...s,
+                    playerTransfers: [...s.playerTransfers, mapPlayerTransfer(insertedTransfer)]
+                }));
+            }
+        }
+
         const { id, name, teamId, role, stats } = playerData;
         const { data, error } = await supabase.from('players').update({
             name, team_id: teamId, role, stats, photo_url: finalPhotoUrl,
         }).eq('id', id).select().single();
         if (error) throw error;
-        setState(s => ({...s, players: s.players.map(p => p.id === id ? mapPlayer(data) : p) }));
-    }, [supabase]);
+        setState(s => ({...s, players: s.players.map(p => p.id === id ? mapPlayer(data) : p).sort((a,b) => a.name.localeCompare(b.name)) }));
+    }, [supabase, state.players]);
 
     const deletePlayer = useCallback(async (id: number) => {
         const { error } = await supabase.from('players').delete().eq('id', id);
