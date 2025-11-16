@@ -19,6 +19,10 @@ import { SupabaseProvider } from './context/SupabaseContext';
 import { Analytics } from '@vercel/analytics/react';
 import { AddToHomeScreenPrompt } from './components/AddToHomeScreenPrompt';
 
+// Initialize the Supabase client once, outside of the component render cycle.
+// This is the critical fix to prevent re-creating the client on every render.
+const supabaseClient = initializeSupabase();
+
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
@@ -153,8 +157,6 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
-    const supabaseClient = initializeSupabase();
-
     return (
         <>
             <SupabaseProvider client={supabaseClient}>
