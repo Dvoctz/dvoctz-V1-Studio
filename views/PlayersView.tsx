@@ -23,7 +23,7 @@ const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ playe
                 </div>
             </div>
              <div className="p-4">
-                <p className="text-sm text-text-secondary">Team: <span className="font-semibold text-text-primary">{team?.name || 'N/A'}</span></p>
+                <p className="text-sm text-text-secondary">Team: <span className="font-semibold text-text-primary">{team?.name || 'Free Agent'}</span></p>
                  <div className="grid grid-cols-4 gap-2 mt-3 text-xs text-text-secondary">
                     <div>
                         <span className="font-bold text-white block">{player.stats?.matches ?? 0}</span>

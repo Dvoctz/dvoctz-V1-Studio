@@ -1277,9 +1277,9 @@ const PlayerTransfersAdmin = () => {
                             </div>
                         </div>
                         <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-                            <span>{getTeamById(t.fromTeamId)?.name || 'Unassigned'}</span>
+                            <span>{getTeamById(t.fromTeamId)?.name || 'Free Agent'}</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-highlight" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                            <span>{getTeamById(t.toTeamId)?.name || 'Unassigned'}</span>
+                            <span>{getTeamById(t.toTeamId)?.name || 'Free Agent'}</span>
                         </div>
                         <p className="text-xs text-text-secondary mt-1">{new Date(t.transferDate).toLocaleDateString()}</p>
                         {t.notes && <p className="text-xs italic text-text-secondary mt-2 p-2 bg-primary rounded-md">Notes: {t.notes}</p>}
@@ -1329,8 +1329,8 @@ const PlayerTransferForm: React.FC<{ transfer: PlayerTransfer | Partial<Omit<Pla
         <form onSubmit={handleSubmit} className="space-y-4">
             {error && <ErrorMessage message={error} />}
             <div><Label>Player</Label><Select name="playerId" value={formData.playerId || ''} onChange={handleChange} required disabled={!!transfer.id}><option value="" disabled>Select a player...</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
-            <div><Label>From Team</Label><Select name="fromTeamId" value={formData.fromTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Unassigned</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
-            <div><Label>To Team</Label><Select name="toTeamId" value={formData.toTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Unassigned</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
+            <div><Label>From Team</Label><Select name="fromTeamId" value={formData.fromTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Free Agent</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
+            <div><Label>To Team</Label><Select name="toTeamId" value={formData.toTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Free Agent</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
             <div><Label>Transfer Date</Label><Input name="transferDate" type="date" value={formData.transferDate.split('T')[0]} onChange={handleChange} required /></div>
             <div><Label>Notes (Optional)</Label><Textarea name="notes" value={formData.notes || ''} onChange={handleChange} rows={3} /></div>
             <div className="flex justify-end space-x-2">

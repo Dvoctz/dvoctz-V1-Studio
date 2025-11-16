@@ -71,7 +71,7 @@ const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: bo
                 {team ? (
                     <p className="text-xs text-text-secondary mt-1 truncate">Team: {team.name}</p>
                 ) : (
-                    <p className="text-xs text-yellow-400 mt-1 truncate">Unassigned</p>
+                    <p className="text-xs text-yellow-400 mt-1 truncate">Free Agent</p>
                 )}
             </div>
         </div>

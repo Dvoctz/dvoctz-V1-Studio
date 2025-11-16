@@ -30,8 +30,8 @@ const TransferHistory: React.FC<{ transfers: PlayerTransfer[] }> = ({ transfers 
                         {transfers.map(t => (
                             <tr key={t.id}>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">{new Date(t.transferDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{getTeamById(t.fromTeamId)?.name || 'Unassigned'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{getTeamById(t.toTeamId)?.name || 'Unassigned'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{getTeamById(t.fromTeamId)?.name || 'Free Agent'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{getTeamById(t.toTeamId)?.name || 'Free Agent'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary hidden sm:table-cell">{t.notes || (t.isAutomated ? 'Automated Roster Change' : 'Manual Entry')}</td>
                             </tr>
                         ))}
@@ -68,7 +68,7 @@ export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBa
         <div className="text-center md:text-left">
             <h1 className="text-4xl font-extrabold text-white">{player.name}</h1>
             <p className="text-xl text-highlight font-semibold mt-1">{player.role}</p>
-            <p className="text-text-secondary mt-2">Current Team: <span className="font-semibold text-text-primary">{team?.name || 'Unassigned'}</span></p>
+            <p className="text-text-secondary mt-2">Current Team: <span className="font-semibold text-text-primary">{team?.name || 'Free Agent'}</span></p>
         </div>
         <div className="w-full md:w-auto md:ml-auto grid grid-cols-2 sm:grid-cols-4 md:grid-cols-2 gap-4 text-center bg-primary p-4 rounded-lg">
              <div><span className="font-bold text-xl text-white block">{player.stats?.matches ?? 0}</span><span className="text-xs text-text-secondary">Matches</span></div>
