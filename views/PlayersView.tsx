@@ -1,14 +1,13 @@
-
 import React, { useState, useMemo } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Player } from '../types';
 
-const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
+const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ player, onSelect }) => {
     const { getTeamById } = useSports();
     const team = getTeamById(player.teamId);
 
     return (
-        <div className="bg-secondary rounded-lg shadow-lg overflow-hidden text-center group">
+        <div onClick={onSelect} className="bg-secondary rounded-lg shadow-lg overflow-hidden text-center group cursor-pointer">
             <div className="relative h-48 bg-accent flex items-center justify-center">
                 {player.photoUrl ? (
                     <img src={player.photoUrl} alt={player.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
@@ -48,7 +47,7 @@ const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
     );
 };
 
-export const PlayersView: React.FC = () => {
+export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> = ({ onSelectPlayer }) => {
   const { players } = useSports();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -79,7 +78,7 @@ export const PlayersView: React.FC = () => {
       {filteredPlayers.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredPlayers.map(player => (
-            <PlayerCard key={player.id} player={player} />
+            <PlayerCard key={player.id} player={player} onSelect={() => onSelectPlayer(player)} />
           ))}
         </div>
       ) : (

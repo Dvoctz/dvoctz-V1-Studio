@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
-import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club, PlayerTransfer } from '../types';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -32,6 +31,11 @@ const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputEleme
 const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     <select {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight disabled:bg-gray-800 disabled:cursor-not-allowed" />
 );
+
+const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+    <textarea {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight" />
+);
+
 
 // FIX: Updated the Label component to accept a `className` prop to resolve the type error.
 const Label: React.FC<{ children: React.ReactNode; htmlFor?: string; className?: string; }> = ({ children, htmlFor, className }) => (
@@ -1205,6 +1209,137 @@ const SponsorForm: React.FC<{ sponsor: Sponsor | Partial<Sponsor>, onSave: (s: a
     );
 };
 
+// Player Transfers
+const PlayerTransfersAdmin = () => {
+    const { playerTransfers, players, teams, addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer, getTeamById } = useSports();
+    const [editing, setEditing] = useState<PlayerTransfer | Partial<Omit<PlayerTransfer, 'id' | 'isAutomated'>> | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const handleSave = async (transfer: PlayerTransfer | Partial<Omit<PlayerTransfer, 'id' | 'isAutomated'>>) => {
+        setError(null);
+        try {
+            if ('id' in transfer && transfer.id) {
+                await updatePlayerTransfer(transfer as PlayerTransfer);
+            } else {
+                await addPlayerTransfer(transfer as Omit<PlayerTransfer, 'id' | 'isAutomated'>);
+            }
+            setEditing(null);
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+    
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this transfer record? This action is permanent.')) {
+            try {
+                await deletePlayerTransfer(id);
+            } catch (err: any) {
+                alert(`Deletion failed: ${err.message}`);
+            }
+        }
+    };
+    
+    const filteredTransfers = useMemo(() => {
+        const lowerSearch = searchTerm.toLowerCase();
+        return playerTransfers
+            .map(t => ({...t, player: players.find(p => p.id === t.playerId)}))
+            .filter(t => t.player && t.player.name.toLowerCase().includes(lowerSearch))
+            .sort((a,b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime())
+    }, [playerTransfers, players, searchTerm]);
+
+    return (
+        <AdminSection title="Manage Player Transfers">
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div className="relative w-full sm:w-auto sm:max-w-xs flex-grow">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                    </span>
+                    <Input
+                        type="text"
+                        placeholder="Search by player name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 !mt-0"
+                    />
+                </div>
+                <Button onClick={() => setEditing({})}>Add Manual Transfer</Button>
+            </div>
+            <div className="mt-4 space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                {filteredTransfers.map(t => (
+                    <div key={t.id} className="p-3 bg-accent rounded-md">
+                        <div className="flex items-center justify-between">
+                            <p className="font-bold">{t.player?.name || 'Unknown Player'}</p>
+                             <div className="space-x-2">
+                                <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500 text-xs px-2 py-1">Edit</Button>
+                                <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500 text-xs px-2 py-1">Delete</Button>
+                            </div>
+                        </div>
+                        <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+                            <span>{getTeamById(t.fromTeamId)?.name || 'Unassigned'}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-highlight" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            <span>{getTeamById(t.toTeamId)?.name || 'Unassigned'}</span>
+                        </div>
+                        <p className="text-xs text-text-secondary mt-1">{new Date(t.transferDate).toLocaleDateString()}</p>
+                        {t.notes && <p className="text-xs italic text-text-secondary mt-2 p-2 bg-primary rounded-md">Notes: {t.notes}</p>}
+                    </div>
+                ))}
+            </div>
+             {editing && (
+                <FormModal title={editing.id ? "Edit Transfer Record" : "Add Manual Transfer"} onClose={() => { setEditing(null); setError(null); }}>
+                    <PlayerTransferForm transfer={editing} onSave={handleSave} onCancel={() => { setEditing(null); setError(null); }} error={error} />
+                </FormModal>
+            )}
+        </AdminSection>
+    );
+};
+
+const PlayerTransferForm: React.FC<{ transfer: PlayerTransfer | Partial<Omit<PlayerTransfer, 'id' | 'isAutomated'>>, onSave: (t: any) => void, onCancel: () => void, error: string | null }> = ({ transfer, onSave, onCancel, error }) => {
+    const { players, teams } = useSports();
+    const [formData, setFormData] = useState({
+        playerId: undefined,
+        fromTeamId: 'unassigned',
+        toTeamId: 'unassigned',
+        transferDate: new Date().toISOString().split('T')[0],
+        notes: '',
+        ...transfer,
+    });
+    
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.playerId) {
+            alert("Please select a player.");
+            return;
+        }
+        const payload = {
+            ...formData,
+            playerId: Number(formData.playerId),
+            fromTeamId: formData.fromTeamId === 'unassigned' ? null : Number(formData.fromTeamId),
+            toTeamId: formData.toTeamId === 'unassigned' ? null : Number(formData.toTeamId),
+        };
+        onSave(payload);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div><Label>Player</Label><Select name="playerId" value={formData.playerId || ''} onChange={handleChange} required disabled={!!transfer.id}><option value="" disabled>Select a player...</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
+            <div><Label>From Team</Label><Select name="fromTeamId" value={formData.fromTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Unassigned</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
+            <div><Label>To Team</Label><Select name="toTeamId" value={formData.toTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Unassigned</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
+            <div><Label>Transfer Date</Label><Input name="transferDate" type="date" value={formData.transferDate.split('T')[0]} onChange={handleChange} required /></div>
+            <div><Label>Notes (Optional)</Label><Textarea name="notes" value={formData.notes || ''} onChange={handleChange} rows={3} /></div>
+            <div className="flex justify-end space-x-2">
+                <Button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                <Button type="submit">Save Transfer</Button>
+            </div>
+        </form>
+    );
+};
+
 
 // Bulk Import
 const BulkImportAdmin = () => {
@@ -1392,6 +1527,7 @@ const availableTabs: AdminTab[] = [
     { id: 'clubs', label: 'Clubs', roles: ['admin', 'team_manager', 'content_editor'] },
     { id: 'teams', label: 'Teams', roles: ['admin', 'team_manager'] },
     { id: 'players', label: 'Players', roles: ['admin', 'team_manager'] },
+    { id: 'transfers', label: 'Player Transfers', roles: ['admin'] },
     { id: 'fixtures', label: 'Fixtures', roles: ['admin', 'fixture_manager'] },
     { id: 'sponsors', label: 'Sponsors', roles: ['admin', 'content_editor'] },
     { id: 'bulk-import', label: 'Bulk Import', roles: ['admin', 'team_manager'] },
@@ -1430,6 +1566,7 @@ export const AdminView: React.FC = () => {
             case 'clubs': return <ClubsAdmin />;
             case 'teams': return <TeamsAdmin />;
             case 'players': return <PlayersAdmin />;
+            case 'transfers': return <PlayerTransfersAdmin />;
             case 'fixtures': return <FixturesAdmin />;
             case 'sponsors': return <SponsorsAdmin />;
             case 'bulk-import': return <BulkImportAdmin />;

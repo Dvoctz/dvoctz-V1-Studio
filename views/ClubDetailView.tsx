@@ -7,6 +7,7 @@ import { AssignPlayerModal } from '../components/AssignPlayerModal';
 interface ClubDetailViewProps {
   club: Club;
   onSelectTeam: (team: Team) => void;
+  onSelectPlayer: (player: Player) => void;
   onBack: () => void;
 }
 
@@ -29,27 +30,29 @@ const TeamRow: React.FC<{ team: Team; onSelect: () => void }> = ({ team, onSelec
     </div>
 );
 
-const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: boolean; onSelect: (id: number) => void; }> = ({ player, isManaging, isSelected, onSelect }) => {
+const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: boolean; onSelect: (player: Player) => void; onToggleSelection: (id: number) => void; }> = ({ player, isManaging, isSelected, onSelect, onToggleSelection }) => {
     const { getTeamById } = useSports();
     const team = getTeamById(player.teamId);
 
     const handleClick = () => {
         if (isManaging) {
-            onSelect(player.id);
+            onToggleSelection(player.id);
+        } else {
+            onSelect(player);
         }
     };
 
     return (
         <div 
             onClick={handleClick} 
-            className={`relative flex items-center p-4 bg-secondary rounded-lg transition-all duration-200 ${isManaging ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-highlight bg-accent' : 'hover:bg-accent'}`}
+            className={`relative flex items-center p-4 bg-secondary rounded-lg transition-all duration-200 cursor-pointer ${isSelected ? 'ring-2 ring-highlight bg-accent' : 'hover:bg-accent'}`}
         >
             {isManaging && (
                 <div className="absolute top-2 right-2">
                     <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => onSelect(player.id)}
+                        onChange={() => onToggleSelection(player.id)}
                         className="h-5 w-5 rounded border-gray-300 text-highlight bg-primary focus:ring-highlight focus:ring-offset-secondary"
                         aria-label={`Select ${player.name}`}
                     />
@@ -76,7 +79,7 @@ const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: bo
 };
 
 
-export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onBack }) => {
+export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onSelectPlayer, onBack }) => {
   const { userProfile } = useAuth();
   const { getTeamsByClub, getPlayersByClub } = useSports();
   const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
@@ -207,7 +210,7 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
                      <div className="flex items-center mb-4 p-2 bg-accent rounded-md">
                         <input
                             type="checkbox"
-                            checked={selectedPlayerIds.size === filteredPlayers.length}
+                            checked={selectedPlayerIds.size === filteredPlayers.length && filteredPlayers.length > 0}
                             onChange={handleSelectAll}
                             className="h-5 w-5 rounded border-gray-300 text-highlight bg-primary focus:ring-highlight"
                             id="select-all-players"
@@ -226,7 +229,8 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
                                 player={player} 
                                 isManaging={isManaging}
                                 isSelected={selectedPlayerIds.has(player.id)}
-                                onSelect={handleTogglePlayerSelection}
+                                onSelect={onSelectPlayer}
+                                onToggleSelection={handleTogglePlayerSelection}
                             />
                         ))
                     ) : (

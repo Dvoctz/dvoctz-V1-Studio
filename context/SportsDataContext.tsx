@@ -1,10 +1,8 @@
-
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub } from '../supabaseClient';
-import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club } from '../types';
+import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer } from '../supabaseClient';
+import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer } from '../types';
 
 interface SportsState {
     tournaments: Tournament[];
@@ -14,6 +12,7 @@ interface SportsState {
     fixtures: Fixture[];
     sponsors: Sponsor[];
     tournamentSponsors: TournamentSponsor[];
+    playerTransfers: PlayerTransfer[];
     rules: string;
     loading: boolean;
 }
@@ -42,6 +41,9 @@ interface SportsContextType extends SportsState {
     updateSponsor: (sponsor: Sponsor & { logoFile?: File }) => Promise<void>;
     deleteSponsor: (id: number) => Promise<void>;
     toggleSponsorShowInFooter: (sponsor: Sponsor) => Promise<void>;
+    addPlayerTransfer: (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => Promise<void>;
+    updatePlayerTransfer: (transfer: PlayerTransfer) => Promise<void>;
+    deletePlayerTransfer: (id: number) => Promise<void>;
     updateRules: (content: string) => Promise<void>;
     bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
@@ -50,11 +52,12 @@ interface SportsContextType extends SportsState {
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
     getFixturesByTournament: (tournamentId: number) => Fixture[];
-    getClubById: (clubId: number) => Club | undefined;
+    getClubById: (clubId: number | null) => Club | undefined;
     getTeamById: (teamId: number | null) => Team | undefined;
     getTeamsByClub: (clubId: number) => Team[];
     getPlayersByTeam: (teamId: number) => Player[];
     getPlayersByClub: (clubId: number) => Player[];
+    getTransfersByPlayerId: (playerId: number) => PlayerTransfer[];
     getStandingsForTournament: (tournamentId: number) => TeamStanding[];
 }
 
@@ -105,6 +108,16 @@ const mapFixture = (f: any): Fixture => ({
   score: f.score as Score | undefined,
 });
 
+const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({
+    id: pt.id,
+    playerId: pt.player_id,
+    fromTeamId: pt.from_team_id,
+    toTeamId: pt.to_team_id,
+    transferDate: pt.transfer_date,
+    notes: pt.notes,
+    isAutomated: pt.is_automated,
+});
+
 
 // Helper function to upload a file to Supabase Storage.
 const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
@@ -137,6 +150,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         fixtures: [],
         sponsors: [],
         tournamentSponsors: [],
+        playerTransfers: [],
         rules: '',
         loading: true,
     });
@@ -152,6 +166,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 { data: fixturesData, error: fixturesError },
                 { data: sponsorsData, error: sponsorsError },
                 { data: tournamentSponsorsData, error: tournamentSponsorsError },
+                { data: playerTransfersData, error: playerTransfersError },
                 { data: rulesData, error: rulesError },
             ] = await Promise.all([
                 supabase.from('tournaments').select('*').order('name'),
@@ -161,6 +176,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 supabase.from('fixtures').select('*'),
                 supabase.from('sponsors').select('*').order('name'),
                 supabase.from('tournament_sponsors').select('*'),
+                supabase.from('player_transfers').select('*'),
                 supabase.from('game_rules').select('content').limit(1).maybeSingle(),
             ]);
 
@@ -171,6 +187,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (fixturesError) throw fixturesError;
             if (sponsorsError) throw sponsorsError;
             if (tournamentSponsorsError) throw tournamentSponsorsError;
+            if (playerTransfersError) throw playerTransfersError;
             if (rulesError) {
                  console.warn('Could not fetch game rules. This is non-critical.', rulesError);
             }
@@ -183,12 +200,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 fixtures: (fixturesData || []).map(mapFixture),
                 sponsors: (sponsorsData || []).map(mapSponsor),
                 tournamentSponsors: (tournamentSponsorsData || []) as TournamentSponsor[],
+                playerTransfers: (playerTransfersData || []).map(mapPlayerTransfer),
                 rules: rulesData?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.',
                 loading: false,
             });
         } catch (error) {
             console.error(
-                "Error fetching data from Supabase. This could be due to incorrect credentials, missing tables (including `game_rules`), or misconfigured Row Level Security policies. Please check your Supabase setup.",
+                "Error fetching data from Supabase. This could be due to incorrect credentials, missing tables (including `game_rules` and `player_transfers`), or misconfigured Row Level Security policies. Please check your Supabase setup.",
                 error
             );
             setState(s => ({...s, loading: false}));
@@ -377,6 +395,37 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         if (error) throw error;
         setState(s => ({...s, sponsors: s.sponsors.map(sp => sp.id === sponsor.id ? mapSponsor(data) : sp) }));
     }, [supabase]);
+    
+    const addPlayerTransfer = useCallback(async (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => {
+        const { data, error } = await supabase.from('player_transfers').insert({
+            player_id: transfer.playerId,
+            from_team_id: transfer.fromTeamId,
+            to_team_id: transfer.toTeamId,
+            transfer_date: transfer.transferDate,
+            notes: transfer.notes,
+            is_automated: false
+        }).select().single();
+        if (error) throw error;
+        setState(s => ({...s, playerTransfers: [...s.playerTransfers, mapPlayerTransfer(data)]}));
+    }, [supabase]);
+
+    const updatePlayerTransfer = useCallback(async (transfer: PlayerTransfer) => {
+        const { data, error } = await supabase.from('player_transfers').update({
+            player_id: transfer.playerId,
+            from_team_id: transfer.fromTeamId,
+            to_team_id: transfer.toTeamId,
+            transfer_date: transfer.transferDate,
+            notes: transfer.notes
+        }).eq('id', transfer.id).select().single();
+        if (error) throw error;
+        setState(s => ({...s, playerTransfers: s.playerTransfers.map(t => t.id === transfer.id ? mapPlayerTransfer(data) : t)}));
+    }, [supabase]);
+
+    const deletePlayerTransfer = useCallback(async (id: number) => {
+        const { error } = await supabase.from('player_transfers').delete().eq('id', id);
+        if (error) throw error;
+        setState(s => ({...s, playerTransfers: s.playerTransfers.filter(t => t.id !== id)}));
+    }, [supabase]);
 
     const updateRules = useCallback(async (content: string) => {
         const { error } = await supabase
@@ -479,6 +528,34 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const bulkUpdatePlayerTeam = useCallback(async (playerIds: number[], teamId: number | null) => {
+        // --- Automatic Transfer Logging ---
+        const playersToUpdate = state.players.filter(p => playerIds.includes(p.id));
+        const newTransfers = playersToUpdate
+            .filter(p => p.teamId !== teamId) // Only log if the team is actually changing
+            .map(p => ({
+                player_id: p.id,
+                from_team_id: p.teamId,
+                to_team_id: teamId,
+                transfer_date: new Date().toISOString(),
+                is_automated: true,
+                notes: 'Automated roster change via admin panel.'
+            }));
+
+        if (newTransfers.length > 0) {
+            const { data: insertedTransfers, error: transferError } = await supabase
+                .from('player_transfers')
+                .insert(newTransfers)
+                .select();
+            if (transferError) throw transferError;
+            if (insertedTransfers) {
+                setState(s => ({
+                    ...s,
+                    playerTransfers: [...s.playerTransfers, ...insertedTransfers.map(mapPlayerTransfer)]
+                }));
+            }
+        }
+        // --- End of Transfer Logging ---
+
         const { data: updatedPlayers, error } = await supabase
             .from('players')
             .update({ team_id: teamId })
@@ -494,7 +571,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 players: s.players.map(p => updatedPlayerMap.get(p.id) || p).sort((a,b) => a.name.localeCompare(b.name))
             }));
         }
-    }, [supabase]);
+    }, [supabase, state.players]);
 
 
     const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
@@ -514,7 +591,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     }, [state.fixtures]);
 
-    const getClubById = useCallback((clubId: number) => {
+    const getClubById = useCallback((clubId: number | null) => {
+        if (clubId === null || clubId === undefined) return undefined;
         return state.clubs.find(c => c.id === clubId);
     }, [state.clubs]);
 
@@ -540,6 +618,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             .filter(p => p.teamId && clubTeamIds.includes(p.teamId))
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [state.teams, state.players]);
+    
+    const getTransfersByPlayerId = useCallback((playerId: number) => {
+        return state.playerTransfers
+            .filter(t => t.playerId === playerId)
+            .sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime());
+    }, [state.playerTransfers]);
 
     const getStandingsForTournament = useCallback((tournamentId: number): TeamStanding[] => {
         const tournamentFixtures = state.fixtures.filter(
@@ -645,6 +729,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         updateSponsor,
         deleteSponsor,
         toggleSponsorShowInFooter,
+        addPlayerTransfer,
+        updatePlayerTransfer,
+        deletePlayerTransfer,
         updateRules,
         bulkAddOrUpdateTeams,
         bulkAddOrUpdatePlayers,
@@ -658,16 +745,18 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         getTeamsByClub,
         getPlayersByTeam,
         getPlayersByClub,
+        getTransfersByPlayerId,
         getStandingsForTournament,
     }), [
         state, addTournament, updateTournament, deleteTournament, addClub,
         updateClub, deleteClub, addTeam, updateTeam, deleteTeam, addPlayer,
         updatePlayer, deletePlayer, addFixture, updateFixture, deleteFixture,
         addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter,
+        addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer,
         updateRules, bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
         updateSponsorsForTournament, bulkUpdatePlayerTeam, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
-        getPlayersByTeam, getPlayersByClub, getStandingsForTournament
+        getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament
     ]);
 
     return (

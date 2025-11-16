@@ -1,4 +1,4 @@
-export type View = 'home' | 'tournaments' | 'clubs' | 'players' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules' | 'club-detail';
+export type View = 'home' | 'tournaments' | 'clubs' | 'players' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules' | 'club-detail' | 'player-detail';
 
 export type PlayerRole = 'Main Netty' | 'Left Front' | 'Right Front' | 'Net Center' | 'Back Center' | 'Left Back' | 'Right Back' | 'Right Netty' | 'Left Netty' | 'Service Man';
 
@@ -90,4 +90,14 @@ export interface UserProfile {
   fullName: string | null;
   email?: string;
   role: UserRole;
+}
+
+export interface PlayerTransfer {
+  id: number;
+  playerId: number;
+  fromTeamId: number | null;
+  toTeamId: number | null;
+  transferDate: string;
+  notes: string | null;
+  isAutomated: boolean;
 }

@@ -8,10 +8,11 @@ import { PlayersView } from './views/PlayersView';
 import { TournamentDetailView } from './views/TournamentDetailView';
 import { ClubDetailView } from './views/ClubDetailView';
 import { TeamDetailView } from './views/TeamDetailView';
+import { PlayerDetailView } from './views/PlayerDetailView';
 import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
 import { RulesView } from './views/RulesView';
-import type { View, Tournament, Team, Club } from './types';
+import type { View, Tournament, Team, Club, Player } from './types';
 import { SportsDataProvider } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { initializeSupabase } from './supabaseClient';
@@ -28,6 +29,7 @@ const AppContent: React.FC = () => {
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const { currentUser, userProfile, loading: authLoading } = useAuth();
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
   const [viewBeforeLogin, setViewBeforeLogin] = useState<View | null>(null);
@@ -60,6 +62,7 @@ const AppContent: React.FC = () => {
     setSelectedTournament(null);
     setSelectedClub(null);
     setSelectedTeam(null);
+    setSelectedPlayer(null);
   }
 
   const handleLoginSuccess = () => {
@@ -80,6 +83,11 @@ const AppContent: React.FC = () => {
     setSelectedTeam(team);
     setCurrentView('team-detail');
   };
+  
+  const handleSelectPlayer = (player: Player) => {
+      setSelectedPlayer(player);
+      setCurrentView('player-detail');
+  };
 
   const handleBackToTournaments = () => {
     setSelectedTournament(null);
@@ -90,6 +98,11 @@ const AppContent: React.FC = () => {
     setSelectedClub(null);
     setSelectedTeam(null);
     setCurrentView('clubs');
+  };
+  
+  const handleBackToPlayers = () => {
+      setSelectedPlayer(null);
+      setCurrentView('players');
   };
 
 
@@ -109,7 +122,7 @@ const AppContent: React.FC = () => {
   
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [currentView, selectedTournament, selectedClub, selectedTeam]);
+  }, [currentView, selectedTournament, selectedClub, selectedTeam, selectedPlayer]);
 
   const renderView = () => {
     if (authLoading && (currentView === 'admin' || currentView === 'login')) {
@@ -126,15 +139,17 @@ const AppContent: React.FC = () => {
       case 'clubs':
         return <ClubsView onSelectClub={handleSelectClub} />;
       case 'players':
-        return <PlayersView />;
+        return <PlayersView onSelectPlayer={handleSelectPlayer} />;
       case 'rules':
         return <RulesView />;
       case 'tournament-detail':
         return selectedTournament ? <TournamentDetailView tournament={selectedTournament} onBack={handleBackToTournaments} /> : <TournamentsView onSelectTournament={handleSelectTournament} />;
       case 'club-detail':
-        return selectedClub ? <ClubDetailView club={selectedClub} onSelectTeam={handleSelectTeam} onBack={handleBackToClubs} /> : <ClubsView onSelectClub={handleSelectClub} />;
+        return selectedClub ? <ClubDetailView club={selectedClub} onSelectTeam={handleSelectTeam} onSelectPlayer={handleSelectPlayer} onBack={handleBackToClubs} /> : <ClubsView onSelectClub={handleSelectClub} />;
       case 'team-detail':
-        return selectedTeam ? <TeamDetailView team={selectedTeam} onBack={handleBackToClubs} /> : <ClubsView onSelectClub={handleSelectClub} />;
+        return selectedTeam ? <TeamDetailView team={selectedTeam} onSelectPlayer={handleSelectPlayer} onBack={handleBackToClubs} /> : <ClubsView onSelectClub={handleSelectClub} />;
+      case 'player-detail':
+        return selectedPlayer ? <PlayerDetailView player={selectedPlayer} onBack={handleBackToPlayers} /> : <PlayersView onSelectPlayer={handleSelectPlayer} />;
       case 'admin':
         return isAdminTypeUser ? <AdminView /> : null;
       case 'login':

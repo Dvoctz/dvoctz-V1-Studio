@@ -33,3 +33,12 @@ export type DbTeam = Omit<Team, 'id'> & { id: number };
 export type DbPlayer = Omit<Player, 'id'> & { id: number };
 export type DbFixture = Omit<Fixture, 'id' | 'score'> & { id: number; score: Score | null };
 export type DbSponsor = Omit<Sponsor, 'id'> & { id: number };
+export type DbPlayerTransfer = {
+    id: number;
+    player_id: number;
+    from_team_id: number | null;
+    to_team_id: number | null;
+    transfer_date: string;
+    notes: string | null;
+    is_automated: boolean;
+};
