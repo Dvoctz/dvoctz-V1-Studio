@@ -103,18 +103,34 @@ const mapTournament = (t: any): Omit<Tournament, 'phase'> => ({
   division: t.division,
 });
 
-const mapFixture = (f: any): Fixture => ({
-  id: f.id,
-  tournamentId: f.tournament_id,
-  team1Id: f.team1_id,
-  team2Id: f.team2_id,
-  ground: f.ground,
-  dateTime: f.date_time,
-  status: f.status,
-  referee: f.referee,
-  score: f.score as Score | undefined,
-  stage: f.stage as Fixture['stage'] | undefined,
-});
+const mapFixture = (f: any): Fixture => {
+    let stage: Fixture['stage'] | undefined = undefined;
+    let actualReferee = f.referee;
+
+    // FIX: Decode knockout stage info from the referee field to avoid needing a 'stage' column in the DB.
+    if (f.referee && typeof f.referee === 'string' && f.referee.startsWith('KO_')) {
+        const parts = f.referee.split(':');
+        const stagePart = parts[0];
+        actualReferee = parts.slice(1).join(':').trim() || undefined;
+
+        if (stagePart === 'KO_QF') stage = 'quarter-final';
+        else if (stagePart === 'KO_SF') stage = 'semi-final';
+        else if (stagePart === 'KO_FINAL') stage = 'final';
+    }
+    
+    return {
+        id: f.id,
+        tournamentId: f.tournament_id,
+        team1Id: f.team1_id,
+        team2Id: f.team2_id,
+        ground: f.ground,
+        dateTime: f.date_time,
+        status: f.status,
+        referee: actualReferee,
+        score: f.score as Score | undefined,
+        stage: stage,
+    };
+};
 
 const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({
     id: pt.id,
@@ -388,21 +404,43 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const addFixture = useCallback(async (fixture: Omit<Fixture, 'id' | 'score'>) => {
+        const { stage, referee, ...rest } = fixture;
+        let dbReferee = referee;
+        if (stage) {
+            const prefix = stage === 'quarter-final' ? 'KO_QF' : stage === 'semi-final' ? 'KO_SF' : 'KO_FINAL';
+            dbReferee = referee ? `${prefix}: ${referee}` : prefix;
+        }
+
         const { data, error } = await supabase.from('fixtures').insert({
-            tournament_id: fixture.tournamentId, team1_id: fixture.team1Id, team2_id: fixture.team2Id,
-            ground: fixture.ground, date_time: fixture.dateTime, status: fixture.status, referee: fixture.referee,
-            stage: fixture.stage,
+            tournament_id: rest.tournamentId,
+            team1_id: rest.team1Id,
+            team2_id: rest.team2Id,
+            ground: rest.ground,
+            date_time: rest.dateTime,
+            status: rest.status,
+            referee: dbReferee,
         }).select().single();
         if (error) throw error;
         setState(s => ({...s, fixtures: [...s.fixtures, mapFixture(data)] }));
     }, [supabase]);
 
     const updateFixture = useCallback(async (fixture: Fixture) => {
+        const { stage, referee, ...rest } = fixture;
+        let dbReferee = referee;
+        if (stage) {
+            const prefix = stage === 'quarter-final' ? 'KO_QF' : stage === 'semi-final' ? 'KO_SF' : 'KO_FINAL';
+            dbReferee = referee ? `${prefix}: ${referee}` : prefix;
+        }
+
         const { data, error } = await supabase.from('fixtures').update({
-            tournament_id: fixture.tournamentId, team1_id: fixture.team1Id, team2_id: fixture.team2Id,
-            ground: fixture.ground, date_time: fixture.dateTime, status: fixture.status,
-            score: fixture.score, referee: fixture.referee,
-            stage: fixture.stage,
+            tournament_id: rest.tournamentId,
+            team1_id: rest.team1Id,
+            team2_id: rest.team2Id,
+            ground: rest.ground,
+            date_time: rest.dateTime,
+            status: rest.status,
+            score: rest.score,
+            referee: dbReferee,
         }).eq('id', fixture.id).select().single();
         if (error) throw error;
         setState(s => ({...s, fixtures: s.fixtures.map(f => f.id === fixture.id ? mapFixture(data) : f) }));
@@ -729,7 +767,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
 
         const standings = getStandingsForTournament(tournamentId);
-
         const newFixtures: Omit<Fixture, 'id' | 'score'>[] = [];
         const now = new Date().toISOString();
 
@@ -737,10 +774,10 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (standings.length < 8) throw new Error('Not enough teams with completed matches to generate Division 1 quarterfinals (requires 8).');
             const top8 = standings.slice(0, 8);
             const matchups = [
-                { team1Id: top8[0].teamId, team2Id: top8[7].teamId }, // 1 vs 8
-                { team1Id: top8[3].teamId, team2Id: top8[4].teamId }, // 4 vs 5
-                { team1Id: top8[1].teamId, team2Id: top8[6].teamId }, // 2 vs 7
-                { team1Id: top8[2].teamId, team2Id: top8[5].teamId }, // 3 vs 6
+                { team1Id: top8[0].teamId, team2Id: top8[7].teamId },
+                { team1Id: top8[3].teamId, team2Id: top8[4].teamId },
+                { team1Id: top8[1].teamId, team2Id: top8[6].teamId },
+                { team1Id: top8[2].teamId, team2Id: top8[5].teamId },
             ];
             matchups.forEach(match => {
                 newFixtures.push({
@@ -757,8 +794,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (standings.length < 4) throw new Error('Not enough teams with completed matches to generate Division 2 semifinals (requires 4).');
             const top4 = standings.slice(0, 4);
             const matchups = [
-                { team1Id: top4[0].teamId, team2Id: top4[3].teamId }, // 1 vs 4
-                { team1Id: top4[1].teamId, team2Id: top4[2].teamId }, // 2 vs 3
+                { team1Id: top4[0].teamId, team2Id: top4[3].teamId },
+                { team1Id: top4[1].teamId, team2Id: top4[2].teamId },
             ];
             matchups.forEach(match => {
                 newFixtures.push({
@@ -774,15 +811,22 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
 
         if (newFixtures.length > 0) {
-            const fixturesToInsert = newFixtures.map(f => ({
-                tournament_id: f.tournamentId,
-                team1_id: f.team1Id,
-                team2_id: f.team2Id,
-                ground: f.ground,
-                date_time: f.dateTime,
-                status: f.status,
-                stage: f.stage,
-            }));
+            const fixturesToInsert = newFixtures.map(f => {
+                let refereeValue;
+                if (f.stage === 'quarter-final') refereeValue = 'KO_QF';
+                if (f.stage === 'semi-final') refereeValue = 'KO_SF';
+                if (f.stage === 'final') refereeValue = 'KO_FINAL';
+                
+                return {
+                    tournament_id: f.tournamentId,
+                    team1_id: f.team1Id,
+                    team2_id: f.team2Id,
+                    ground: f.ground,
+                    date_time: f.dateTime,
+                    status: f.status,
+                    referee: refereeValue,
+                };
+            });
             const { error: insertError } = await supabase.from('fixtures').insert(fixturesToInsert);
             if (insertError) throw insertError;
         }

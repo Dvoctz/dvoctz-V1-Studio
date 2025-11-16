@@ -809,8 +809,9 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
     const handleStatsChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, stats: { ...formData.stats, [e.target.name]: parseInt(e.target.value, 10) || 0 }});
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // FIX: Safely handle teamId which can be a number from existing data, or a string from the form's select element.
-        const teamIdValue = formData.teamId === '' || formData.teamId == null ? null : parseInt(String(formData.teamId), 10);
+        // FIX: The original check `formData.teamId === ''` caused a type error because teamId could be a number.
+        // Using `?? ''` safely converts null/undefined to an empty string for comparison, resolving the type error.
+        const teamIdValue = (formData.teamId ?? '') === '' ? null : parseInt(String(formData.teamId!), 10);
         onSave({...formData, teamId: teamIdValue, photoFile });
     };
 
@@ -1348,8 +1349,9 @@ const PlayerTransfersAdmin = () => {
     const handleSave = async (transfer: PlayerTransfer | Partial<Omit<PlayerTransfer, 'id' | 'isAutomated'>>) => {
         setError(null);
         try {
-            // FIX: Use a type guard to correctly distinguish between editing an existing transfer (which has an 'id') and adding a new one.
-            if ('id' in transfer) {
+            // FIX: The 'in' operator type guard is incompatible with the `Omit` in `Partial<Omit<...>>`.
+            // A direct property check on a cast object is used instead to determine if it's an existing record.
+            if ((transfer as PlayerTransfer).id) {
                 await updatePlayerTransfer(transfer as PlayerTransfer);
             } else {
                 await addPlayerTransfer(transfer as Omit<PlayerTransfer, 'id' | 'isAutomated'>);
