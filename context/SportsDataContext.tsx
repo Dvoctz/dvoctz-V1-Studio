@@ -97,11 +97,10 @@ const mapSponsor = (s: any): Sponsor => ({
   showInFooter: s.show_in_footer || false,
 });
 
-const mapTournament = (t: any): Tournament => ({
+const mapTournament = (t: any): Omit<Tournament, 'phase'> => ({
   id: t.id,
   name: t.name,
   division: t.division,
-  phase: t.phase || 'round-robin',
 });
 
 const mapFixture = (f: any): Fixture => ({
@@ -200,13 +199,28 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (rulesError) {
                  console.warn('Could not fetch game rules. This is non-critical.', rulesError);
             }
+            
+            const fixtures = (fixturesData || []).map(mapFixture);
+            const tournamentsWithPhase = (tournamentsData || []).map(mapTournament).map(t => {
+                const knockoutFixtures = fixtures.some(f => f.tournamentId === t.id && f.stage);
+                const finalFixture = fixtures.find(f => f.tournamentId === t.id && f.stage === 'final');
+
+                let phase: Tournament['phase'] = 'round-robin';
+                if (finalFixture && finalFixture.status === 'completed') {
+                    phase = 'completed';
+                } else if (knockoutFixtures) {
+                    phase = 'knockout';
+                }
+
+                return { ...t, phase };
+            });
 
             setState({
-                tournaments: (tournamentsData || []).map(mapTournament),
+                tournaments: tournamentsWithPhase,
                 clubs: (clubsData || []).map(mapClub),
                 teams: (teamsData || []).map(mapTeam),
                 players: (playersData || []).map(mapPlayer),
-                fixtures: (fixturesData || []).map(mapFixture),
+                fixtures: fixtures,
                 sponsors: (sponsorsData || []).map(mapSponsor),
                 tournamentSponsors: (tournamentSponsorsData || []) as TournamentSponsor[],
                 playerTransfers: (playerTransfersData || []).map(mapPlayerTransfer),
@@ -227,16 +241,22 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [fetchData]);
 
     const addTournament = useCallback(async (tournament: Omit<Tournament, 'id'>) => {
-        const { data, error } = await supabase.from('tournaments').insert(tournament).select().single();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { phase, ...dbTournament } = tournament;
+        const { data, error } = await supabase.from('tournaments').insert(dbTournament).select().single();
         if (error) throw error;
-        setState(s => ({...s, tournaments: [...s.tournaments, mapTournament(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
+        const newTournament = { ...mapTournament(data), phase: 'round-robin' as const };
+        setState(s => ({...s, tournaments: [...s.tournaments, newTournament].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
 
     const updateTournament = useCallback(async (tournament: Tournament) => {
-        const { id, ...rest } = tournament;
-        const { data, error } = await supabase.from('tournaments').update(rest).eq('id', id).select().single();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id, phase, ...rest } = tournament;
+        const dbTournament = { name: rest.name, division: rest.division };
+        const { data, error } = await supabase.from('tournaments').update(dbTournament).eq('id', id).select().single();
         if (error) throw error;
-        setState(s => ({...s, tournaments: s.tournaments.map(t => t.id === id ? mapTournament(data) : t) }));
+        const updatedTournament = { ...mapTournament(data), phase: tournament.phase };
+        setState(s => ({...s, tournaments: s.tournaments.map(t => t.id === id ? updatedTournament : t) }));
     }, [supabase]);
 
     const deleteTournament = useCallback(async (id: number) => {
@@ -607,10 +627,15 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
         if (updatedPlayers) {
             const updatedPlayerMap = new Map(updatedPlayers.map(p => [p.id, mapPlayer(p)]));
-            setState(s => ({
-                ...s,
-                players: s.players.map(p => updatedPlayerMap.get(p.id) || p).sort((a,b) => a.name.localeCompare(b.name))
-            }));
+            // FIX: Broke down setState to help TS correctly infer the type of `newPlayers` as Player[],
+            // which in turn allows the `sort` method to work without type errors.
+            setState(s => {
+                const newPlayers: Player[] = s.players.map(p => updatedPlayerMap.get(p.id) || p);
+                return {
+                    ...s,
+                    players: newPlayers.sort((a,b) => a.name.localeCompare(b.name))
+                };
+            });
         }
     }, [supabase, state.players]);
 
@@ -761,12 +786,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const { error: insertError } = await supabase.from('fixtures').insert(fixturesToInsert);
             if (insertError) throw insertError;
         }
-
-        const { error: updateError } = await supabase
-            .from('tournaments')
-            .update({ phase: 'knockout' })
-            .eq('id', tournamentId);
-        if (updateError) throw updateError;
         
         await fetchData();
     }, [supabase, state.tournaments, getStandingsForTournament, fetchData]);

@@ -188,7 +188,6 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
     const [formData, setFormData] = useState({
         name: '',
         division: 'Division 1',
-        phase: 'round-robin',
         ...tournament
     });
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -810,7 +809,8 @@ const PlayerForm: React.FC<{ player: Player | Partial<Player>, onSave: (p: any) 
     const handleStatsChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, stats: { ...formData.stats, [e.target.name]: parseInt(e.target.value, 10) || 0 }});
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const teamIdValue = formData.teamId === '' ? null : parseInt(formData.teamId as string, 10);
+        // FIX: Safely handle teamId which can be a number from existing data, or a string from the form's select element.
+        const teamIdValue = formData.teamId === '' || formData.teamId == null ? null : parseInt(String(formData.teamId), 10);
         onSave({...formData, teamId: teamIdValue, photoFile });
     };
 
@@ -1348,7 +1348,8 @@ const PlayerTransfersAdmin = () => {
     const handleSave = async (transfer: PlayerTransfer | Partial<Omit<PlayerTransfer, 'id' | 'isAutomated'>>) => {
         setError(null);
         try {
-            if ('id' in transfer && transfer.id) {
+            // FIX: Use a type guard to correctly distinguish between editing an existing transfer (which has an 'id') and adding a new one.
+            if ('id' in transfer) {
                 await updatePlayerTransfer(transfer as PlayerTransfer);
             } else {
                 await addPlayerTransfer(transfer as Omit<PlayerTransfer, 'id' | 'isAutomated'>);
@@ -1456,7 +1457,7 @@ const PlayerTransferForm: React.FC<{ transfer: PlayerTransfer | Partial<Omit<Pla
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             {error && <ErrorMessage message={error} />}
-            <div><Label>Player</Label><Select name="playerId" value={formData.playerId || ''} onChange={handleChange} required disabled={!!transfer.id}><option value="" disabled>Select a player...</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
+            <div><Label>Player</Label><Select name="playerId" value={formData.playerId || ''} onChange={handleChange} required disabled={'id' in transfer}><option value="" disabled>Select a player...</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
             <div><Label>From Team</Label><Select name="fromTeamId" value={formData.fromTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Free Agent</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
             <div><Label>To Team</Label><Select name="toTeamId" value={formData.toTeamId || 'unassigned'} onChange={handleChange} required><option value="unassigned">Free Agent</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
             <div><Label>Transfer Date</Label><Input name="transferDate" type="date" value={formData.transferDate.split('T')[0]} onChange={handleChange} required /></div>
