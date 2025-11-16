@@ -2,6 +2,9 @@
 const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
+const postcss = require('postcss');
+const tailwindcss = require('tailwindcss');
+const autoprefixer = require('autoprefixer');
 
 async function build() {
   try {
@@ -14,7 +17,20 @@ async function build() {
     fs.mkdirSync(distDir);
     console.log('🚀 Starting build...');
 
-    // 1. Build the main JS bundle from index.tsx
+    // 1. Process CSS with PostCSS and Tailwind
+    const cssInPath = path.join(__dirname, 'styles.css');
+    const cssOutPath = path.join(distDir, 'bundle.css');
+    const cssContent = fs.readFileSync(cssInPath, 'utf-8');
+    
+    const cssResult = await postcss([
+        tailwindcss(require('./tailwind.config.js')), 
+        autoprefixer
+    ]).process(cssContent, { from: cssInPath, to: cssOutPath });
+    
+    fs.writeFileSync(cssOutPath, cssResult.css);
+    console.log('✅ CSS processed with PostCSS and Tailwind.');
+
+    // 2. Build the main JS bundle from index.tsx
     await esbuild.build({
       entryPoints: ['index.tsx'],
       bundle: true,
@@ -30,7 +46,7 @@ async function build() {
     });
     console.log('✅ JavaScript bundled successfully.');
 
-    // 2. Process and copy index.html
+    // 3. Process and copy index.html
     let htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
     
     // Remove environment variable injection placeholder for security
@@ -47,7 +63,7 @@ async function build() {
     fs.writeFileSync(path.join(distDir, 'index.html'), htmlContent);
     console.log('✅ index.html processed and copied.');
 
-    // 3. Copy other static files to the dist directory
+    // 4. Copy other static files to the dist directory
     const staticFiles = [
       'manifest.json',
       'sw.js',
