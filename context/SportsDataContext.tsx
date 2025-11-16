@@ -46,6 +46,7 @@ interface SportsContextType extends SportsState {
     bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
     updateSponsorsForTournament: (tournamentId: number, sponsorIds: number[]) => Promise<void>;
+    bulkUpdatePlayerTeam: (playerIds: number[], teamId: number | null) => Promise<void>;
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
     getFixturesByTournament: (tournamentId: number) => Fixture[];
@@ -477,6 +478,17 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }));
     }, [supabase]);
 
+    const bulkUpdatePlayerTeam = useCallback(async (playerIds: number[], teamId: number | null) => {
+        const { error } = await supabase
+            .from('players')
+            .update({ team_id: teamId })
+            .in('id', playerIds);
+        
+        if (error) throw error;
+        await fetchData();
+    }, [supabase, fetchData]);
+
+
     const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
         const sponsorIds = state.tournamentSponsors
             .filter(ts => ts.tournament_id === tournamentId)
@@ -628,6 +640,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         bulkAddOrUpdateTeams,
         bulkAddOrUpdatePlayers,
         updateSponsorsForTournament,
+        bulkUpdatePlayerTeam,
         getSponsorsForTournament,
         getTournamentsByDivision,
         getFixturesByTournament,
@@ -643,7 +656,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         updatePlayer, deletePlayer, addFixture, updateFixture, deleteFixture,
         addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter,
         updateRules, bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
-        updateSponsorsForTournament, getSponsorsForTournament, getTournamentsByDivision,
+        updateSponsorsForTournament, bulkUpdatePlayerTeam, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
         getPlayersByTeam, getPlayersByClub, getStandingsForTournament
     ]);

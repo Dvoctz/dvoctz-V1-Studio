@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useSports } from '../context/SportsDataContext';
+import { useAuth } from '../context/AuthContext';
 import type { Club, Team, Player } from '../types';
+import { AssignPlayerModal } from '../components/AssignPlayerModal';
 
 interface ClubDetailViewProps {
   club: Club;
@@ -27,12 +29,32 @@ const TeamRow: React.FC<{ team: Team; onSelect: () => void }> = ({ team, onSelec
     </div>
 );
 
-const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
+const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: boolean; onSelect: (id: number) => void; }> = ({ player, isManaging, isSelected, onSelect }) => {
     const { getTeamById } = useSports();
     const team = getTeamById(player.teamId);
 
+    const handleClick = () => {
+        if (isManaging) {
+            onSelect(player.id);
+        }
+    };
+
     return (
-        <div className="flex items-center p-4 bg-secondary rounded-lg hover:bg-accent transition-colors duration-200">
+        <div 
+            onClick={handleClick} 
+            className={`relative flex items-center p-4 bg-secondary rounded-lg transition-all duration-200 ${isManaging ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-highlight bg-accent' : 'hover:bg-accent'}`}
+        >
+            {isManaging && (
+                <div className="absolute top-2 right-2">
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onSelect(player.id)}
+                        className="h-5 w-5 rounded border-gray-300 text-highlight bg-primary focus:ring-highlight focus:ring-offset-secondary"
+                        aria-label={`Select ${player.name}`}
+                    />
+                </div>
+            )}
             {player.photoUrl ? (
                 <img src={player.photoUrl} alt={player.name} className="w-16 h-16 rounded-full object-cover mr-4" />
             ) : (
@@ -43,16 +65,29 @@ const PlayerCard: React.FC<{ player: Player }> = ({ player }) => {
             <div className="overflow-hidden">
                 <p className="font-bold text-white text-lg truncate">{player.name}</p>
                 <p className="text-sm text-highlight truncate">{player.role}</p>
-                {team && <p className="text-xs text-text-secondary mt-1 truncate">Team: {team.name}</p>}
+                {team ? (
+                    <p className="text-xs text-text-secondary mt-1 truncate">Team: {team.name}</p>
+                ) : (
+                    <p className="text-xs text-yellow-400 mt-1 truncate">Unassigned</p>
+                )}
             </div>
         </div>
     );
 };
 
+
 export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onBack }) => {
+  const { userProfile } = useAuth();
   const { getTeamsByClub, getPlayersByClub } = useSports();
   const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Roster Management State
+  const [isManaging, setIsManaging] = useState(false);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const isAdmin = userProfile?.role === 'admin';
 
   const clubTeams = useMemo(() => getTeamsByClub(club.id), [getTeamsByClub, club.id]);
   const clubPlayers = useMemo(() => getPlayersByClub(club.id), [getPlayersByClub, club.id]);
@@ -61,6 +96,30 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
     if (!searchTerm) return clubPlayers;
     return clubPlayers.filter(player => player.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [clubPlayers, searchTerm]);
+
+  const handleTogglePlayerSelection = (playerId: number) => {
+      const newSelection = new Set(selectedPlayerIds);
+      if (newSelection.has(playerId)) {
+          newSelection.delete(playerId);
+      } else {
+          newSelection.add(playerId);
+      }
+      setSelectedPlayerIds(newSelection);
+  };
+  
+  const handleSelectAll = () => {
+      if (selectedPlayerIds.size === filteredPlayers.length) {
+          setSelectedPlayerIds(new Set());
+      } else {
+          setSelectedPlayerIds(new Set(filteredPlayers.map(p => p.id)));
+      }
+  };
+
+  const handleAssignmentSuccess = () => {
+      setIsModalOpen(false);
+      setSelectedPlayerIds(new Set());
+      setIsManaging(false);
+  }
 
   const TabButton: React.FC<{ tab: 'teams' | 'players'; children: React.ReactNode }> = ({ tab, children }) => (
     <button
@@ -111,7 +170,7 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
         )}
         
         {activeTab === 'players' && (
-            <div>
+            <div className="pb-24">
                  <div className="mb-6 max-w-lg mx-auto">
                     <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3">
@@ -130,9 +189,46 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
                     </div>
                 </div>
 
+                {isAdmin && (
+                    <div className="flex justify-end items-center mb-4">
+                        <button
+                            onClick={() => {
+                                setIsManaging(!isManaging);
+                                setSelectedPlayerIds(new Set()); // Clear selection on toggle
+                            }}
+                            className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors duration-300 ${isManaging ? 'bg-red-600 hover:bg-red-500' : 'bg-highlight hover:bg-teal-400'}`}
+                        >
+                           {isManaging ? 'Cancel Management' : 'Manage Roster'}
+                        </button>
+                    </div>
+                )}
+                
+                {isManaging && filteredPlayers.length > 0 && (
+                     <div className="flex items-center mb-4 p-2 bg-accent rounded-md">
+                        <input
+                            type="checkbox"
+                            checked={selectedPlayerIds.size === filteredPlayers.length}
+                            onChange={handleSelectAll}
+                            className="h-5 w-5 rounded border-gray-300 text-highlight bg-primary focus:ring-highlight"
+                            id="select-all-players"
+                        />
+                        <label htmlFor="select-all-players" className="ml-3 text-sm text-text-primary">
+                            Select All / Deselect All
+                        </label>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredPlayers.length > 0 ? (
-                        filteredPlayers.map(player => <PlayerCard key={player.id} player={player} />)
+                        filteredPlayers.map(player => (
+                            <PlayerCard 
+                                key={player.id} 
+                                player={player} 
+                                isManaging={isManaging}
+                                isSelected={selectedPlayerIds.has(player.id)}
+                                onSelect={handleTogglePlayerSelection}
+                            />
+                        ))
                     ) : (
                          <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players found for this club.</p>
                     )}
@@ -140,6 +236,30 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
             </div>
         )}
       </div>
+      
+      {isManaging && selectedPlayerIds.size > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-secondary shadow-lg p-4 border-t border-accent z-40">
+              <div className="container mx-auto flex justify-between items-center">
+                  <p className="text-text-primary font-bold">{selectedPlayerIds.size} player{selectedPlayerIds.size > 1 ? 's' : ''} selected</p>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors duration-300 bg-highlight hover:bg-teal-400"
+                  >
+                    Assign to Team...
+                  </button>
+              </div>
+          </div>
+      )}
+
+      {isModalOpen && (
+          <AssignPlayerModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onAssignmentSuccess={handleAssignmentSuccess}
+            clubId={club.id}
+            selectedPlayerIds={Array.from(selectedPlayerIds)}
+          />
+      )}
     </div>
   );
 };
