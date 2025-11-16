@@ -50,10 +50,26 @@ const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ playe
 export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> = ({ onSelectPlayer }) => {
   const { players } = useSports();
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'freeAgents'>('all');
 
-  const filteredPlayers = useMemo(() => players.filter(player => {
-    return player.name.toLowerCase().includes(searchTerm.toLowerCase());
-  }), [players, searchTerm]);
+  const filteredPlayers = useMemo(() => {
+      let playerList = players;
+      if (activeTab === 'freeAgents') {
+          playerList = players.filter(p => p.teamId === null);
+      }
+      return playerList.filter(player => {
+        return player.name.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+  }, [players, searchTerm, activeTab]);
+
+  const TabButton: React.FC<{ tab: 'all' | 'freeAgents'; children: React.ReactNode }> = ({ tab, children }) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`px-6 py-3 text-lg font-semibold transition-colors duration-300 focus:outline-none ${activeTab === tab ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+    >
+      {children}
+    </button>
+  );
 
   return (
     <div>
@@ -75,6 +91,12 @@ export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> 
           />
         </div>
       </div>
+
+       <div className="flex border-b border-accent mb-6 justify-center">
+            <TabButton tab="all">All Players</TabButton>
+            <TabButton tab="freeAgents">Free Agents</TabButton>
+      </div>
+
       {filteredPlayers.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredPlayers.map(player => (
@@ -83,7 +105,12 @@ export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> 
         </div>
       ) : (
         <div className="text-center py-10">
-          <p className="text-text-secondary text-lg">No players found matching your search.</p>
+          <p className="text-text-secondary text-lg">
+            {activeTab === 'freeAgents' 
+              ? 'There are currently no free agents.' 
+              : 'No players found matching your search.'
+            }
+          </p>
         </div>
       )}
     </div>

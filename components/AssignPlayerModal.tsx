@@ -95,7 +95,7 @@ export const AssignPlayerModal: React.FC<AssignPlayerModalProps> = ({ isOpen, on
                         aria-label="Select a team"
                     >
                         <option value="" disabled>Choose an option...</option>
-                        <option value="unassign" className="text-yellow-400 font-bold">Remove from Team (Unassign)</option>
+                        <option value="unassign" className="text-yellow-400 font-bold">Unassign (Make Free Agent)</option>
                         {clubTeamsInDivision.map(team => (
                             <option key={team.id} value={team.id}>{team.name}</option>
                         ))}
