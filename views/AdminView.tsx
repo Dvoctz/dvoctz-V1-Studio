@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
@@ -1402,7 +1403,11 @@ export const AdminView: React.FC = () => {
     const { userProfile } = useAuth();
     const userRole = userProfile?.role;
 
-    const accessibleTabs = availableTabs.filter(tab => userRole && tab.roles.includes(userRole));
+    // FIX: Memoize the accessibleTabs array. This prevents it from being a new
+    // array on every render, which was causing an infinite loop in the useEffect hook below.
+    const accessibleTabs = useMemo(() =>
+        availableTabs.filter(tab => userRole && tab.roles.includes(userRole))
+    , [userRole]);
     
     const [activeTab, setActiveTab] = useState<string | null>(null);
 
