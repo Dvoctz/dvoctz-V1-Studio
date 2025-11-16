@@ -5,7 +5,7 @@ export type PlayerRole = 'Main Netty' | 'Left Front' | 'Right Front' | 'Net Cent
 export interface Player {
   id: number;
   name: string;
-  teamId: number;
+  teamId: number | null;
   photoUrl: string | null;
   role: PlayerRole;
   stats?: {

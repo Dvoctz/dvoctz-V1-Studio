@@ -51,7 +51,7 @@ interface SportsContextType extends SportsState {
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
     getFixturesByTournament: (tournamentId: number) => Fixture[];
     getClubById: (clubId: number) => Club | undefined;
-    getTeamById: (teamId: number) => Team | undefined;
+    getTeamById: (teamId: number | null) => Team | undefined;
     getTeamsByClub: (clubId: number) => Team[];
     getPlayersByTeam: (teamId: number) => Player[];
     getPlayersByClub: (clubId: number) => Player[];
@@ -479,14 +479,22 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const bulkUpdatePlayerTeam = useCallback(async (playerIds: number[], teamId: number | null) => {
-        const { error } = await supabase
+        const { data: updatedPlayers, error } = await supabase
             .from('players')
             .update({ team_id: teamId })
-            .in('id', playerIds);
+            .in('id', playerIds)
+            .select();
         
         if (error) throw error;
-        await fetchData();
-    }, [supabase, fetchData]);
+
+        if (updatedPlayers) {
+            const updatedPlayerMap = new Map(updatedPlayers.map(p => [p.id, mapPlayer(p)]));
+            setState(s => ({
+                ...s,
+                players: s.players.map(p => updatedPlayerMap.get(p.id) || p).sort((a,b) => a.name.localeCompare(b.name))
+            }));
+        }
+    }, [supabase]);
 
 
     const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
@@ -510,7 +518,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         return state.clubs.find(c => c.id === clubId);
     }, [state.clubs]);
 
-    const getTeamById = useCallback((teamId: number) => {
+    const getTeamById = useCallback((teamId: number | null) => {
+        if (teamId === null || teamId === undefined) return undefined;
         return state.teams.find(t => t.id === teamId);
     }, [state.teams]);
 
@@ -528,7 +537,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             .map(t => t.id);
         
         return state.players
-            .filter(p => clubTeamIds.includes(p.teamId))
+            .filter(p => p.teamId && clubTeamIds.includes(p.teamId))
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [state.teams, state.players]);
 
