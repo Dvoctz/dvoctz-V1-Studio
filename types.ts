@@ -48,12 +48,14 @@ export interface Fixture {
   status: 'upcoming' | 'live' | 'completed';
   score?: Score;
   referee?: string;
+  stage?: 'quarter-final' | 'semi-final' | 'final';
 }
 
 export interface Tournament {
   id: number;
   name: string;
   division: 'Division 1' | 'Division 2';
+  phase?: 'round-robin' | 'knockout' | 'completed';
 }
 
 export interface Sponsor {

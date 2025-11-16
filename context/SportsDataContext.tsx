@@ -49,6 +49,7 @@ interface SportsContextType extends SportsState {
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
     updateSponsorsForTournament: (tournamentId: number, sponsorIds: number[]) => Promise<void>;
     bulkUpdatePlayerTeam: (playerIds: number[], teamId: number | null) => Promise<void>;
+    concludeLeaguePhase: (tournamentId: number) => Promise<void>;
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
     getFixturesByTournament: (tournamentId: number) => Fixture[];
@@ -96,6 +97,13 @@ const mapSponsor = (s: any): Sponsor => ({
   showInFooter: s.show_in_footer || false,
 });
 
+const mapTournament = (t: any): Tournament => ({
+  id: t.id,
+  name: t.name,
+  division: t.division,
+  phase: t.phase || 'round-robin',
+});
+
 const mapFixture = (f: any): Fixture => ({
   id: f.id,
   tournamentId: f.tournament_id,
@@ -106,6 +114,7 @@ const mapFixture = (f: any): Fixture => ({
   status: f.status,
   referee: f.referee,
   score: f.score as Score | undefined,
+  stage: f.stage as Fixture['stage'] | undefined,
 });
 
 const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({
@@ -193,7 +202,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             }
 
             setState({
-                tournaments: (tournamentsData || []) as DbTournament[],
+                tournaments: (tournamentsData || []).map(mapTournament),
                 clubs: (clubsData || []).map(mapClub),
                 teams: (teamsData || []).map(mapTeam),
                 players: (playersData || []).map(mapPlayer),
@@ -220,14 +229,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const addTournament = useCallback(async (tournament: Omit<Tournament, 'id'>) => {
         const { data, error } = await supabase.from('tournaments').insert(tournament).select().single();
         if (error) throw error;
-        setState(s => ({...s, tournaments: [...s.tournaments, data as Tournament].sort((a,b) => a.name.localeCompare(b.name)) }));
+        setState(s => ({...s, tournaments: [...s.tournaments, mapTournament(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
 
     const updateTournament = useCallback(async (tournament: Tournament) => {
         const { id, ...rest } = tournament;
         const { data, error } = await supabase.from('tournaments').update(rest).eq('id', id).select().single();
         if (error) throw error;
-        setState(s => ({...s, tournaments: s.tournaments.map(t => t.id === id ? data as Tournament : t) }));
+        setState(s => ({...s, tournaments: s.tournaments.map(t => t.id === id ? mapTournament(data) : t) }));
     }, [supabase]);
 
     const deleteTournament = useCallback(async (id: number) => {
@@ -362,6 +371,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { data, error } = await supabase.from('fixtures').insert({
             tournament_id: fixture.tournamentId, team1_id: fixture.team1Id, team2_id: fixture.team2Id,
             ground: fixture.ground, date_time: fixture.dateTime, status: fixture.status, referee: fixture.referee,
+            stage: fixture.stage,
         }).select().single();
         if (error) throw error;
         setState(s => ({...s, fixtures: [...s.fixtures, mapFixture(data)] }));
@@ -372,6 +382,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             tournament_id: fixture.tournamentId, team1_id: fixture.team1Id, team2_id: fixture.team2Id,
             ground: fixture.ground, date_time: fixture.dateTime, status: fixture.status,
             score: fixture.score, referee: fixture.referee,
+            stage: fixture.stage,
         }).eq('id', fixture.id).select().single();
         if (error) throw error;
         setState(s => ({...s, fixtures: s.fixtures.map(f => f.id === fixture.id ? mapFixture(data) : f) }));
@@ -603,66 +614,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
     }, [supabase, state.players]);
 
-
-    const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
-        const sponsorIds = state.tournamentSponsors
-            .filter(ts => ts.tournament_id === tournamentId)
-            .map(ts => ts.sponsor_id);
-        
-        return state.sponsors.filter(s => sponsorIds.includes(s.id));
-    }, [state.tournamentSponsors, state.sponsors]);
-
-    const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => {
-        return state.tournaments.filter(t => t.division === division);
-    }, [state.tournaments]);
-
-    const getFixturesByTournament = useCallback((tournamentId: number) => {
-        return state.fixtures.filter(f => f.tournamentId === tournamentId)
-            .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-    }, [state.fixtures]);
-
-    const getClubById = useCallback((clubId: number | null) => {
-        if (clubId === null || clubId === undefined) return undefined;
-        return state.clubs.find(c => c.id === clubId);
-    }, [state.clubs]);
-
-    const getTeamById = useCallback((teamId: number | null) => {
-        if (teamId === null || teamId === undefined) return undefined;
-        return state.teams.find(t => t.id === teamId);
-    }, [state.teams]);
-
-    const getTeamsByClub = useCallback((clubId: number) => {
-        return state.teams.filter(t => t.clubId === clubId);
-    }, [state.teams]);
-
-    const getPlayersByTeam = useCallback((teamId: number) => {
-        return state.players.filter(p => p.teamId === teamId);
-    }, [state.players]);
-
-    const getPlayersByClub = useCallback((clubId: number): Player[] => {
-        const clubTeamIds = state.teams
-            .filter(t => t.clubId === clubId)
-            .map(t => t.id);
-        
-        return state.players
-            .filter(p => p.teamId && clubTeamIds.includes(p.teamId))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }, [state.teams, state.players]);
-    
-    const getTransfersByPlayerId = useCallback((playerId: number) => {
-        return state.playerTransfers
-            .filter(t => t.playerId === playerId)
-            .sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime());
-    }, [state.playerTransfers]);
-
     const getStandingsForTournament = useCallback((tournamentId: number): TeamStanding[] => {
         const tournamentFixtures = state.fixtures.filter(
-            f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0
+            f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage
         );
 
         const teamIdsInTournament = new Set<number>();
         state.teams.forEach(team => {
-            const teamFixtures = state.fixtures.filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id));
+            const teamFixtures = state.fixtures.filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id) && !f.stage);
             if (teamFixtures.length > 0) {
                 teamIdsInTournament.add(team.id);
             }
@@ -738,6 +697,132 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         return standings;
     }, [state.fixtures, state.teams]);
 
+     const concludeLeaguePhase = useCallback(async (tournamentId: number) => {
+        const tournament = state.tournaments.find(t => t.id === tournamentId);
+        if (!tournament || tournament.phase !== 'round-robin') {
+            throw new Error('Tournament is not in the correct phase to conclude the league stage.');
+        }
+
+        const standings = getStandingsForTournament(tournamentId);
+
+        const newFixtures: Omit<Fixture, 'id' | 'score'>[] = [];
+        const now = new Date().toISOString();
+
+        if (tournament.division === 'Division 1') {
+            if (standings.length < 8) throw new Error('Not enough teams with completed matches to generate Division 1 quarterfinals (requires 8).');
+            const top8 = standings.slice(0, 8);
+            const matchups = [
+                { team1Id: top8[0].teamId, team2Id: top8[7].teamId }, // 1 vs 8
+                { team1Id: top8[3].teamId, team2Id: top8[4].teamId }, // 4 vs 5
+                { team1Id: top8[1].teamId, team2Id: top8[6].teamId }, // 2 vs 7
+                { team1Id: top8[2].teamId, team2Id: top8[5].teamId }, // 3 vs 6
+            ];
+            matchups.forEach(match => {
+                newFixtures.push({
+                    tournamentId,
+                    team1Id: match.team1Id,
+                    team2Id: match.team2Id,
+                    ground: 'TBD',
+                    dateTime: now,
+                    status: 'upcoming',
+                    stage: 'quarter-final',
+                });
+            });
+        } else if (tournament.division === 'Division 2') {
+            if (standings.length < 4) throw new Error('Not enough teams with completed matches to generate Division 2 semifinals (requires 4).');
+            const top4 = standings.slice(0, 4);
+            const matchups = [
+                { team1Id: top4[0].teamId, team2Id: top4[3].teamId }, // 1 vs 4
+                { team1Id: top4[1].teamId, team2Id: top4[2].teamId }, // 2 vs 3
+            ];
+            matchups.forEach(match => {
+                newFixtures.push({
+                    tournamentId,
+                    team1Id: match.team1Id,
+                    team2Id: match.team2Id,
+                    ground: 'TBD',
+                    dateTime: now,
+                    status: 'upcoming',
+                    stage: 'semi-final',
+                });
+            });
+        }
+
+        if (newFixtures.length > 0) {
+            const fixturesToInsert = newFixtures.map(f => ({
+                tournament_id: f.tournamentId,
+                team1_id: f.team1Id,
+                team2_id: f.team2Id,
+                ground: f.ground,
+                date_time: f.dateTime,
+                status: f.status,
+                stage: f.stage,
+            }));
+            const { error: insertError } = await supabase.from('fixtures').insert(fixturesToInsert);
+            if (insertError) throw insertError;
+        }
+
+        const { error: updateError } = await supabase
+            .from('tournaments')
+            .update({ phase: 'knockout' })
+            .eq('id', tournamentId);
+        if (updateError) throw updateError;
+        
+        await fetchData();
+    }, [supabase, state.tournaments, getStandingsForTournament, fetchData]);
+
+
+    const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
+        const sponsorIds = state.tournamentSponsors
+            .filter(ts => ts.tournament_id === tournamentId)
+            .map(ts => ts.sponsor_id);
+        
+        return state.sponsors.filter(s => sponsorIds.includes(s.id));
+    }, [state.tournamentSponsors, state.sponsors]);
+
+    const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => {
+        return state.tournaments.filter(t => t.division === division);
+    }, [state.tournaments]);
+
+    const getFixturesByTournament = useCallback((tournamentId: number) => {
+        return state.fixtures.filter(f => f.tournamentId === tournamentId)
+            .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+    }, [state.fixtures]);
+
+    const getClubById = useCallback((clubId: number | null) => {
+        if (clubId === null || clubId === undefined) return undefined;
+        return state.clubs.find(c => c.id === clubId);
+    }, [state.clubs]);
+
+    const getTeamById = useCallback((teamId: number | null) => {
+        if (teamId === null || teamId === undefined) return undefined;
+        return state.teams.find(t => t.id === teamId);
+    }, [state.teams]);
+
+    const getTeamsByClub = useCallback((clubId: number) => {
+        return state.teams.filter(t => t.clubId === clubId);
+    }, [state.teams]);
+
+    const getPlayersByTeam = useCallback((teamId: number) => {
+        return state.players.filter(p => p.teamId === teamId);
+    }, [state.players]);
+
+    const getPlayersByClub = useCallback((clubId: number): Player[] => {
+        const clubTeamIds = state.teams
+            .filter(t => t.clubId === clubId)
+            .map(t => t.id);
+        
+        return state.players
+            .filter(p => p.teamId && clubTeamIds.includes(p.teamId))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [state.teams, state.players]);
+    
+    const getTransfersByPlayerId = useCallback((playerId: number) => {
+        return state.playerTransfers
+            .filter(t => t.playerId === playerId)
+            .sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime());
+    }, [state.playerTransfers]);
+
     const contextValue = useMemo(() => ({
         ...state,
         addTournament,
@@ -767,6 +852,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         bulkAddOrUpdatePlayers,
         updateSponsorsForTournament,
         bulkUpdatePlayerTeam,
+        concludeLeaguePhase,
         getSponsorsForTournament,
         getTournamentsByDivision,
         getFixturesByTournament,
@@ -784,7 +870,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter,
         addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer,
         updateRules, bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
-        updateSponsorsForTournament, bulkUpdatePlayerTeam, getSponsorsForTournament, getTournamentsByDivision,
+        updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
         getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament
     ]);

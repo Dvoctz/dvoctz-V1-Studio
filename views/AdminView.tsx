@@ -72,11 +72,13 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 
 // Tournaments
 const TournamentsAdmin = () => {
-    const { tournaments, addTournament, updateTournament, deleteTournament } = useSports();
+    const { tournaments, addTournament, updateTournament, deleteTournament, fixtures, concludeLeaguePhase } = useSports();
     const [editing, setEditing] = useState<Tournament | Partial<Tournament> | null>(null);
     const [managingSponsorsFor, setManagingSponsorsFor] = useState<Tournament | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isConcluding, setIsConcluding] = useState<number | null>(null);
+    const [managingDrawFor, setManagingDrawFor] = useState<Tournament | null>(null);
 
     const handleSave = async (tournament: Tournament | Partial<Tournament>) => {
         setError(null);
@@ -100,6 +102,27 @@ const TournamentsAdmin = () => {
                 alert(`Deletion failed: ${err.message}`);
             }
         }
+    };
+    
+    const handleConclude = async (id: number) => {
+        setIsConcluding(id);
+        setError(null);
+        if (window.confirm('Are you sure you want to conclude the league phase? This will generate knockout fixtures and cannot be undone.')) {
+            try {
+                await concludeLeaguePhase(id);
+            } catch (err: any) {
+                alert(`Failed to conclude phase: ${err.message}`);
+            }
+        }
+        setIsConcluding(null);
+    };
+
+    const canManageDraw = (tournament: Tournament): boolean => {
+        if (tournament.division !== 'Division 1' || tournament.phase !== 'knockout') return false;
+        const quarterFinals = fixtures.filter(f => f.tournamentId === tournament.id && f.stage === 'quarter-final');
+        const semis = fixtures.filter(f => f.tournamentId === tournament.id && f.stage === 'semi-final');
+        if (quarterFinals.length !== 4 || semis.length > 0) return false;
+        return quarterFinals.every(f => f.status === 'completed');
     };
 
     const filteredTournaments = useMemo(() => tournaments.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())), [tournaments, searchTerm]);
@@ -128,7 +151,17 @@ const TournamentsAdmin = () => {
                             <p className="font-bold">{t.name}</p>
                             <p className="text-sm text-highlight">{t.division}</p>
                         </div>
-                        <div className="space-x-2">
+                        <div className="space-x-2 flex-shrink-0">
+                            {t.phase === 'round-robin' && (
+                                <Button onClick={() => handleConclude(t.id)} className="bg-green-600 hover:bg-green-500" disabled={isConcluding === t.id}>
+                                    {isConcluding === t.id ? 'Processing...' : 'Conclude League'}
+                                </Button>
+                            )}
+                            {canManageDraw(t) && (
+                                <Button onClick={() => setManagingDrawFor(t)} className="bg-yellow-600 hover:bg-yellow-500">
+                                    Manage Semis
+                                </Button>
+                            )}
                             <Button onClick={() => setManagingSponsorsFor(t)} className="bg-green-600 hover:bg-green-500">Sponsors</Button>
                             <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
                             <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
@@ -144,6 +177,9 @@ const TournamentsAdmin = () => {
             {managingSponsorsFor && (
                 <TournamentSponsorsModal tournament={managingSponsorsFor} onClose={() => setManagingSponsorsFor(null)} />
             )}
+            {managingDrawFor && (
+                <SemifinalDrawModal tournament={managingDrawFor} onClose={() => setManagingDrawFor(null)} />
+            )}
         </AdminSection>
     );
 };
@@ -152,6 +188,7 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
     const [formData, setFormData] = useState({
         name: '',
         division: 'Division 1',
+        phase: 'round-robin',
         ...tournament
     });
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -180,6 +217,97 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
             </div>
         </form>
     );
+};
+
+const SemifinalDrawModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
+    const { fixtures, getTeamById, addFixture } = useSports();
+    const [matchup1, setMatchup1] = useState<{ team1?: number; team2?: number }>({});
+    const [matchup2, setMatchup2] = useState<{ team1?: number; team2?: number }>({});
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const winners = useMemo(() => {
+        const quarterFinals = fixtures.filter(f => f.tournamentId === tournament.id && f.stage === 'quarter-final' && f.status === 'completed');
+        const winnerIds = new Set<number>();
+        quarterFinals.forEach(f => {
+            if (f.score) {
+                const winnerId = f.score.team1Score > f.score.team2Score ? f.team1Id : f.team2Id;
+                winnerIds.add(winnerId);
+            }
+        });
+        return Array.from(winnerIds);
+    }, [fixtures, tournament.id]);
+
+    const availableForMatchup1Team2 = useMemo(() => {
+        return winners.filter(id => id !== matchup1.team1);
+    }, [winners, matchup1.team1]);
+
+    const handleSave = async () => {
+        if (!matchup1.team1 || !matchup1.team2 || !matchup2.team1 || !matchup2.team2) {
+            setError("Please define both semifinal matchups.");
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        try {
+            const now = new Date().toISOString();
+            const semiFinals: Omit<Fixture, 'id' | 'score'>[] = [
+                { tournamentId: tournament.id, team1Id: matchup1.team1, team2Id: matchup1.team2, ground: 'TBD', dateTime: now, status: 'upcoming', stage: 'semi-final' },
+                { tournamentId: tournament.id, team1Id: matchup2.team1, team2Id: matchup2.team2, ground: 'TBD', dateTime: now, status: 'upcoming', stage: 'semi-final' }
+            ];
+            await Promise.all(semiFinals.map(f => addFixture(f)));
+            onClose();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    useEffect(() => {
+        const selected = new Set([matchup1.team1, matchup1.team2]);
+        const remaining = winners.filter(id => !selected.has(id));
+        if (remaining.length === 2) {
+            setMatchup2({ team1: remaining[0], team2: remaining[1] });
+        } else {
+            setMatchup2({});
+        }
+    }, [matchup1, winners]);
+
+    return (
+        <FormModal title={`Set Semifinal Draw for ${tournament.name}`} onClose={onClose}>
+            <div className="space-y-4">
+                {error && <ErrorMessage message={error} />}
+                <p className="text-text-secondary">Create the two semifinal matches from the quarterfinal winners.</p>
+                <fieldset className="border border-accent p-3 rounded-md">
+                    <legend className="px-2 text-sm text-text-secondary">Semifinal 1</legend>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Select value={matchup1.team1 || ''} onChange={(e) => setMatchup1({ team1: Number(e.target.value) })}>
+                            <option disabled value="">Select Team</option>
+                            {winners.map(id => <option key={id} value={id}>{getTeamById(id)?.name}</option>)}
+                        </Select>
+                        <Select value={matchup1.team2 || ''} onChange={(e) => setMatchup1(m => ({ ...m, team2: Number(e.target.value) }))} disabled={!matchup1.team1}>
+                            <option disabled value="">Select Opponent</option>
+                            {availableForMatchup1Team2.map(id => <option key={id} value={id}>{getTeamById(id)?.name}</option>)}
+                        </Select>
+                    </div>
+                </fieldset>
+                <fieldset className="border border-accent p-3 rounded-md bg-primary">
+                     <legend className="px-2 text-sm text-text-secondary">Semifinal 2</legend>
+                     <div className="grid grid-cols-2 gap-4">
+                         <p className="p-2 text-center text-text-primary">{getTeamById(matchup2.team1)?.name || 'TBD'}</p>
+                         <p className="p-2 text-center text-text-primary">{getTeamById(matchup2.team2)?.name || 'TBD'}</p>
+                     </div>
+                </fieldset>
+
+                <div className="flex justify-end space-x-2">
+                    <Button onClick={onClose} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                    <Button onClick={handleSave} disabled={loading}>{loading ? "Saving..." : "Create Fixtures"}</Button>
+                </div>
+            </div>
+        </FormModal>
+    )
 };
 
 

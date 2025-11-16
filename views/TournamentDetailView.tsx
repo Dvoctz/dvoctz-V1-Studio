@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Fixture, Tournament, Team, TeamStanding } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
+import { KnockoutBracket } from '../components/KnockoutBracket';
 
 interface TournamentDetailViewProps {
   tournament: Tournament;
@@ -174,10 +175,10 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament, onBack }) => {
   const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament } = useSports();
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
-  const [activeTab, setActiveTab] = useState<'fixtures' | 'standings'>('fixtures');
+  const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
 
-  const fixtures = useMemo(() => getFixturesByTournament(tournament.id), [getFixturesByTournament, tournament.id]);
+  const fixtures = useMemo(() => getFixturesByTournament(tournament.id).filter(f => !f.stage), [getFixturesByTournament, tournament.id]);
   const standings = useMemo(() => getStandingsForTournament(tournament.id), [getStandingsForTournament, tournament.id]);
   const sponsors = useMemo(() => getSponsorsForTournament(tournament.id), [getSponsorsForTournament, tournament.id]);
 
@@ -190,6 +191,14 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
     }
   }, [currentSponsorIndex, sponsors.length]);
   
+  useEffect(() => {
+      if (tournament.phase === 'knockout' || tournament.phase === 'completed') {
+          setActiveTab('knockout');
+      } else {
+          setActiveTab('fixtures');
+      }
+  }, [tournament.phase]);
+
   const handlePrevSponsor = () => {
     setCurrentSponsorIndex((prevIndex) => (prevIndex - 1 + sponsors.length) % sponsors.length);
   };
@@ -201,7 +210,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   const team1 = selectedFixture ? getTeamById(selectedFixture.team1Id) : null;
   const team2 = selectedFixture ? getTeamById(selectedFixture.team2Id) : null;
 
-  const TabButton: React.FC<{ tab: 'fixtures' | 'standings'; children: React.ReactNode }> = ({ tab, children }) => (
+  const TabButton: React.FC<{ tab: 'fixtures' | 'standings' | 'knockout'; children: React.ReactNode }> = ({ tab, children }) => (
     <button
       onClick={() => setActiveTab(tab)}
       className={`px-6 py-3 text-lg font-semibold transition-colors duration-300 focus:outline-none ${activeTab === tab ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
@@ -275,6 +284,9 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
       <div className="flex border-b border-accent mb-6 justify-center">
             <TabButton tab="fixtures">Fixtures</TabButton>
             <TabButton tab="standings">Standings</TabButton>
+            {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
+                <TabButton tab="knockout">Knockout</TabButton>
+            )}
       </div>
 
       <div className="space-y-6">
@@ -282,10 +294,17 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
           fixtures.length > 0 ? (
             fixtures.map(f => <FixtureItem key={f.id} fixture={f} onScorecardClick={setSelectedFixture} />)
           ) : (
-            <p className="text-center text-text-secondary">No fixtures scheduled for this tournament yet.</p>
+            <p className="text-center text-text-secondary">No round-robin fixtures scheduled for this tournament yet.</p>
           )
+        ) : activeTab === 'standings' ? (
+            <>
+                <StandingsTable standings={standings} />
+                 {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
+                    <p className="text-center text-yellow-400 p-4 bg-secondary rounded-lg mt-4">The league phase is complete. The top teams have advanced to the knockout stage.</p>
+                )}
+            </>
         ) : (
-           <StandingsTable standings={standings} />
+            <KnockoutBracket tournament={tournament} />
         )}
       </div>
 
