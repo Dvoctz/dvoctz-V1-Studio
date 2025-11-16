@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
@@ -97,7 +97,7 @@ const TournamentsAdmin = () => {
         }
     };
 
-    const filteredTournaments = tournaments.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredTournaments = useMemo(() => tournaments.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())), [tournaments, searchTerm]);
 
     return (
         <AdminSection title="Manage Tournaments">
@@ -267,7 +267,7 @@ const ClubsAdmin = () => {
         }
     };
 
-    const filteredClubs = clubs.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredClubs = useMemo(() => clubs.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())), [clubs, searchTerm]);
 
     return (
         <AdminSection title="Manage Clubs">
@@ -408,10 +408,10 @@ const TeamsAdmin = () => {
         }
     };
 
-    const filteredTeams = teams.filter(t =>
+    const filteredTeams = useMemo(() => teams.filter(t =>
         t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.shortName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ), [teams, searchTerm]);
 
     return (
         <AdminSection title="Manage Teams">
@@ -581,14 +581,14 @@ const PlayersAdmin = () => {
         }
     };
 
-    const filteredPlayers = players.filter(p => {
+    const filteredPlayers = useMemo(() => players.filter(p => {
         const team = getTeamById(p.teamId);
         const lowerSearchTerm = searchTerm.toLowerCase();
         return (
             p.name.toLowerCase().includes(lowerSearchTerm) ||
             (team && team.name.toLowerCase().includes(lowerSearchTerm))
         );
-    });
+    }), [players, getTeamById, searchTerm]);
 
     return (
         <AdminSection title="Manage Players">
@@ -864,7 +864,7 @@ const FixturesAdmin = () => {
         }
     };
 
-    const filteredFixtures = fixtures.filter(f => {
+    const filteredFixtures = useMemo(() => fixtures.filter(f => {
         const team1 = getTeamById(f.team1Id);
         const team2 = getTeamById(f.team2Id);
         const tournament = tournaments.find(t => t.id === f.tournamentId);
@@ -876,7 +876,7 @@ const FixturesAdmin = () => {
             (tournament && tournament.name.toLowerCase().includes(lowerSearchTerm)) ||
             f.ground.toLowerCase().includes(lowerSearchTerm)
         );
-    });
+    }), [fixtures, getTeamById, tournaments, searchTerm]);
 
     return (
         <AdminSection title="Manage Fixtures">
@@ -1068,7 +1068,7 @@ const SponsorsAdmin = () => {
         }
     };
 
-    const filteredSponsors = sponsors.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredSponsors = useMemo(() => sponsors.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())), [sponsors, searchTerm]);
 
     return (
         <AdminSection title="Manage Master Sponsor List">
@@ -1433,7 +1433,8 @@ export const AdminView: React.FC = () => {
         }
     };
 
-    const TabButton = ({ tab, label }: { tab: string; label: string }) => (
+    // FIX: Used React.FC to correctly type the component props, which resolves the TypeScript error related to the 'key' prop when mapping over elements.
+    const TabButton: React.FC<{ tab: string; label: string }> = ({ tab, label }) => (
         <button
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-300 whitespace-nowrap ${activeTab === tab

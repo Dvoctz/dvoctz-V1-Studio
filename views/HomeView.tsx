@@ -1,5 +1,6 @@
 
-import React from 'react';
+
+import React, { useMemo } from 'react';
 // FIX: Replaced useSportsData with useSports and updated the import path.
 import { useSports } from '../context/SportsDataContext';
 import type { Fixture, Team, Tournament, View } from '../types';
@@ -36,7 +37,7 @@ const FixtureCard: React.FC<{ fixture: Fixture; team1?: Team; team2?: Team; }> =
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
     const { getTeamById, fixtures } = useSports();
-    const upcomingFixtures = fixtures.filter(f => f.status === 'upcoming').slice(0, 3);
+    const upcomingFixtures = useMemo(() => fixtures.filter(f => f.status === 'upcoming').slice(0, 3), [fixtures]);
 
     return (
         <div className="space-y-12">

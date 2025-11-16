@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useMemo } from 'react';
 // FIX: Replaced useSportsData with useSports and updated the import path.
 import { useSports } from '../context/SportsDataContext';
 import type { Tournament } from '../types';
@@ -28,13 +29,13 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
   const [searchTerm, setSearchTerm] = useState('');
   const { getTournamentsByDivision } = useSports();
   
-  const filterTournaments = (tournaments: Tournament[]) => {
-    if (!searchTerm) return tournaments;
-    return tournaments.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  };
+  const division1Tournaments = useMemo(() => {
+    return getTournamentsByDivision('Division 1').filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [getTournamentsByDivision, searchTerm]);
 
-  const division1Tournaments = filterTournaments(getTournamentsByDivision('Division 1'));
-  const division2Tournaments = filterTournaments(getTournamentsByDivision('Division 2'));
+  const division2Tournaments = useMemo(() => {
+    return getTournamentsByDivision('Division 2').filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [getTournamentsByDivision, searchTerm]);
   
   const displayedTournaments = activeTab === 'd1' ? division1Tournaments : division2Tournaments;
 

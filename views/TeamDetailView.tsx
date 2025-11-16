@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Team, Player } from '../types';
 
@@ -25,7 +25,7 @@ const PlayerRow: React.FC<{ player: Player }> = ({ player }) => (
 
 export const TeamDetailView: React.FC<TeamDetailViewProps> = ({ team, onBack }) => {
   const { getPlayersByTeam } = useSports();
-  const teamPlayers = getPlayersByTeam(team.id);
+  const teamPlayers = useMemo(() => getPlayersByTeam(team.id), [getPlayersByTeam, team.id]);
 
   return (
     <div>

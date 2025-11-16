@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Fixture, Tournament, Team, TeamStanding } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
@@ -177,9 +177,9 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
 
-  const fixtures = getFixturesByTournament(tournament.id);
-  const standings = getStandingsForTournament(tournament.id);
-  const sponsors = getSponsorsForTournament(tournament.id);
+  const fixtures = useMemo(() => getFixturesByTournament(tournament.id), [getFixturesByTournament, tournament.id]);
+  const standings = useMemo(() => getStandingsForTournament(tournament.id), [getStandingsForTournament, tournament.id]);
+  const sponsors = useMemo(() => getSponsorsForTournament(tournament.id), [getSponsorsForTournament, tournament.id]);
 
   useEffect(() => {
     if (sponsors.length > 1) {

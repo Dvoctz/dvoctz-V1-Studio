@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Club } from '../types';
 
@@ -28,9 +28,9 @@ export const ClubsView: React.FC<ClubsViewProps> = ({ onSelectClub }) => {
   const { clubs } = useSports();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredClubs = clubs.filter(club => {
+  const filteredClubs = useMemo(() => clubs.filter(club => {
       return club.name.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  }), [clubs, searchTerm]);
 
   return (
     <div>

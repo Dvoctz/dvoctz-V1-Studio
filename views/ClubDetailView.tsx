@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Club, Team } from '../types';
 
@@ -29,7 +29,7 @@ const TeamRow: React.FC<{ team: Team; onSelect: () => void }> = ({ team, onSelec
 
 export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onBack }) => {
   const { getTeamsByClub } = useSports();
-  const clubTeams = getTeamsByClub(club.id);
+  const clubTeams = useMemo(() => getTeamsByClub(club.id), [getTeamsByClub, club.id]);
 
   return (
     <div>
