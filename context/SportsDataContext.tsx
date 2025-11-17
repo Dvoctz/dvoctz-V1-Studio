@@ -4,7 +4,28 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer } from '../supabaseClient';
 import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice } from '../types';
 
+type EntityName = 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules';
+
 interface SportsState {
+    tournaments: Tournament[] | null;
+    clubs: Club[] | null;
+    teams: Team[] | null;
+    players: Player[] | null;
+    fixtures: Fixture[] | null;
+    sponsors: Sponsor[] | null;
+    tournamentSponsors: TournamentSponsor[] | null;
+    playerTransfers: PlayerTransfer[] | null;
+    notices: Notice[] | null;
+    rules: string | null;
+    loading: Set<EntityName>;
+    error: Error | null;
+}
+
+export type CsvTeam = Omit<Team, 'id' | 'clubId'> & { clubName: string };
+export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'stats'> & { teamName: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
+
+
+interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules'> {
     tournaments: Tournament[];
     clubs: Club[];
     teams: Team[];
@@ -15,14 +36,9 @@ interface SportsState {
     playerTransfers: PlayerTransfer[];
     notices: Notice[];
     rules: string;
-    loading: boolean;
-}
-
-export type CsvTeam = Omit<Team, 'id' | 'clubId'> & { clubName: string };
-export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'stats'> & { teamName: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
-
-
-interface SportsContextType extends SportsState {
+    // FIX: Expose the raw internal state to allow hooks like useEntityData to check for null values and trigger fetches.
+    _internal_state: SportsState;
+    fetchData: <T extends EntityName>(entityName: T) => Promise<SportsState[T]>;
     addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
     updateTournament: (tournament: Tournament) => Promise<void>;
     deleteTournament: (id: number) => Promise<void>;
@@ -70,368 +86,215 @@ interface SportsContextType extends SportsState {
 const SportsDataContext = createContext<SportsContextType | undefined>(undefined);
 
 // MAPPING FUNCTIONS to convert snake_case from DB to camelCase for the app
-const mapClub = (c: any): Club => ({
-  id: c.id,
-  name: c.name,
-  logoUrl: c.logo_url,
-});
-
-const mapTeam = (t: any): Team => ({
-  id: t.id,
-  name: t.name,
-  shortName: t.short_name,
-  logoUrl: t.logo_url,
-  division: t.division,
-  clubId: t.club_id,
-});
-
-const mapPlayer = (p: any): Player => ({
-  id: p.id,
-  name: p.name,
-  teamId: p.team_id,
-  photoUrl: p.photo_url,
-  role: p.role,
-  stats: p.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 },
-});
-
-const mapSponsor = (s: any): Sponsor => ({
-  id: s.id,
-  name: s.name,
-  website: s.website,
-  logoUrl: s.logo_url,
-  showInFooter: s.show_in_footer || false,
-});
-
-const mapTournament = (t: any): Omit<Tournament, 'phase'> => ({
-  id: t.id,
-  name: t.name,
-  division: t.division,
-});
-
-const mapNotice = (n: any): Notice => ({
-    id: n.id,
-    title: n.title,
-    message: n.message,
-    level: n.level,
-    expiresAt: n.expires_at,
-    createdAt: n.created_at,
-});
-
+const mapClub = (c: any): Club => ({ id: c.id, name: c.name, logoUrl: c.logo_url });
+const mapTeam = (t: any): Team => ({ id: t.id, name: t.name, shortName: t.short_name, logoUrl: t.logo_url, division: t.division, clubId: t.club_id });
+const mapPlayer = (p: any): Player => ({ id: p.id, name: p.name, teamId: p.team_id, photoUrl: p.photo_url, role: p.role, stats: p.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 } });
+const mapSponsor = (s: any): Sponsor => ({ id: s.id, name: s.name, website: s.website, logoUrl: s.logo_url, showInFooter: s.show_in_footer || false });
+const mapTournament = (t: any): Omit<Tournament, 'phase'> => ({ id: t.id, name: t.name, division: t.division });
+const mapNotice = (n: any): Notice => ({ id: n.id, title: n.title, message: n.message, level: n.level, expiresAt: n.expires_at, createdAt: n.created_at });
 const mapFixture = (f: any): Fixture => {
     let stage: Fixture['stage'] | undefined = undefined;
     let actualReferee = f.referee;
-
-    // FIX: Decode knockout stage info from the referee field to avoid needing a 'stage' column in the DB.
     if (f.referee && typeof f.referee === 'string' && f.referee.startsWith('KO_')) {
         const parts = f.referee.split(':');
         const stagePart = parts[0];
         actualReferee = parts.slice(1).join(':').trim() || undefined;
-
         if (stagePart === 'KO_QF') stage = 'quarter-final';
         else if (stagePart === 'KO_SF') stage = 'semi-final';
         else if (stagePart === 'KO_FINAL') stage = 'final';
     }
-    
-    return {
-        id: f.id,
-        tournamentId: f.tournament_id,
-        team1Id: f.team1_id,
-        team2Id: f.team2_id,
-        ground: f.ground,
-        dateTime: f.date_time,
-        status: f.status,
-        referee: actualReferee,
-        score: f.score as Score | undefined,
-        stage: stage,
-    };
+    return { id: f.id, tournamentId: f.tournament_id, team1Id: f.team1_id, team2Id: f.team2_id, ground: f.ground, dateTime: f.date_time, status: f.status, referee: actualReferee, score: f.score as Score | undefined, stage: stage };
 };
+const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({ id: pt.id, playerId: pt.player_id, fromTeamId: pt.from_team_id, toTeamId: pt.to_team_id, transferDate: pt.transfer_date, notes: pt.notes, isAutomated: pt.is_automated });
 
-const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({
-    id: pt.id,
-    playerId: pt.player_id,
-    fromTeamId: pt.from_team_id,
-    toTeamId: pt.to_team_id,
-    transferDate: pt.transfer_date,
-    notes: pt.notes,
-    isAutomated: pt.is_automated,
-});
-
-
-// Helper function to upload a file to Supabase Storage.
 const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-    
-    const { error } = await supabase.storage
-      .from('assets')
-      .upload(fileName, file);
-
-    if (error) {
-        console.error('Error uploading file:', error);
-        throw new Error(`Failed to upload asset: ${error.message}`);
-    }
-
-    const { data } = supabase.storage
-        .from('assets')
-        .getPublicUrl(fileName);
-        
+    const { error } = await supabase.storage.from('assets').upload(fileName, file);
+    if (error) throw new Error(`Failed to upload asset: ${error.message}`);
+    const { data } = supabase.storage.from('assets').getPublicUrl(fileName);
     return data.publicUrl;
 };
 
 export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { supabase } = useSupabase();
     const [state, setState] = useState<SportsState>({
-        tournaments: [],
-        clubs: [],
-        teams: [],
-        players: [],
-        fixtures: [],
-        sponsors: [],
-        tournamentSponsors: [],
-        playerTransfers: [],
-        notices: [],
-        rules: '',
-        loading: true,
+        tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null,
+        loading: new Set(),
+        error: null,
     });
 
-    const fetchData = useCallback(async () => {
-        setState(s => ({...s, loading: true}));
-        try {
-            const [
-                { data: tournamentsData, error: tournamentsError },
-                { data: clubsData, error: clubsError },
-                { data: teamsData, error: teamsError },
-                { data: playersData, error: playersError },
-                { data: fixturesData, error: fixturesError },
-                { data: sponsorsData, error: sponsorsError },
-                { data: tournamentSponsorsData, error: tournamentSponsorsError },
-                { data: playerTransfersData, error: playerTransfersError },
-                { data: noticesData, error: noticesError },
-                { data: rulesData, error: rulesError },
-            ] = await Promise.all([
-                supabase.from('tournaments').select('*').order('name'),
-                supabase.from('clubs').select('*').order('name'),
-                supabase.from('teams').select('*').order('name'),
-                supabase.from('players').select('*').order('name'),
-                supabase.from('fixtures').select('*'),
-                supabase.from('sponsors').select('*').order('name'),
-                supabase.from('tournament_sponsors').select('*'),
-                supabase.from('player_transfers').select('*'),
-                supabase.from('notices').select('*'),
-                supabase.from('game_rules').select('content').limit(1).maybeSingle(),
-            ]);
+    const fetchData = useCallback(async <T extends EntityName>(entityName: T): Promise<SportsState[T]> => {
+        if (state[entityName] !== null) {
+            return state[entityName] as SportsState[T];
+        }
 
-            if (tournamentsError) throw tournamentsError;
-            if (clubsError) throw clubsError;
-            if (teamsError) throw teamsError;
-            if (playersError) throw playersError;
-            if (fixturesError) throw fixturesError;
-            if (sponsorsError) throw sponsorsError;
-            if (tournamentSponsorsError) throw tournamentSponsorsError;
-            if (playerTransfersError) throw playerTransfersError;
-            if (noticesError) throw noticesError;
-            if (rulesError) {
-                 console.warn('Could not fetch game rules. This is non-critical.', rulesError);
+        setState(s => ({ ...s, loading: new Set(s.loading).add(entityName) }));
+
+        try {
+            let data: any;
+            let error: any;
+
+            switch (entityName) {
+                case 'tournaments': ({ data, error } = await supabase.from('tournaments').select('*').order('name')); break;
+                case 'clubs': ({ data, error } = await supabase.from('clubs').select('*').order('name')); break;
+                case 'teams': ({ data, error } = await supabase.from('teams').select('*').order('name')); break;
+                case 'players': ({ data, error } = await supabase.from('players').select('*').order('name')); break;
+                case 'fixtures': ({ data, error } = await supabase.from('fixtures').select('*')); break;
+                case 'sponsors': ({ data, error } = await supabase.from('sponsors').select('*').order('name')); break;
+                case 'tournamentSponsors': ({ data, error } = await supabase.from('tournament_sponsors').select('*')); break;
+                case 'playerTransfers': ({ data, error } = await supabase.from('player_transfers').select('*')); break;
+                case 'notices': ({ data, error } = await supabase.from('notices').select('*')); break;
+                case 'rules': ({ data, error } = await supabase.from('game_rules').select('content').limit(1).maybeSingle()); break;
+            }
+
+            if (error) throw error;
+            
+            let processedData: any;
+            if (entityName === 'fixtures') {
+                 processedData = (data || []).map(mapFixture);
+            } else if (entityName === 'tournaments') {
+                const fixturesData = state.fixtures || await fetchData('fixtures');
+                processedData = (data || []).map(mapTournament).map(t => {
+                    const knockoutFixtures = (fixturesData as Fixture[]).some(f => f.tournamentId === t.id && f.stage);
+                    const finalFixture = (fixturesData as Fixture[]).find(f => f.tournamentId === t.id && f.stage === 'final');
+                    let phase: Tournament['phase'] = 'round-robin';
+                    if (finalFixture && finalFixture.status === 'completed') phase = 'completed';
+                    else if (knockoutFixtures) phase = 'knockout';
+                    return { ...t, phase };
+                });
+            } else if (entityName === 'rules') {
+                processedData = data?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.';
+            } else {
+                // FIX: The generic type 'T' is too broad for direct indexing. An explicit type assertion
+                // for the key assures TypeScript that `entityName` will be one of the map's keys here.
+                const mapFn = { clubs: mapClub, teams: mapTeam, players: mapPlayer, sponsors: mapSponsor, notices: mapNotice, playerTransfers: mapPlayerTransfer, tournamentSponsors: (d: any) => d }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors'];
+                processedData = (data || []).map(mapFn);
             }
             
-            const fixtures = (fixturesData || []).map(mapFixture);
-            const tournamentsWithPhase = (tournamentsData || []).map(mapTournament).map(t => {
-                const knockoutFixtures = fixtures.some(f => f.tournamentId === t.id && f.stage);
-                const finalFixture = fixtures.find(f => f.tournamentId === t.id && f.stage === 'final');
-
-                let phase: Tournament['phase'] = 'round-robin';
-                if (finalFixture && finalFixture.status === 'completed') {
-                    phase = 'completed';
-                } else if (knockoutFixtures) {
-                    phase = 'knockout';
-                }
-
-                return { ...t, phase };
+            setState(s => {
+                const newLoading = new Set(s.loading);
+                newLoading.delete(entityName);
+                return { ...s, [entityName]: processedData, loading: newLoading, error: null };
             });
+            return processedData;
 
-            setState({
-                tournaments: tournamentsWithPhase,
-                clubs: (clubsData || []).map(mapClub),
-                teams: (teamsData || []).map(mapTeam),
-                players: (playersData || []).map(mapPlayer),
-                fixtures: fixtures,
-                sponsors: (sponsorsData || []).map(mapSponsor),
-                tournamentSponsors: (tournamentSponsorsData || []) as TournamentSponsor[],
-                playerTransfers: (playerTransfersData || []).map(mapPlayerTransfer),
-                notices: (noticesData || []).map(mapNotice),
-                rules: rulesData?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.',
-                loading: false,
+        } catch (error: any) {
+            console.error(`Error fetching ${entityName}:`, error);
+            setState(s => {
+                const newLoading = new Set(s.loading);
+                newLoading.delete(entityName);
+                return { ...s, loading: newLoading, error };
             });
-        } catch (error) {
-            console.error(
-                "Error fetching data from Supabase. This could be due to incorrect credentials, missing tables (including `game_rules`, `player_transfers`, and `notices`), or misconfigured Row Level Security policies. Please check your Supabase setup.",
-                error
-            );
-            setState(s => ({...s, loading: false}));
+            throw error;
         }
-    }, [supabase]);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    }, [supabase, state]);
 
     const addTournament = useCallback(async (tournament: Omit<Tournament, 'id'>) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { phase, ...dbTournament } = tournament;
         const { data, error } = await supabase.from('tournaments').insert(dbTournament).select().single();
         if (error) throw error;
         const newTournament = { ...mapTournament(data), phase: 'round-robin' as const };
-        setState(s => ({...s, tournaments: [...s.tournaments, newTournament].sort((a,b) => a.name.localeCompare(b.name)) }));
+        setState(s => ({...s, tournaments: [...(s.tournaments || []), newTournament].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
-
+    
     const updateTournament = useCallback(async (tournament: Tournament) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id, phase, ...rest } = tournament;
         const dbTournament = { name: rest.name, division: rest.division };
         const { data, error } = await supabase.from('tournaments').update(dbTournament).eq('id', id).select().single();
         if (error) throw error;
         const updatedTournament = { ...mapTournament(data), phase: tournament.phase };
-        setState(s => ({...s, tournaments: s.tournaments.map(t => t.id === id ? updatedTournament : t) }));
+        setState(s => ({...s, tournaments: (s.tournaments || []).map(t => t.id === id ? updatedTournament : t) }));
     }, [supabase]);
 
     const deleteTournament = useCallback(async (id: number) => {
         const { error } = await supabase.from('tournaments').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, tournaments: s.tournaments.filter(t => t.id !== id) }));
+        setState(s => ({...s, tournaments: (s.tournaments || []).filter(t => t.id !== id) }));
     }, [supabase]);
 
     const addClub = useCallback(async (clubData: Omit<Club, 'id'> & { logoFile?: File }) => {
         let finalLogoUrl = clubData.logoUrl;
-        if (clubData.logoFile) {
-            finalLogoUrl = await uploadAsset(supabase, clubData.logoFile);
-        }
-        const { name } = clubData;
-        const { data, error } = await supabase.from('clubs').insert({ name, logo_url: finalLogoUrl }).select().single();
+        if (clubData.logoFile) finalLogoUrl = await uploadAsset(supabase, clubData.logoFile);
+        const { data, error } = await supabase.from('clubs').insert({ name: clubData.name, logo_url: finalLogoUrl }).select().single();
         if (error) throw error;
-        setState(s => ({...s, clubs: [...s.clubs, mapClub(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
+        setState(s => ({...s, clubs: [...(s.clubs || []), mapClub(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
 
     const updateClub = useCallback(async (clubData: Club & { logoFile?: File }) => {
         let finalLogoUrl = clubData.logoUrl;
-        if (clubData.logoFile) {
-            finalLogoUrl = await uploadAsset(supabase, clubData.logoFile);
-        }
-        const { id, name } = clubData;
-        const { data, error } = await supabase.from('clubs').update({ name, logo_url: finalLogoUrl }).eq('id', id).select().single();
+        if (clubData.logoFile) finalLogoUrl = await uploadAsset(supabase, clubData.logoFile);
+        const { data, error } = await supabase.from('clubs').update({ name: clubData.name, logo_url: finalLogoUrl }).eq('id', clubData.id).select().single();
         if (error) throw error;
-        setState(s => ({...s, clubs: s.clubs.map(c => c.id === id ? mapClub(data) : c) }));
+        setState(s => ({...s, clubs: (s.clubs || []).map(c => c.id === clubData.id ? mapClub(data) : c) }));
     }, [supabase]);
 
     const deleteClub = useCallback(async (id: number) => {
          const { error } = await supabase.from('clubs').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, clubs: s.clubs.filter(c => c.id !== id) }));
+        setState(s => ({...s, clubs: (s.clubs || []).filter(c => c.id !== id) }));
     }, [supabase]);
     
     const addTeam = useCallback(async (teamData: Omit<Team, 'id'> & { logoFile?: File }) => {
         let finalLogoUrl = teamData.logoUrl;
-        if (teamData.logoFile) {
-            finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
-        }
+        if (teamData.logoFile) finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
         const { name, shortName, division, clubId } = teamData;
-        const { data, error } = await supabase.from('teams').insert({
-            name, short_name: shortName, division, logo_url: finalLogoUrl, club_id: clubId,
-        }).select().single();
+        const { data, error } = await supabase.from('teams').insert({ name, short_name: shortName, division, logo_url: finalLogoUrl, club_id: clubId }).select().single();
         if (error) throw error;
-        setState(s => ({...s, teams: [...s.teams, mapTeam(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
+        setState(s => ({...s, teams: [...(s.teams || []), mapTeam(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
 
     const updateTeam = useCallback(async (teamData: Team & { logoFile?: File }) => {
         let finalLogoUrl = teamData.logoUrl;
-        if (teamData.logoFile) {
-            finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
-        }
+        if (teamData.logoFile) finalLogoUrl = await uploadAsset(supabase, teamData.logoFile);
         const { id, name, shortName, division, clubId } = teamData;
-        const { data, error } = await supabase.from('teams').update({
-            name, short_name: shortName, division, logo_url: finalLogoUrl, club_id: clubId,
-        }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('teams').update({ name, short_name: shortName, division, logo_url: finalLogoUrl, club_id: clubId }).eq('id', id).select().single();
         if (error) throw error;
-        setState(s => ({...s, teams: s.teams.map(t => t.id === id ? mapTeam(data) : t) }));
+        setState(s => ({...s, teams: (s.teams || []).map(t => t.id === id ? mapTeam(data) : t) }));
     }, [supabase]);
 
     const deleteTeam = useCallback(async (id: number) => {
         const { error } = await supabase.from('teams').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, teams: s.teams.filter(t => t.id !== id) }));
+        setState(s => ({...s, teams: (s.teams || []).filter(t => t.id !== id) }));
     }, [supabase]);
 
     const addPlayer = useCallback(async (playerData: Omit<Player, 'id'> & { photoFile?: File }) => {
         let finalPhotoUrl = playerData.photoUrl;
-        if (playerData.photoFile) {
-            finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
-        }
+        if (playerData.photoFile) finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
         const { name, teamId, role, stats } = playerData;
-        const { data, error } = await supabase.from('players').insert({
-            name, team_id: teamId, role, stats, photo_url: finalPhotoUrl,
-        }).select().single();
+        const { data, error } = await supabase.from('players').insert({ name, team_id: teamId, role, stats, photo_url: finalPhotoUrl }).select().single();
         if (error) throw error;
-        setState(s => ({...s, players: [...s.players, mapPlayer(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
+        setState(s => ({...s, players: [...(s.players || []), mapPlayer(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
 
     const updatePlayer = useCallback(async (playerData: Player & { photoFile?: File }) => {
-        const originalPlayer = state.players.find(p => p.id === playerData.id);
-
+        const originalPlayer = (state.players || []).find(p => p.id === playerData.id);
         let finalPhotoUrl = playerData.photoUrl;
-        if (playerData.photoFile) {
-            finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
-        }
-        
-        // Check for team change and log transfer if necessary
+        if (playerData.photoFile) finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
         if (originalPlayer && originalPlayer.teamId !== playerData.teamId) {
-            const newTransfer = {
-                player_id: playerData.id,
-                from_team_id: originalPlayer.teamId,
-                to_team_id: playerData.teamId,
-                transfer_date: new Date().toISOString().split('T')[0],
-                is_automated: true,
-                notes: 'Player details updated via admin panel.'
-            };
-            
-            const { data: insertedTransfer, error: transferError } = await supabase
-                .from('player_transfers')
-                .insert(newTransfer)
-                .select()
-                .single();
-                
+            const newTransfer = { player_id: playerData.id, from_team_id: originalPlayer.teamId, to_team_id: playerData.teamId, transfer_date: new Date().toISOString().split('T')[0], is_automated: true, notes: 'Player details updated via admin panel.' };
+            const { data: insertedTransfer, error: transferError } = await supabase.from('player_transfers').insert(newTransfer).select().single();
             if (transferError) throw transferError;
-            
-            if (insertedTransfer) {
-                setState(s => ({
-                    ...s,
-                    playerTransfers: [...s.playerTransfers, mapPlayerTransfer(insertedTransfer)]
-                }));
-            }
+            if (insertedTransfer) setState(s => ({ ...s, playerTransfers: [...(s.playerTransfers || []), mapPlayerTransfer(insertedTransfer)] }));
         }
-
         const { id, name, teamId, role, stats } = playerData;
-        const { data, error } = await supabase.from('players').update({
-            name, team_id: teamId, role, stats, photo_url: finalPhotoUrl,
-        }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('players').update({ name, team_id: teamId, role, stats, photo_url: finalPhotoUrl }).eq('id', id).select().single();
         if (error) throw error;
-        setState(s => ({...s, players: s.players.map(p => p.id === id ? mapPlayer(data) : p).sort((a,b) => a.name.localeCompare(b.name)) }));
+        setState(s => ({...s, players: (s.players || []).map(p => p.id === id ? mapPlayer(data) : p).sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase, state.players]);
 
     const deletePlayer = useCallback(async (id: number) => {
         const { error } = await supabase.from('players').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, players: s.players.filter(p => p.id !== id) }));
+        setState(s => ({...s, players: (s.players || []).filter(p => p.id !== id) }));
     }, [supabase]);
     
     const deleteAllPlayers = useCallback(async () => {
-        // Delete related player transfers first to avoid foreign key constraint errors
         const { error: transferError } = await supabase.from('player_transfers').delete().neq('id', -1);
         if (transferError) throw transferError;
-    
-        // Then delete players
         const { error } = await supabase.from('players').delete().neq('id', -1);
         if (error) throw error;
-        
-        // Update state
         setState(s => ({ ...s, players: [], playerTransfers: [] }));
     }, [supabase]);
 
@@ -442,18 +305,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const prefix = stage === 'quarter-final' ? 'KO_QF' : stage === 'semi-final' ? 'KO_SF' : 'KO_FINAL';
             dbReferee = referee ? `${prefix}: ${referee}` : prefix;
         }
-
-        const { data, error } = await supabase.from('fixtures').insert({
-            tournament_id: rest.tournamentId,
-            team1_id: rest.team1Id,
-            team2_id: rest.team2Id,
-            ground: rest.ground,
-            date_time: rest.dateTime,
-            status: rest.status,
-            referee: dbReferee,
-        }).select().single();
+        const { data, error } = await supabase.from('fixtures').insert({ tournament_id: rest.tournamentId, team1_id: rest.team1Id, team2_id: rest.team2Id, ground: rest.ground, date_time: rest.dateTime, status: rest.status, referee: dbReferee }).select().single();
         if (error) throw error;
-        setState(s => ({...s, fixtures: [...s.fixtures, mapFixture(data)] }));
+        setState(s => ({...s, fixtures: [...(s.fixtures || []), mapFixture(data)] }));
     }, [supabase]);
 
     const updateFixture = useCallback(async (fixture: Fixture) => {
@@ -463,563 +317,265 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const prefix = stage === 'quarter-final' ? 'KO_QF' : stage === 'semi-final' ? 'KO_SF' : 'KO_FINAL';
             dbReferee = referee ? `${prefix}: ${referee}` : prefix;
         }
-
-        const { data, error } = await supabase.from('fixtures').update({
-            tournament_id: rest.tournamentId,
-            team1_id: rest.team1Id,
-            team2_id: rest.team2Id,
-            ground: rest.ground,
-            date_time: rest.dateTime,
-            status: rest.status,
-            score: rest.score,
-            referee: dbReferee,
-        }).eq('id', fixture.id).select().single();
+        const { data, error } = await supabase.from('fixtures').update({ tournament_id: rest.tournamentId, team1_id: rest.team1Id, team2_id: rest.team2Id, ground: rest.ground, date_time: rest.dateTime, status: rest.status, score: rest.score, referee: dbReferee }).eq('id', fixture.id).select().single();
         if (error) throw error;
-        setState(s => ({...s, fixtures: s.fixtures.map(f => f.id === fixture.id ? mapFixture(data) : f) }));
+        setState(s => ({...s, fixtures: (s.fixtures || []).map(f => f.id === fixture.id ? mapFixture(data) : f) }));
     }, [supabase]);
 
     const deleteFixture = useCallback(async (id: number) => {
         const { error } = await supabase.from('fixtures').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, fixtures: s.fixtures.filter(f => f.id !== id) }));
+        setState(s => ({...s, fixtures: (s.fixtures || []).filter(f => f.id !== id) }));
     }, [supabase]);
 
     const addSponsor = useCallback(async (sponsorData: Omit<Sponsor, 'id'> & { logoFile?: File }) => {
         let finalLogoUrl = sponsorData.logoUrl;
-        if (sponsorData.logoFile) {
-            finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
-        }
+        if (sponsorData.logoFile) finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
         const { name, website, showInFooter } = sponsorData;
-        const { data, error } = await supabase.from('sponsors').insert({
-            name, website, logo_url: finalLogoUrl, show_in_footer: showInFooter || false,
-        }).select().single();
+        const { data, error } = await supabase.from('sponsors').insert({ name, website, logo_url: finalLogoUrl, show_in_footer: showInFooter || false }).select().single();
         if (error) throw error;
-        setState(s => ({...s, sponsors: [...s.sponsors, mapSponsor(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
+        setState(s => ({...s, sponsors: [...(s.sponsors || []), mapSponsor(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
 
     const updateSponsor = useCallback(async (sponsorData: Sponsor & { logoFile?: File }) => {
         let finalLogoUrl = sponsorData.logoUrl;
-        if (sponsorData.logoFile) {
-            finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
-        }
+        if (sponsorData.logoFile) finalLogoUrl = await uploadAsset(supabase, sponsorData.logoFile);
         const { id, name, website, showInFooter } = sponsorData;
-        const { data, error } = await supabase.from('sponsors').update({
-            name, website, logo_url: finalLogoUrl, show_in_footer: showInFooter,
-        }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('sponsors').update({ name, website, logo_url: finalLogoUrl, show_in_footer: showInFooter }).eq('id', id).select().single();
         if (error) throw error;
-        setState(s => ({...s, sponsors: s.sponsors.map(sp => sp.id === id ? mapSponsor(data) : sp) }));
+        setState(s => ({...s, sponsors: (s.sponsors || []).map(sp => sp.id === id ? mapSponsor(data) : sp) }));
     }, [supabase]);
 
     const deleteSponsor = useCallback(async (id: number) => {
         const { error } = await supabase.from('sponsors').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, sponsors: s.sponsors.filter(sp => sp.id !== id) }));
+        setState(s => ({...s, sponsors: (s.sponsors || []).filter(sp => sp.id !== id) }));
     }, [supabase]);
 
     const toggleSponsorShowInFooter = useCallback(async (sponsor: Sponsor) => {
-        const { data, error } = await supabase
-            .from('sponsors')
-            .update({ show_in_footer: !sponsor.showInFooter })
-            .eq('id', sponsor.id)
-            .select()
-            .single();
+        const { data, error } = await supabase.from('sponsors').update({ show_in_footer: !sponsor.showInFooter }).eq('id', sponsor.id).select().single();
         if (error) throw error;
-        setState(s => ({...s, sponsors: s.sponsors.map(sp => sp.id === sponsor.id ? mapSponsor(data) : sp) }));
+        setState(s => ({...s, sponsors: (s.sponsors || []).map(sp => sp.id === sponsor.id ? mapSponsor(data) : sp) }));
     }, [supabase]);
     
     const addPlayerTransfer = useCallback(async (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => {
-        const { data, error } = await supabase.from('player_transfers').insert({
-            player_id: transfer.playerId,
-            from_team_id: transfer.fromTeamId,
-            to_team_id: transfer.toTeamId,
-            transfer_date: transfer.transferDate,
-            notes: transfer.notes,
-            is_automated: false
-        }).select().single();
+        const { data, error } = await supabase.from('player_transfers').insert({ player_id: transfer.playerId, from_team_id: transfer.fromTeamId, to_team_id: transfer.toTeamId, transfer_date: transfer.transferDate, notes: transfer.notes, is_automated: false }).select().single();
         if (error) throw error;
-        setState(s => ({...s, playerTransfers: [...s.playerTransfers, mapPlayerTransfer(data)]}));
+        setState(s => ({...s, playerTransfers: [...(s.playerTransfers || []), mapPlayerTransfer(data)]}));
     }, [supabase]);
 
     const updatePlayerTransfer = useCallback(async (transfer: PlayerTransfer) => {
-        const { data, error } = await supabase.from('player_transfers').update({
-            player_id: transfer.playerId,
-            from_team_id: transfer.fromTeamId,
-            to_team_id: transfer.toTeamId,
-            transfer_date: transfer.transferDate,
-            notes: transfer.notes
-        }).eq('id', transfer.id).select().single();
+        const { data, error } = await supabase.from('player_transfers').update({ player_id: transfer.playerId, from_team_id: transfer.fromTeamId, to_team_id: transfer.toTeamId, transfer_date: transfer.transferDate, notes: transfer.notes }).eq('id', transfer.id).select().single();
         if (error) throw error;
-        setState(s => ({...s, playerTransfers: s.playerTransfers.map(t => t.id === transfer.id ? mapPlayerTransfer(data) : t)}));
+        setState(s => ({...s, playerTransfers: (s.playerTransfers || []).map(t => t.id === transfer.id ? mapPlayerTransfer(data) : t)}));
     }, [supabase]);
 
     const deletePlayerTransfer = useCallback(async (id: number) => {
         const { error } = await supabase.from('player_transfers').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, playerTransfers: s.playerTransfers.filter(t => t.id !== id)}));
+        setState(s => ({...s, playerTransfers: (s.playerTransfers || []).filter(t => t.id !== id)}));
     }, [supabase]);
     
     const addNotice = useCallback(async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error('The request to save the notice timed out after 10 seconds. This is often caused by a missing or misconfigured Row Level Security (RLS) policy on the "notices" table in your Supabase database.')),
-            10000
-          )
-        );
-    
-        const dbOperation = supabase.from('notices').insert({
-            title: notice.title,
-            message: notice.message,
-            level: notice.level,
-            expires_at: notice.expiresAt
-        }).select().single();
-    
-        try {
-            const { data, error } = await Promise.race([dbOperation, timeoutPromise]);
-    
-            if (error) {
-                throw error;
-            }
-    
-            setState(s => ({...s, notices: [...s.notices, mapNotice(data)]}));
-        } catch (error) {
-            // Re-throw the error from dbOperation or timeoutPromise
-            throw error;
-        }
+        const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('The request timed out. This may be due to a missing or misconfigured Row Level Security (RLS) policy on the "notices" table.')), 10000));
+        const dbOperation = supabase.from('notices').insert({ title: notice.title, message: notice.message, level: notice.level, expires_at: notice.expiresAt }).select().single();
+        const { data, error } = await Promise.race([dbOperation, timeoutPromise]);
+        if (error) throw error;
+        setState(s => ({...s, notices: [...(s.notices || []), mapNotice(data)]}));
     }, [supabase]);
 
     const deleteNotice = useCallback(async (id: number) => {
         const { error } = await supabase.from('notices').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, notices: s.notices.filter(n => n.id !== id)}));
+        setState(s => ({...s, notices: (s.notices || []).filter(n => n.id !== id)}));
     }, [supabase]);
 
     const updateRules = useCallback(async (content: string) => {
-        const { error } = await supabase
-            .from('game_rules')
-            .update({ content, updated_at: new Date().toISOString() })
-            .eq('id', 1);
-
+        const { error } = await supabase.from('game_rules').update({ content, updated_at: new Date().toISOString() }).eq('id', 1);
         if (error) {
             if (error.code === 'PGRST204') { 
                const { error: insertError } = await supabase.from('game_rules').insert({ id: 1, content });
                if (insertError) throw insertError;
-            } else {
-                throw error;
-            }
+            } else throw error;
         }
         setState(s => ({ ...s, rules: content }));
     }, [supabase]);
     
     const bulkAddOrUpdateTeams = useCallback(async (teamsData: CsvTeam[]) => {
         const clubNameMap = new Map<string, number>();
-        state.clubs.forEach(club => {
-            clubNameMap.set(club.name.toLowerCase(), club.id);
-        });
-
+        (state.clubs || []).forEach(club => clubNameMap.set(club.name.toLowerCase(), club.id));
         const teamsToUpsert = teamsData.map(t => {
             const clubId = clubNameMap.get(t.clubName.toLowerCase());
-            if (!clubId) {
-                 throw new Error(`Club "${t.clubName}" not found for team "${t.name}". Please ensure all clubs exist before importing teams.`);
-            }
-            return {
-                name: t.name,
-                short_name: t.shortName,
-                division: t.division,
-                logo_url: t.logoUrl,
-                club_id: clubId,
-            }
+            if (!clubId) throw new Error(`Club "${t.clubName}" not found for team "${t.name}".`);
+            return { name: t.name, short_name: t.shortName, division: t.division, logo_url: t.logoUrl, club_id: clubId };
         });
         const { error } = await supabase.from('teams').upsert(teamsToUpsert, { onConflict: 'name' });
         if (error) throw error;
-        await fetchData();
+        await fetchData('teams');
     }, [supabase, state.clubs, fetchData]);
 
     const bulkAddOrUpdatePlayers = useCallback(async (playersData: CsvPlayer[]) => {
         const teamNameMap = new Map<string, number>();
-        state.teams.forEach(team => {
-            teamNameMap.set(team.name.toLowerCase(), team.id);
-        });
-
+        (state.teams || []).forEach(team => teamNameMap.set(team.name.toLowerCase(), team.id));
         const playersToUpsert = playersData.map(p => {
             const teamId = teamNameMap.get(p.teamName.toLowerCase());
-            if (!teamId) {
-                throw new Error(`Team "${p.teamName}" not found for player "${p.name}". Please ensure all teams exist before importing players.`);
-            }
-            const { name, role, photoUrl, matches, aces, kills, blocks } = p;
-            return { 
-                name,
-                role,
-                photo_url: photoUrl,
-                team_id: teamId,
-                stats: {
-                    matches: parseInt(matches || '0', 10),
-                    aces: parseInt(aces || '0', 10),
-                    kills: parseInt(kills || '0', 10),
-                    blocks: parseInt(blocks || '0', 10),
-                }
-            };
+            if (!teamId) throw new Error(`Team "${p.teamName}" not found for player "${p.name}".`);
+            return { name: p.name, role: p.role, photo_url: p.photoUrl, team_id: teamId, stats: { matches: parseInt(p.matches || '0', 10), aces: parseInt(p.aces || '0', 10), kills: parseInt(p.kills || '0', 10), blocks: parseInt(p.blocks || '0', 10) } };
         });
-
         const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,team_id' });
         if (error) throw error;
-        await fetchData();
+        await fetchData('players');
     }, [supabase, state.teams, fetchData]);
     
     const updateSponsorsForTournament = useCallback(async (tournamentId: number, sponsorIds: number[]) => {
-        const { error: deleteError } = await supabase
-            .from('tournament_sponsors')
-            .delete()
-            .eq('tournament_id', tournamentId);
-        
+        const { error: deleteError } = await supabase.from('tournament_sponsors').delete().eq('tournament_id', tournamentId);
         if (deleteError) throw deleteError;
-
         if (sponsorIds.length > 0) {
-            const newLinks = sponsorIds.map(sponsor_id => ({
-                tournament_id: tournamentId,
-                sponsor_id,
-            }));
-            const { error: insertError } = await supabase
-                .from('tournament_sponsors')
-                .insert(newLinks);
-            
+            const newLinks = sponsorIds.map(sponsor_id => ({ tournament_id: tournamentId, sponsor_id }));
+            const { error: insertError } = await supabase.from('tournament_sponsors').insert(newLinks);
             if (insertError) throw insertError;
         }
-
         const { data, error } = await supabase.from('tournament_sponsors').select('*');
         if (error) throw error;
-        setState(s => ({
-            ...s,
-            tournamentSponsors: (data || []) as TournamentSponsor[]
-        }));
+        setState(s => ({ ...s, tournamentSponsors: (data || []) as TournamentSponsor[] }));
     }, [supabase]);
 
     const bulkUpdatePlayerTeam = useCallback(async (playerIds: number[], teamId: number | null) => {
-        // --- Automatic Transfer Logging ---
-        const playersToUpdate = state.players.filter(p => playerIds.includes(p.id));
-        const newTransfers = playersToUpdate
-            .filter(p => p.teamId !== teamId) // Only log if the team is actually changing
-            .map(p => ({
-                player_id: p.id,
-                from_team_id: p.teamId,
-                to_team_id: teamId,
-                transfer_date: new Date().toISOString(),
-                is_automated: true,
-                notes: 'Automated roster change via admin panel.'
-            }));
-
+        const playersToUpdate = (state.players || []).filter(p => playerIds.includes(p.id));
+        const newTransfers = playersToUpdate.filter(p => p.teamId !== teamId).map(p => ({ player_id: p.id, from_team_id: p.teamId, to_team_id: teamId, transfer_date: new Date().toISOString(), is_automated: true, notes: 'Automated roster change via admin panel.' }));
         if (newTransfers.length > 0) {
-            const { data: insertedTransfers, error: transferError } = await supabase
-                .from('player_transfers')
-                .insert(newTransfers)
-                .select();
+            const { data: insertedTransfers, error: transferError } = await supabase.from('player_transfers').insert(newTransfers).select();
             if (transferError) throw transferError;
-            if (insertedTransfers) {
-                setState(s => ({
-                    ...s,
-                    playerTransfers: [...s.playerTransfers, ...insertedTransfers.map(mapPlayerTransfer)]
-                }));
-            }
+            if (insertedTransfers) setState(s => ({ ...s, playerTransfers: [...(s.playerTransfers || []), ...insertedTransfers.map(mapPlayerTransfer)] }));
         }
-        // --- End of Transfer Logging ---
-
-        const { data: updatedPlayers, error } = await supabase
-            .from('players')
-            .update({ team_id: teamId })
-            .in('id', playerIds)
-            .select();
-        
+        const { data: updatedPlayers, error } = await supabase.from('players').update({ team_id: teamId }).in('id', playerIds).select();
         if (error) throw error;
-
         if (updatedPlayers) {
             const updatedPlayerMap = new Map(updatedPlayers.map(p => [p.id, mapPlayer(p)]));
-            // FIX: Broke down setState to help TS correctly infer the type of `newPlayers` as Player[],
-            // which in turn allows the `sort` method to work without type errors.
             setState(s => {
-                const newPlayers: Player[] = s.players.map(p => updatedPlayerMap.get(p.id) || p);
-                return {
-                    ...s,
-                    players: newPlayers.sort((a,b) => a.name.localeCompare(b.name))
-                };
+                const newPlayers: Player[] = (s.players || []).map(p => updatedPlayerMap.get(p.id) || p);
+                return { ...s, players: newPlayers.sort((a,b) => a.name.localeCompare(b.name)) };
             });
         }
     }, [supabase, state.players]);
 
     const getStandingsForTournament = useCallback((tournamentId: number): TeamStanding[] => {
-        const tournamentFixtures = state.fixtures.filter(
-            f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage
-        );
-
+        const tournamentFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage);
         const teamIdsInTournament = new Set<number>();
-        state.teams.forEach(team => {
-            const teamFixtures = state.fixtures.filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id) && !f.stage);
-            if (teamFixtures.length > 0) {
-                teamIdsInTournament.add(team.id);
-            }
+        (state.teams || []).forEach(team => {
+            const teamFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id) && !f.stage);
+            if (teamFixtures.length > 0) teamIdsInTournament.add(team.id);
         });
-
         const standingsMap = new Map<number, TeamStanding>();
-
         teamIdsInTournament.forEach(id => {
-            const team = state.teams.find(t => t.id === id);
-            if (team) {
-                standingsMap.set(id, {
-                    teamId: id,
-                    teamName: team.name,
-                    logoUrl: team.logoUrl,
-                    gamesPlayed: 0,
-                    wins: 0,
-                    draws: 0,
-                    losses: 0,
-                    goalsFor: 0,
-                    goalsAgainst: 0,
-                    goalDifference: 0,
-                    points: 0,
-                });
-            }
+            const team = (state.teams || []).find(t => t.id === id);
+            if (team) standingsMap.set(id, { teamId: id, teamName: team.name, logoUrl: team.logoUrl, gamesPlayed: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 });
         });
-
         tournamentFixtures.forEach(fixture => {
             const team1Standing = standingsMap.get(fixture.team1Id);
             const team2Standing = standingsMap.get(fixture.team2Id);
-            const score = fixture.score!;
-
             if (team1Standing && team2Standing) {
-                team1Standing.gamesPlayed++;
-                team2Standing.gamesPlayed++;
-
-                const team1TotalPoints = score.sets.reduce((sum, set) => sum + set.team1Points, 0);
-                const team2TotalPoints = score.sets.reduce((sum, set) => sum + set.team2Points, 0);
-                
-                team1Standing.goalsFor += team1TotalPoints;
-                team1Standing.goalsAgainst += team2TotalPoints;
-                team2Standing.goalsFor += team2TotalPoints;
-                team2Standing.goalsAgainst += team1TotalPoints;
-
-                if (score.team1Score > score.team2Score) {
-                    team1Standing.wins++;
-                    team2Standing.losses++;
-                    team1Standing.points += 3;
-                } else if (score.team2Score > score.team1Score) {
-                    team2Standing.wins++;
-                    team1Standing.losses++;
-                    team2Standing.points += 3;
-                } else {
-                    team1Standing.draws++;
-                    team2Standing.draws++;
-                    team1Standing.points += 1;
-                    team2Standing.points += 1;
-                }
+                team1Standing.gamesPlayed++; team2Standing.gamesPlayed++;
+                const team1TotalPoints = fixture.score!.sets.reduce((sum, set) => sum + set.team1Points, 0);
+                const team2TotalPoints = fixture.score!.sets.reduce((sum, set) => sum + set.team2Points, 0);
+                team1Standing.goalsFor += team1TotalPoints; team1Standing.goalsAgainst += team2TotalPoints;
+                team2Standing.goalsFor += team2TotalPoints; team2Standing.goalsAgainst += team1TotalPoints;
+                if (fixture.score!.team1Score > fixture.score!.team2Score) { team1Standing.wins++; team2Standing.losses++; team1Standing.points += 3; }
+                else if (fixture.score!.team2Score > fixture.score!.team1Score) { team2Standing.wins++; team1Standing.losses++; team2Standing.points += 3; }
+                else { team1Standing.draws++; team2Standing.draws++; team1Standing.points += 1; team2Standing.points += 1; }
             }
         });
-
         const standings = Array.from(standingsMap.values());
-        standings.forEach(s => {
-            s.goalDifference = s.goalsFor - s.goalsAgainst;
-        });
-        
+        standings.forEach(s => s.goalDifference = s.goalsFor - s.goalsAgainst);
         standings.sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
             if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
             if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
             return a.teamName.localeCompare(b.teamName);
         });
-
         return standings;
     }, [state.fixtures, state.teams]);
 
      const concludeLeaguePhase = useCallback(async (tournamentId: number) => {
-        const tournament = state.tournaments.find(t => t.id === tournamentId);
-        if (!tournament || tournament.phase !== 'round-robin') {
-            throw new Error('Tournament is not in the correct phase to conclude the league stage.');
-        }
-
+        const tournament = (state.tournaments || []).find(t => t.id === tournamentId);
+        if (!tournament || tournament.phase !== 'round-robin') throw new Error('Tournament is not in the correct phase.');
         const standings = getStandingsForTournament(tournamentId);
         const newFixtures: Omit<Fixture, 'id' | 'score'>[] = [];
         const now = new Date().toISOString();
-
         if (tournament.division === 'Division 1') {
-            if (standings.length < 8) throw new Error('Not enough teams with completed matches to generate Division 1 quarterfinals (requires 8).');
+            if (standings.length < 8) throw new Error('Not enough teams with completed matches (requires 8).');
             const top8 = standings.slice(0, 8);
-            const matchups = [
-                { team1Id: top8[0].teamId, team2Id: top8[7].teamId },
-                { team1Id: top8[3].teamId, team2Id: top8[4].teamId },
-                { team1Id: top8[1].teamId, team2Id: top8[6].teamId },
-                { team1Id: top8[2].teamId, team2Id: top8[5].teamId },
-            ];
-            matchups.forEach(match => {
-                newFixtures.push({
-                    tournamentId,
-                    team1Id: match.team1Id,
-                    team2Id: match.team2Id,
-                    ground: 'TBD',
-                    dateTime: now,
-                    status: 'upcoming',
-                    stage: 'quarter-final',
-                });
-            });
+            [{ t1: 0, t2: 7 }, { t1: 3, t2: 4 }, { t1: 1, t2: 6 }, { t1: 2, t2: 5 }].forEach(m => newFixtures.push({ tournamentId, team1Id: top8[m.t1].teamId, team2Id: top8[m.t2].teamId, ground: 'TBD', dateTime: now, status: 'upcoming', stage: 'quarter-final' }));
         } else if (tournament.division === 'Division 2') {
-            if (standings.length < 4) throw new Error('Not enough teams with completed matches to generate Division 2 semifinals (requires 4).');
+            if (standings.length < 4) throw new Error('Not enough teams with completed matches (requires 4).');
             const top4 = standings.slice(0, 4);
-            const matchups = [
-                { team1Id: top4[0].teamId, team2Id: top4[3].teamId },
-                { team1Id: top4[1].teamId, team2Id: top4[2].teamId },
-            ];
-            matchups.forEach(match => {
-                newFixtures.push({
-                    tournamentId,
-                    team1Id: match.team1Id,
-                    team2Id: match.team2Id,
-                    ground: 'TBD',
-                    dateTime: now,
-                    status: 'upcoming',
-                    stage: 'semi-final',
-                });
-            });
+            [{ t1: 0, t2: 3 }, { t1: 1, t2: 2 }].forEach(m => newFixtures.push({ tournamentId, team1Id: top4[m.t1].teamId, team2Id: top4[m.t2].teamId, ground: 'TBD', dateTime: now, status: 'upcoming', stage: 'semi-final' }));
         }
-
         if (newFixtures.length > 0) {
-            const fixturesToInsert = newFixtures.map(f => {
-                let refereeValue;
-                if (f.stage === 'quarter-final') refereeValue = 'KO_QF';
-                if (f.stage === 'semi-final') refereeValue = 'KO_SF';
-                if (f.stage === 'final') refereeValue = 'KO_FINAL';
-                
-                return {
-                    tournament_id: f.tournamentId,
-                    team1_id: f.team1Id,
-                    team2_id: f.team2Id,
-                    ground: f.ground,
-                    date_time: f.dateTime,
-                    status: f.status,
-                    referee: refereeValue,
-                };
-            });
+            const fixturesToInsert = newFixtures.map(f => ({ tournament_id: f.tournamentId, team1_id: f.team1Id, team2_id: f.team2Id, ground: f.ground, date_time: f.dateTime, status: f.status, referee: f.stage === 'quarter-final' ? 'KO_QF' : 'KO_SF' }));
             const { error: insertError } = await supabase.from('fixtures').insert(fixturesToInsert);
             if (insertError) throw insertError;
         }
-        
-        await fetchData();
+        await fetchData('fixtures');
+        await fetchData('tournaments');
     }, [supabase, state.tournaments, getStandingsForTournament, fetchData]);
 
     const getActiveNotice = useCallback((): Notice | null => {
+        if (!state.notices) return null;
         const now = new Date();
-        const activeNotices = state.notices
-            .filter(n => new Date(n.expiresAt) > now)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        
-        return activeNotices.length > 0 ? activeNotices[0] : null;
+        const activeNotices = state.notices.filter(n => new Date(n.expiresAt) > now).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return activeNotices[0] || null;
     }, [state.notices]);
 
     const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
-        const sponsorIds = state.tournamentSponsors
-            .filter(ts => ts.tournament_id === tournamentId)
-            .map(ts => ts.sponsor_id);
-        
-        return state.sponsors.filter(s => sponsorIds.includes(s.id));
+        const sponsorIds = (state.tournamentSponsors || []).filter(ts => ts.tournament_id === tournamentId).map(ts => ts.sponsor_id);
+        return (state.sponsors || []).filter(s => sponsorIds.includes(s.id));
     }, [state.tournamentSponsors, state.sponsors]);
 
-    const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => {
-        return state.tournaments.filter(t => t.division === division);
-    }, [state.tournaments]);
-
-    const getFixturesByTournament = useCallback((tournamentId: number) => {
-        return state.fixtures.filter(f => f.tournamentId === tournamentId)
-            .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-    }, [state.fixtures]);
-
-    const getClubById = useCallback((clubId: number | null) => {
-        if (clubId === null || clubId === undefined) return undefined;
-        return state.clubs.find(c => c.id === clubId);
-    }, [state.clubs]);
-
-    const getTeamById = useCallback((teamId: number | null) => {
-        if (teamId === null || teamId === undefined) return undefined;
-        return state.teams.find(t => t.id === teamId);
-    }, [state.teams]);
-
-    const getTeamsByClub = useCallback((clubId: number) => {
-        return state.teams.filter(t => t.clubId === clubId);
-    }, [state.teams]);
-
-    const getPlayersByTeam = useCallback((teamId: number) => {
-        return state.players.filter(p => p.teamId === teamId);
-    }, [state.players]);
-
+    const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => (state.tournaments || []).filter(t => t.division === division), [state.tournaments]);
+    const getFixturesByTournament = useCallback((tournamentId: number) => (state.fixtures || []).filter(f => f.tournamentId === tournamentId).sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()), [state.fixtures]);
+    const getClubById = useCallback((clubId: number | null) => (state.clubs || []).find(c => c.id === clubId), [state.clubs]);
+    const getTeamById = useCallback((teamId: number | null) => (state.teams || []).find(t => t.id === teamId), [state.teams]);
+    const getTeamsByClub = useCallback((clubId: number) => (state.teams || []).filter(t => t.clubId === clubId), [state.teams]);
+    const getPlayersByTeam = useCallback((teamId: number) => (state.players || []).filter(p => p.teamId === teamId), [state.players]);
     const getPlayersByClub = useCallback((clubId: number): Player[] => {
-        const clubTeamIds = state.teams
-            .filter(t => t.clubId === clubId)
-            .map(t => t.id);
-        
-        return state.players
-            .filter(p => p.teamId && clubTeamIds.includes(p.teamId))
-            .sort((a, b) => a.name.localeCompare(b.name));
+        const clubTeamIds = (state.teams || []).filter(t => t.clubId === clubId).map(t => t.id);
+        return (state.players || []).filter(p => p.teamId && clubTeamIds.includes(p.teamId)).sort((a, b) => a.name.localeCompare(b.name));
     }, [state.teams, state.players]);
-    
-    const getTransfersByPlayerId = useCallback((playerId: number) => {
-        return state.playerTransfers
-            .filter(t => t.playerId === playerId)
-            .sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime());
-    }, [state.playerTransfers]);
+    const getTransfersByPlayerId = useCallback((playerId: number) => (state.playerTransfers || []).filter(t => t.playerId === playerId).sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime()), [state.playerTransfers]);
 
-    const contextValue = useMemo(() => ({
+    const contextValue = {
         ...state,
-        addTournament,
-        updateTournament,
-        deleteTournament,
-        addClub,
-        updateClub,
-        deleteClub,
-        addTeam,
-        updateTeam,
-        deleteTeam,
-        addPlayer,
-        updatePlayer,
-        deletePlayer,
-        deleteAllPlayers,
-        addFixture,
-        updateFixture,
-        deleteFixture,
-        addSponsor,
-        updateSponsor,
-        deleteSponsor,
-        toggleSponsorShowInFooter,
-        addPlayerTransfer,
-        updatePlayerTransfer,
-        deletePlayerTransfer,
-        addNotice,
-        deleteNotice,
-        updateRules,
-        bulkAddOrUpdateTeams,
-        bulkAddOrUpdatePlayers,
-        updateSponsorsForTournament,
-        bulkUpdatePlayerTeam,
-        concludeLeaguePhase,
-        getActiveNotice,
-        getSponsorsForTournament,
-        getTournamentsByDivision,
-        getFixturesByTournament,
-        getClubById,
-        getTeamById,
-        getTeamsByClub,
-        getPlayersByTeam,
-        getPlayersByClub,
-        getTransfersByPlayerId,
-        getStandingsForTournament,
-    }), [
-        state, addTournament, updateTournament, deleteTournament, addClub,
-        updateClub, deleteClub, addTeam, updateTeam, deleteTeam, addPlayer,
-        updatePlayer, deletePlayer, deleteAllPlayers, addFixture, updateFixture, deleteFixture,
+        _internal_state: state,
+        tournaments: state.tournaments || [],
+        clubs: state.clubs || [],
+        teams: state.teams || [],
+        players: state.players || [],
+        fixtures: state.fixtures || [],
+        sponsors: state.sponsors || [],
+        tournamentSponsors: state.tournamentSponsors || [],
+        playerTransfers: state.playerTransfers || [],
+        notices: state.notices || [],
+        rules: state.rules || '',
+        fetchData,
+        addTournament, updateTournament, deleteTournament,
+        addClub, updateClub, deleteClub,
+        addTeam, updateTeam, deleteTeam,
+        addPlayer, updatePlayer, deletePlayer, deleteAllPlayers,
+        addFixture, updateFixture, deleteFixture,
         addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter,
         addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer,
         addNotice, deleteNotice,
-        updateRules, bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
-        updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase, getActiveNotice, getSponsorsForTournament, getTournamentsByDivision,
+        updateRules,
+        bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
+        updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase,
+        getActiveNotice, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
         getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament
-    ]);
+    };
 
     return (
-        <SportsDataContext.Provider value={contextValue}>
+        <SportsDataContext.Provider value={contextValue as SportsContextType}>
             {children}
         </SportsDataContext.Provider>
     );
@@ -1027,8 +583,20 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
 export const useSports = (): SportsContextType => {
     const context = useContext(SportsDataContext);
-    if (context === undefined) {
-        throw new Error('useSports must be used within a SportsDataProvider');
-    }
+    if (context === undefined) throw new Error('useSports must be used within a SportsDataProvider');
     return context;
+};
+
+export const useEntityData = <T extends EntityName>(entityName: T): { data: SportsState[T], loading: boolean } => {
+    // FIX: Destructure the new `_internal_state` property and use it for fetching logic and the return value.
+    // This resolves both the type error and the functional bug where data was not re-fetched.
+    const { fetchData, loading: loadingSet, _internal_state } = useSports();
+
+    useEffect(() => {
+        if (_internal_state[entityName] === null && !loadingSet.has(entityName)) {
+            fetchData(entityName);
+        }
+    }, [entityName, fetchData, _internal_state, loadingSet]);
+
+    return { data: _internal_state[entityName], loading: loadingSet.has(entityName) };
 };

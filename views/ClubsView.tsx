@@ -1,10 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Club } from '../types';
 
 interface ClubsViewProps {
   onSelectClub: (club: Club) => void;
 }
+
+const ClubCardSkeleton: React.FC = () => (
+    <div className="bg-secondary p-4 rounded-lg shadow-md text-center animate-pulse">
+        <div className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-accent bg-accent"></div>
+        <div className="h-6 w-3/4 mx-auto bg-accent rounded"></div>
+    </div>
+);
+
 
 const ClubCard: React.FC<{ club: Club, onSelect: () => void }> = ({ club, onSelect }) => (
   <div 
@@ -25,10 +33,10 @@ const ClubCard: React.FC<{ club: Club, onSelect: () => void }> = ({ club, onSele
 );
 
 export const ClubsView: React.FC<ClubsViewProps> = ({ onSelectClub }) => {
-  const { clubs } = useSports();
+  const { data: clubs, loading } = useEntityData('clubs');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredClubs = useMemo(() => clubs.filter(club => {
+  const filteredClubs = useMemo(() => (clubs || []).filter(club => {
       return club.name.toLowerCase().includes(searchTerm.toLowerCase());
   }), [clubs, searchTerm]);
 
@@ -53,7 +61,11 @@ export const ClubsView: React.FC<ClubsViewProps> = ({ onSelectClub }) => {
         </div>
       </div>
       
-      {filteredClubs.length > 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => <ClubCardSkeleton key={i} />)}
+        </div>
+      ) : filteredClubs.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredClubs.map(club => (
             <ClubCard key={club.id} club={club} onSelect={() => onSelectClub(club)} />

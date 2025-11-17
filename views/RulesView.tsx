@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 
 export const RulesView: React.FC = () => {
-    const { rules, updateRules, loading } = useSports();
+    const { updateRules } = useSports();
+    const { data: rules, loading } = useEntityData('rules');
     const { userProfile } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [content, setContent] = useState('');
@@ -38,7 +38,7 @@ export const RulesView: React.FC = () => {
     };
 
     const handleCancel = () => {
-        setContent(rules);
+        setContent(rules || '');
         setIsEditing(false);
         setError('');
     };
@@ -57,20 +57,16 @@ export const RulesView: React.FC = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ question, rules }),
+                body: JSON.stringify({ question, rules: content }),
             });
 
             if (!response.ok) {
                 let errorMessage = `An error occurred: ${response.status} ${response.statusText}`;
-                // Read the body as text first, as this is a safe operation that won't fail
-                // on non-JSON responses and only consumes the stream once.
                 const responseText = await response.text();
                 try {
-                    // Try to parse the text as JSON. If it works, we get a structured error.
                     const errorData = JSON.parse(responseText);
                     errorMessage = errorData.error?.message || responseText;
                 } catch (e) {
-                    // If parsing fails, it means the error was not JSON. Use the raw text.
                     errorMessage = responseText || errorMessage;
                 }
                 throw new Error(errorMessage);
@@ -94,10 +90,6 @@ export const RulesView: React.FC = () => {
     };
 
     const canEdit = userProfile?.role === 'admin' || userProfile?.role === 'content_editor';
-
-    if (loading) {
-        return <div className="text-center text-text-secondary">Loading rules...</div>;
-    }
 
     return (
         <div>
@@ -164,7 +156,14 @@ export const RulesView: React.FC = () => {
              </div>
 
             <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
-                {isEditing ? (
+                {loading ? (
+                     <div className="space-y-4 animate-pulse">
+                        <div className="h-6 bg-accent rounded w-3/4"></div>
+                        <div className="h-4 bg-accent rounded w-full"></div>
+                        <div className="h-4 bg-accent rounded w-5/6"></div>
+                        <div className="h-4 bg-accent rounded w-full"></div>
+                    </div>
+                ) : isEditing ? (
                     <div className="space-y-4">
                         <textarea
                             value={content}

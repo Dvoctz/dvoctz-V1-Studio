@@ -1,12 +1,31 @@
 import React, { useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import { NoticeBanner } from '../components/NoticeBanner';
-import type { Fixture, Team, Tournament, View } from '../types';
+import type { Fixture, Team, Tournament, View, Notice } from '../types';
 
 interface HomeViewProps {
   onNavigate: (view: View) => void;
   onSelectTournament: (tournament: Tournament) => void;
 }
+
+const FixtureCardSkeleton: React.FC = () => (
+    <div className="bg-secondary rounded-lg p-4 animate-pulse">
+        <div className="h-4 bg-accent rounded w-3/4 mx-auto mb-4"></div>
+        <div className="flex items-start justify-between space-x-2">
+            <div className="flex flex-col items-center w-2/5">
+                <div className="w-16 h-16 rounded-full bg-accent mb-2"></div>
+                <div className="h-5 bg-accent rounded w-full"></div>
+            </div>
+            <div className="pt-8 w-1/5 flex justify-center"><div className="h-6 w-8 bg-accent rounded"></div></div>
+            <div className="flex flex-col items-center w-2/5">
+                <div className="w-16 h-16 rounded-full bg-accent mb-2"></div>
+                <div className="h-5 bg-accent rounded w-full"></div>
+            </div>
+        </div>
+        <div className="h-3 bg-accent rounded w-1/2 mx-auto mt-5"></div>
+    </div>
+);
+
 
 const FixtureCard: React.FC<{ fixture: Fixture; team1?: Team; team2?: Team; }> = ({ fixture, team1, team2 }) => {
     if (!team1 || !team2) return null;
@@ -34,13 +53,16 @@ const FixtureCard: React.FC<{ fixture: Fixture; team1?: Team; team2?: Team; }> =
 
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
-    const { getTeamById, fixtures, getActiveNotice } = useSports();
-    const upcomingFixtures = useMemo(() => fixtures.filter(f => f.status === 'upcoming').slice(0, 3), [fixtures]);
+    const { getTeamById, getActiveNotice } = useSports();
+    const { data: fixtures, loading: fixturesLoading } = useEntityData('fixtures');
+    const { loading: noticesLoading } = useEntityData('notices');
+
+    const upcomingFixtures = useMemo(() => (fixtures || []).filter(f => f.status === 'upcoming').slice(0, 3), [fixtures]);
     const activeNotice = getActiveNotice();
 
     return (
         <div className="space-y-12">
-            {activeNotice && <NoticeBanner notice={activeNotice} />}
+            {!noticesLoading && activeNotice && <NoticeBanner notice={activeNotice} />}
 
             <div className="text-center p-8 bg-secondary rounded-xl shadow-lg">
                 <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Welcome to DVOC Tanzania</h1>
@@ -61,9 +83,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
              <div>
                 <h2 className="text-3xl font-bold text-center mb-6">Upcoming Matches</h2>
                 <div className="grid md:grid-cols-3 gap-6">
-                    {upcomingFixtures.map(fixture => (
-                        <FixtureCard key={fixture.id} fixture={fixture} team1={getTeamById(fixture.team1Id)} team2={getTeamById(fixture.team2Id)} />
-                    ))}
+                    {fixturesLoading ? (
+                        <>
+                            <FixtureCardSkeleton />
+                            <FixtureCardSkeleton />
+                            <FixtureCardSkeleton />
+                        </>
+                    ) : (
+                        upcomingFixtures.map(fixture => (
+                            <FixtureCard key={fixture.id} fixture={fixture} team1={getTeamById(fixture.team1Id)} team2={getTeamById(fixture.team2Id)} />
+                        ))
+                    )}
                 </div>
             </div>
         </div>

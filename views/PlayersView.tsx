@@ -1,6 +1,22 @@
 import React, { useState, useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Player } from '../types';
+
+const PlayerCardSkeleton: React.FC = () => (
+    <div className="bg-secondary rounded-lg shadow-lg overflow-hidden animate-pulse">
+        <div className="h-48 bg-accent"></div>
+        <div className="p-4">
+            <div className="h-5 bg-accent rounded w-3/4 mb-2"></div>
+            <div className="h-4 bg-accent rounded w-1/2"></div>
+            <div className="grid grid-cols-4 gap-2 mt-4">
+                <div className="space-y-1"><div className="h-4 bg-accent rounded"></div><div className="h-3 bg-accent rounded"></div></div>
+                <div className="space-y-1"><div className="h-4 bg-accent rounded"></div><div className="h-3 bg-accent rounded"></div></div>
+                <div className="space-y-1"><div className="h-4 bg-accent rounded"></div><div className="h-3 bg-accent rounded"></div></div>
+                <div className="space-y-1"><div className="h-4 bg-accent rounded"></div><div className="h-3 bg-accent rounded"></div></div>
+            </div>
+        </div>
+    </div>
+);
 
 const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ player, onSelect }) => {
     const { getTeamById } = useSports();
@@ -48,14 +64,15 @@ const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ playe
 };
 
 export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> = ({ onSelectPlayer }) => {
-  const { players } = useSports();
+  const { data: players, loading: playersLoading } = useEntityData('players');
+  const { loading: teamsLoading } = useEntityData('teams');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'freeAgents'>('all');
 
   const filteredPlayers = useMemo(() => {
-      let playerList = players;
+      let playerList = players || [];
       if (activeTab === 'freeAgents') {
-          playerList = players.filter(p => p.teamId === null);
+          playerList = playerList.filter(p => p.teamId === null);
       }
       return playerList.filter(player => {
         return player.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -70,6 +87,8 @@ export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> 
       {children}
     </button>
   );
+
+  const isLoading = playersLoading || teamsLoading;
 
   return (
     <div>
@@ -97,7 +116,11 @@ export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> 
             <TabButton tab="freeAgents">Free Agents</TabButton>
       </div>
 
-      {filteredPlayers.length > 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => <PlayerCardSkeleton key={i} />)}
+        </div>
+      ) : filteredPlayers.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredPlayers.map(player => (
             <PlayerCard key={player.id} player={player} onSelect={() => onSelectPlayer(player)} />

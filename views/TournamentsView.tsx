@@ -1,8 +1,5 @@
-
-
 import React, { useState, useMemo } from 'react';
-// FIX: Replaced useSportsData with useSports and updated the import path.
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Tournament } from '../types';
 
 interface TournamentsViewProps {
@@ -18,7 +15,7 @@ const TournamentCard: React.FC<{ tournament: Tournament; onSelect: () => void; }
         <h3 className="text-xl font-bold text-white">{tournament.name}</h3>
         <p className="text-sm text-highlight">{tournament.division}</p>
     </div>
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-text-secondary" fill="none" viewBox="0 0 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
     </svg>
   </div>
@@ -28,14 +25,15 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
   const [activeTab, setActiveTab] = useState<'d1' | 'd2'>('d1');
   const [searchTerm, setSearchTerm] = useState('');
   const { getTournamentsByDivision } = useSports();
+  const { data: tournaments, loading } = useEntityData('tournaments');
   
   const division1Tournaments = useMemo(() => {
     return getTournamentsByDivision('Division 1').filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [getTournamentsByDivision, searchTerm]);
+  }, [getTournamentsByDivision, searchTerm, tournaments]); // Add tournaments dependency
 
   const division2Tournaments = useMemo(() => {
     return getTournamentsByDivision('Division 2').filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [getTournamentsByDivision, searchTerm]);
+  }, [getTournamentsByDivision, searchTerm, tournaments]); // Add tournaments dependency
   
   const displayedTournaments = activeTab === 'd1' ? division1Tournaments : division2Tournaments;
 
@@ -77,7 +75,9 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
         </div>
       </div>
       {renderTabs()}
-      {displayedTournaments.length > 0 ? (
+      {loading ? (
+        <div className="text-center py-10 text-text-secondary">Loading tournaments...</div>
+      ) : displayedTournaments.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {displayedTournaments.map(t => (
             <TournamentCard key={t.id} tournament={t} onSelect={() => onSelectTournament(t)} />

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dvoc-tanzania-cache-v2'; // Increment version
+const CACHE_NAME = 'dvoc-tanzania-cache-v3'; // Increment version to force update
 const APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -23,61 +23,6 @@ self.addEventListener('install', event => {
   );
 });
 
-self.addEventListener('fetch', event => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Don't cache API calls or non-GET requests
-  if (request.method !== 'GET' || url.hostname.includes('supabase.co')) {
-    // Just fetch from the network without trying to cache
-    return;
-  }
-
-  // For app shell files (HTML, JS, CSS), use a Network Falling Back to Cache strategy.
-  // This ensures users get the latest version if online.
-  if (APP_SHELL_URLS.map(u => new URL(u, self.location.origin).pathname).includes(url.pathname) || request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          // If fetch is successful and returns a valid response, update the cache.
-          if (response.ok) {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // If the network fails, serve the main page from the cache.
-          return caches.match(request.mode === 'navigate' ? '/index.html' : request);
-        })
-    );
-    return;
-  }
-
-  // For all other requests (e.g., images not in the initial cache), use a Cache First strategy.
-  event.respondWith(
-    caches.match(request)
-      .then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(request).then(networkResponse => {
-          if (networkResponse.ok) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return networkResponse;
-        });
-      })
-  );
-});
-
-
-// Clean up old caches when a new service worker is activated
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
@@ -90,6 +35,57 @@ self.addEventListener('activate', event => {
           }
         })
       );
+    }).then(() => self.clients.claim()) // Take control of all clients immediately
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Ignore Supabase API calls and non-GET requests entirely.
+  if (request.method !== 'GET' || url.hostname.includes('supabase.co')) {
+    return;
+  }
+
+  // Use Stale-While-Revalidate for app shell resources
+  if (APP_SHELL_URLS.map(u => new URL(u, self.location.origin).pathname).includes(url.pathname) || request.mode === 'navigate') {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(cache => {
+        return cache.match(request.mode === 'navigate' ? '/index.html' : request).then(cachedResponse => {
+          const fetchPromise = fetch(request).then(networkResponse => {
+            if (networkResponse.ok) {
+              cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => {
+            // This catch is for when the network request itself fails.
+            // If we have a cached response, we've already returned it.
+            // If not, the user will see the browser's offline page.
+          });
+          // Return cached response immediately if available, while the network fetch happens in the background.
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+
+  // Use Cache First for other static assets (e.g., images)
+  event.respondWith(
+    caches.match(request).then(cachedResponse => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(request).then(networkResponse => {
+        if (networkResponse.ok) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseToCache);
+          });
+        }
+        return networkResponse;
+      });
     })
   );
 });
