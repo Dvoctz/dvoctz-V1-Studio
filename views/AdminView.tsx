@@ -1915,6 +1915,7 @@ const NoticeBoardAdmin = () => {
     const { notices, addNotice, deleteNotice } = useSports();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [error, setError] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
     const activeNotices = useMemo(() => {
         const now = new Date();
@@ -1925,11 +1926,14 @@ const NoticeBoardAdmin = () => {
 
     const handleSave = async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
         setError('');
+        setIsSaving(true);
         try {
             await addNotice(notice);
             setIsModalOpen(false);
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || 'Failed to publish notice. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -1969,14 +1973,14 @@ const NoticeBoardAdmin = () => {
             </div>
             {isModalOpen && (
                 <FormModal title="Add New Notice" onClose={() => setIsModalOpen(false)}>
-                    <NoticeForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} error={error} />
+                    <NoticeForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} error={error} isSaving={isSaving} />
                 </FormModal>
             )}
         </AdminSection>
     );
 };
 
-const NoticeForm: React.FC<{ onSave: (notice: Omit<Notice, 'id' | 'createdAt'>) => void, onCancel: () => void, error: string | null }> = ({ onSave, onCancel, error }) => {
+const NoticeForm: React.FC<{ onSave: (notice: Omit<Notice, 'id' | 'createdAt'>) => void, onCancel: () => void, error: string | null, isSaving: boolean }> = ({ onSave, onCancel, error, isSaving }) => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     
@@ -2005,25 +2009,27 @@ const NoticeForm: React.FC<{ onSave: (notice: Omit<Notice, 'id' | 'createdAt'>) 
             {error && <ErrorMessage message={error} />}
             <div>
                 <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" type="text" value={formData.title} onChange={handleChange} required />
+                <Input id="title" name="title" type="text" value={formData.title} onChange={handleChange} required disabled={isSaving}/>
             </div>
             <div>
                 <Label htmlFor="message">Message</Label>
-                <Textarea id="message" name="message" value={formData.message} onChange={handleChange} required rows={4} />
+                <Textarea id="message" name="message" value={formData.message} onChange={handleChange} required rows={4} disabled={isSaving}/>
             </div>
              <div>
                 <Label htmlFor="level">Notice Level</Label>
-                <Select id="level" name="level" value={formData.level} onChange={handleChange} required>
+                <Select id="level" name="level" value={formData.level} onChange={handleChange} required disabled={isSaving}>
                     {noticeLevels.map(level => <option key={level} value={level}>{level}</option>)}
                 </Select>
             </div>
              <div>
                 <Label htmlFor="expiresAt">Expiration Date</Label>
-                <Input id="expiresAt" name="expiresAt" type="date" value={formData.expiresAt} onChange={handleChange} required />
+                <Input id="expiresAt" name="expiresAt" type="date" value={formData.expiresAt} onChange={handleChange} required disabled={isSaving}/>
             </div>
             <div className="flex justify-end space-x-2">
-                <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
-                <Button type="submit">Publish Notice</Button>
+                <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500" disabled={isSaving}>Cancel</Button>
+                <Button type="submit" disabled={isSaving}>
+                    {isSaving ? 'Publishing...' : 'Publish Notice'}
+                </Button>
             </div>
         </form>
     );
