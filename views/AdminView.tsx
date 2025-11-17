@@ -1439,10 +1439,10 @@ const PlayerTransfersAdmin = () => {
     const handleSave = async (transfer: PlayerTransfer | Partial<Omit<PlayerTransfer, 'id' | 'isAutomated'>>) => {
         setError(null);
         try {
-            // FIX: The 'in' operator type guard is incompatible with the `Omit` in `Partial<Omit<...>>`.
-            // A direct property check on a cast object is used instead to determine if it's an existing record.
-            if ((transfer as PlayerTransfer).id) {
-                await updatePlayerTransfer(transfer as PlayerTransfer);
+            // FIX: Replaced an incorrect type assertion with a proper 'in' operator type guard.
+            // This correctly narrows the type to `PlayerTransfer` for existing records.
+            if ('id' in transfer && transfer.id) {
+                await updatePlayerTransfer(transfer);
             } else {
                 await addPlayerTransfer(transfer as Omit<PlayerTransfer, 'id' | 'isAutomated'>);
             }

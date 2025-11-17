@@ -38,8 +38,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
     setIsMenuOpen(false);
   };
   
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setIsMenuOpen(false);
     onNavigate('home');
   }

@@ -105,9 +105,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
     const logout = async () => {
         await supabase.auth.signOut();
-        setCurrentUser(null);
-        setUserProfile(null);
-        setSession(null);
+        // The onAuthStateChange listener will automatically update state.
     };
 
     return (
