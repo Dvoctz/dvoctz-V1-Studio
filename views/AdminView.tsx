@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
@@ -1924,7 +1924,7 @@ const NoticeBoardAdmin = () => {
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [notices]);
 
-    const handleSave = async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
+    const handleSave = useCallback(async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
         setError('');
         setIsSaving(true);
         try {
@@ -1932,10 +1932,12 @@ const NoticeBoardAdmin = () => {
             setIsModalOpen(false);
         } catch (err: any) {
             setError(err.message || 'Failed to publish notice. Please try again.');
+            // Re-throw the error to let the caller know it failed.
+            throw err;
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [addNotice]);
 
     const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this notice immediately?')) {
@@ -1980,7 +1982,12 @@ const NoticeBoardAdmin = () => {
     );
 };
 
-const NoticeForm: React.FC<{ onSave: (notice: Omit<Notice, 'id' | 'createdAt'>) => void, onCancel: () => void, error: string | null, isSaving: boolean }> = ({ onSave, onCancel, error, isSaving }) => {
+const NoticeForm: React.FC<{ 
+    onSave: (notice: Omit<Notice, 'id' | 'createdAt'>) => Promise<void>, 
+    onCancel: () => void, 
+    error: string | null, 
+    isSaving: boolean 
+}> = ({ onSave, onCancel, error, isSaving }) => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     
@@ -1995,11 +2002,17 @@ const NoticeForm: React.FC<{ onSave: (notice: Omit<Notice, 'id' | 'createdAt'>) 
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const expiryDate = new Date(formData.expiresAt);
         expiryDate.setHours(23, 59, 59, 999);
-        onSave({ ...formData, expiresAt: expiryDate.toISOString() });
+        try {
+            await onSave({ ...formData, expiresAt: expiryDate.toISOString() });
+        } catch (err) {
+            // Error is already set in the parent component, so we don't need to do anything here.
+            // The purpose of this try/catch is to prevent the form submission from crashing.
+            console.error("Save operation failed:", err);
+        }
     };
     
     const noticeLevels: NoticeLevel[] = ['Information', 'Warning', 'Urgent'];
