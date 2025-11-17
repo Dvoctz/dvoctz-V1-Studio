@@ -1,23 +1,24 @@
-const CACHE_NAME = 'dvoc-tanzania-cache-v1';
-const urlsToCache = [
+const CACHE_NAME = 'dvoc-tanzania-cache-v2'; // Increment version
+const APP_SHELL_URLS = [
   '/',
   '/index.html',
   '/bundle.js',
+  '/bundle.css',
+  '/manifest.json',
   '/icon-192.svg',
   '/icon-512.svg',
   'https://rsms.me/inter/inter.css'
 ];
 
 self.addEventListener('install', event => {
-  // Perform install steps
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        console.log('Opened cache and caching app shell');
+        return cache.addAll(APP_SHELL_URLS);
       })
       .catch(error => {
-        console.error('Failed to cache during install:', error);
+        console.error('Failed to cache app shell during install:', error);
       })
   );
 });
@@ -26,45 +27,44 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // We only want to handle GET requests.
-  if (request.method !== 'GET') {
+  // Don't cache API calls or non-GET requests
+  if (request.method !== 'GET' || url.hostname.includes('supabase.co')) {
+    // Just fetch from the network without trying to cache
     return;
   }
 
-  // Network First strategy for HTML and the main JS bundle.
-  // This ensures users always get the latest app code when online.
-  if (request.mode === 'navigate' || url.pathname.endsWith('/bundle.js')) {
+  // For app shell files (HTML, JS, CSS), use a Network Falling Back to Cache strategy.
+  // This ensures users get the latest version if online.
+  if (APP_SHELL_URLS.map(u => new URL(u, self.location.origin).pathname).includes(url.pathname) || request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then(response => {
-          // If fetch is successful, clone it and cache it for offline use.
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseToCache);
-          });
+          // If fetch is successful and returns a valid response, update the cache.
+          if (response.ok) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, responseToCache);
+            });
+          }
           return response;
         })
         .catch(() => {
-          // If the network fails, try to serve the response from the cache.
-          return caches.match(request);
+          // If the network fails, serve the main page from the cache.
+          return caches.match(request.mode === 'navigate' ? '/index.html' : request);
         })
     );
     return;
   }
 
-  // Cache First strategy for all other static assets (fonts, icons, etc.) for performance.
+  // For all other requests (e.g., images not in the initial cache), use a Cache First strategy.
   event.respondWith(
     caches.match(request)
       .then(response => {
-        // If we have a cached response, return it.
         if (response) {
           return response;
         }
-
-        // Otherwise, fetch from the network.
         return fetch(request).then(networkResponse => {
-          // Check if we received a valid response and if it's a cacheable asset.
-          if (networkResponse && networkResponse.status === 200 && isCacheable(request)) {
+          if (networkResponse.ok) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then(cache => {
               cache.put(request, responseToCache);
@@ -85,6 +85,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -92,13 +93,3 @@ self.addEventListener('activate', event => {
     })
   );
 });
-
-function isCacheable(request) {
-    const url = new URL(request.url);
-    // Don't cache API calls to Supabase
-    if (url.hostname.includes('supabase.co')) {
-        return false;
-    }
-    // Cache local assets and known CDN assets
-    return url.origin === self.location.origin || url.hostname === 'rsms.me';
-}
