@@ -559,14 +559,32 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const addNotice = useCallback(async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
-        const { data, error } = await supabase.from('notices').insert({
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('The request to save the notice timed out after 10 seconds. This is often caused by a missing or misconfigured Row Level Security (RLS) policy on the "notices" table in your Supabase database.')),
+            10000
+          )
+        );
+    
+        const dbOperation = supabase.from('notices').insert({
             title: notice.title,
             message: notice.message,
             level: notice.level,
             expires_at: notice.expiresAt
         }).select().single();
-        if (error) throw error;
-        setState(s => ({...s, notices: [...s.notices, mapNotice(data)]}));
+    
+        try {
+            const { data, error } = await Promise.race([dbOperation, timeoutPromise]);
+    
+            if (error) {
+                throw error;
+            }
+    
+            setState(s => ({...s, notices: [...s.notices, mapNotice(data)]}));
+        } catch (error) {
+            // Re-throw the error from dbOperation or timeoutPromise
+            throw error;
+        }
     }, [supabase]);
 
     const deleteNotice = useCallback(async (id: number) => {
