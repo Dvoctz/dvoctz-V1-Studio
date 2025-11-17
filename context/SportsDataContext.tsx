@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer } from '../supabaseClient';
-import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice } from '../types';
 
 interface SportsState {
     tournaments: Tournament[];
@@ -13,6 +13,7 @@ interface SportsState {
     sponsors: Sponsor[];
     tournamentSponsors: TournamentSponsor[];
     playerTransfers: PlayerTransfer[];
+    notices: Notice[];
     rules: string;
     loading: boolean;
 }
@@ -45,12 +46,15 @@ interface SportsContextType extends SportsState {
     addPlayerTransfer: (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => Promise<void>;
     updatePlayerTransfer: (transfer: PlayerTransfer) => Promise<void>;
     deletePlayerTransfer: (id: number) => Promise<void>;
+    addNotice: (notice: Omit<Notice, 'id' | 'createdAt'>) => Promise<void>;
+    deleteNotice: (id: number) => Promise<void>;
     updateRules: (content: string) => Promise<void>;
     bulkAddOrUpdateTeams: (teams: CsvTeam[]) => Promise<void>;
     bulkAddOrUpdatePlayers: (players: CsvPlayer[]) => Promise<void>;
     updateSponsorsForTournament: (tournamentId: number, sponsorIds: number[]) => Promise<void>;
     bulkUpdatePlayerTeam: (playerIds: number[], teamId: number | null) => Promise<void>;
     concludeLeaguePhase: (tournamentId: number) => Promise<void>;
+    getActiveNotice: () => Notice | null;
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
     getFixturesByTournament: (tournamentId: number) => Fixture[];
@@ -102,6 +106,15 @@ const mapTournament = (t: any): Omit<Tournament, 'phase'> => ({
   id: t.id,
   name: t.name,
   division: t.division,
+});
+
+const mapNotice = (n: any): Notice => ({
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    level: n.level,
+    expiresAt: n.expires_at,
+    createdAt: n.created_at,
 });
 
 const mapFixture = (f: any): Fixture => {
@@ -176,6 +189,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         sponsors: [],
         tournamentSponsors: [],
         playerTransfers: [],
+        notices: [],
         rules: '',
         loading: true,
     });
@@ -192,6 +206,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 { data: sponsorsData, error: sponsorsError },
                 { data: tournamentSponsorsData, error: tournamentSponsorsError },
                 { data: playerTransfersData, error: playerTransfersError },
+                { data: noticesData, error: noticesError },
                 { data: rulesData, error: rulesError },
             ] = await Promise.all([
                 supabase.from('tournaments').select('*').order('name'),
@@ -202,6 +217,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 supabase.from('sponsors').select('*').order('name'),
                 supabase.from('tournament_sponsors').select('*'),
                 supabase.from('player_transfers').select('*'),
+                supabase.from('notices').select('*'),
                 supabase.from('game_rules').select('content').limit(1).maybeSingle(),
             ]);
 
@@ -213,6 +229,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (sponsorsError) throw sponsorsError;
             if (tournamentSponsorsError) throw tournamentSponsorsError;
             if (playerTransfersError) throw playerTransfersError;
+            if (noticesError) throw noticesError;
             if (rulesError) {
                  console.warn('Could not fetch game rules. This is non-critical.', rulesError);
             }
@@ -241,12 +258,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 sponsors: (sponsorsData || []).map(mapSponsor),
                 tournamentSponsors: (tournamentSponsorsData || []) as TournamentSponsor[],
                 playerTransfers: (playerTransfersData || []).map(mapPlayerTransfer),
+                notices: (noticesData || []).map(mapNotice),
                 rules: rulesData?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.',
                 loading: false,
             });
         } catch (error) {
             console.error(
-                "Error fetching data from Supabase. This could be due to incorrect credentials, missing tables (including `game_rules` and `player_transfers`), or misconfigured Row Level Security policies. Please check your Supabase setup.",
+                "Error fetching data from Supabase. This could be due to incorrect credentials, missing tables (including `game_rules`, `player_transfers`, and `notices`), or misconfigured Row Level Security policies. Please check your Supabase setup.",
                 error
             );
             setState(s => ({...s, loading: false}));
@@ -538,6 +556,23 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { error } = await supabase.from('player_transfers').delete().eq('id', id);
         if (error) throw error;
         setState(s => ({...s, playerTransfers: s.playerTransfers.filter(t => t.id !== id)}));
+    }, [supabase]);
+    
+    const addNotice = useCallback(async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
+        const { data, error } = await supabase.from('notices').insert({
+            title: notice.title,
+            message: notice.message,
+            level: notice.level,
+            expires_at: notice.expiresAt
+        }).select().single();
+        if (error) throw error;
+        setState(s => ({...s, notices: [...s.notices, mapNotice(data)]}));
+    }, [supabase]);
+
+    const deleteNotice = useCallback(async (id: number) => {
+        const { error } = await supabase.from('notices').delete().eq('id', id);
+        if (error) throw error;
+        setState(s => ({...s, notices: s.notices.filter(n => n.id !== id)}));
     }, [supabase]);
 
     const updateRules = useCallback(async (content: string) => {
@@ -848,6 +883,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         await fetchData();
     }, [supabase, state.tournaments, getStandingsForTournament, fetchData]);
 
+    const getActiveNotice = useCallback((): Notice | null => {
+        const now = new Date();
+        const activeNotices = state.notices
+            .filter(n => new Date(n.expiresAt) > now)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        return activeNotices.length > 0 ? activeNotices[0] : null;
+    }, [state.notices]);
 
     const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
         const sponsorIds = state.tournamentSponsors
@@ -925,12 +968,15 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         addPlayerTransfer,
         updatePlayerTransfer,
         deletePlayerTransfer,
+        addNotice,
+        deleteNotice,
         updateRules,
         bulkAddOrUpdateTeams,
         bulkAddOrUpdatePlayers,
         updateSponsorsForTournament,
         bulkUpdatePlayerTeam,
         concludeLeaguePhase,
+        getActiveNotice,
         getSponsorsForTournament,
         getTournamentsByDivision,
         getFixturesByTournament,
@@ -947,8 +993,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         updatePlayer, deletePlayer, deleteAllPlayers, addFixture, updateFixture, deleteFixture,
         addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter,
         addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer,
+        addNotice, deleteNotice,
         updateRules, bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
-        updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase, getSponsorsForTournament, getTournamentsByDivision,
+        updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase, getActiveNotice, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
         getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament
     ]);

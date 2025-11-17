@@ -103,3 +103,14 @@ export interface PlayerTransfer {
   notes: string | null;
   isAutomated: boolean;
 }
+
+export type NoticeLevel = 'Information' | 'Warning' | 'Urgent';
+
+export interface Notice {
+  id: number;
+  title: string;
+  message: string;
+  level: NoticeLevel;
+  expiresAt: string;
+  createdAt: string;
+}

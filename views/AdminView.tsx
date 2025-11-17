@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
-import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club, PlayerTransfer } from '../types';
+import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club, PlayerTransfer, Notice, NoticeLevel } from '../types';
 
 // Reusable UI Components
 const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -33,7 +33,7 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
 );
 
 const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-    <textarea {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight" />
+    <textarea {...props} className={`w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight ${props.className || ''}`} />
 );
 
 
@@ -1830,6 +1830,7 @@ const availableTabs: AdminTab[] = [
     { id: 'players', label: 'Players', roles: ['admin', 'team_manager'] },
     { id: 'transfers', label: 'Player Transfers', roles: ['admin'] },
     { id: 'fixtures', label: 'Fixtures', roles: ['admin', 'fixture_manager'] },
+    { id: 'notice-board', label: 'Notice Board', roles: ['admin', 'content_editor'] },
     { id: 'sponsors', label: 'Sponsors', roles: ['admin', 'content_editor'] },
     { id: 'bulk-import', label: 'Bulk Import', roles: ['admin', 'team_manager'] },
     { id: 'export', label: 'Export Data', roles: ['admin'] },
@@ -1869,6 +1870,7 @@ export const AdminView: React.FC = () => {
             case 'players': return <PlayersAdmin />;
             case 'transfers': return <PlayerTransfersAdmin />;
             case 'fixtures': return <FixturesAdmin />;
+            case 'notice-board': return <NoticeBoardAdmin />;
             case 'sponsors': return <SponsorsAdmin />;
             case 'bulk-import': return <BulkImportAdmin />;
             case 'export': return <ExportAdmin />;
@@ -1906,5 +1908,123 @@ export const AdminView: React.FC = () => {
                 </div>
             )}
         </div>
+    );
+};
+
+const NoticeBoardAdmin = () => {
+    const { notices, addNotice, deleteNotice } = useSports();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [error, setError] = useState('');
+
+    const activeNotices = useMemo(() => {
+        const now = new Date();
+        return notices
+            .filter(n => new Date(n.expiresAt) > now)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }, [notices]);
+
+    const handleSave = async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
+        setError('');
+        try {
+            await addNotice(notice);
+            setIsModalOpen(false);
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this notice immediately?')) {
+            try {
+                await deleteNotice(id);
+            } catch (err: any) {
+                alert(`Failed to delete notice: ${err.message}`);
+            }
+        }
+    };
+
+    return (
+        <AdminSection title="Notice Board">
+            <div className="flex justify-between items-center mb-4">
+                <p className="text-text-secondary">Create or remove site-wide announcements.</p>
+                <Button onClick={() => setIsModalOpen(true)}>Add New Notice</Button>
+            </div>
+            <div className="mt-4 space-y-3">
+                {activeNotices.length > 0 ? activeNotices.map(notice => (
+                    <div key={notice.id} className="p-4 bg-accent rounded-lg">
+                        <div className="flex justify-between items-start gap-4">
+                            <div>
+                                <p className="font-bold text-white">{notice.title}</p>
+                                <p className="text-sm text-text-primary mt-1">{notice.message}</p>
+                                <p className="text-xs text-text-secondary mt-2">
+                                    Expires on: {new Date(notice.expiresAt).toLocaleDateString()}
+                                </p>
+                            </div>
+                            <Button onClick={() => handleDelete(notice.id)} className="bg-red-600 hover:bg-red-500 flex-shrink-0">Delete</Button>
+                        </div>
+                    </div>
+                )) : (
+                    <p className="text-center text-text-secondary py-4">There are no active notices.</p>
+                )}
+            </div>
+            {isModalOpen && (
+                <FormModal title="Add New Notice" onClose={() => setIsModalOpen(false)}>
+                    <NoticeForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} error={error} />
+                </FormModal>
+            )}
+        </AdminSection>
+    );
+};
+
+const NoticeForm: React.FC<{ onSave: (notice: Omit<Notice, 'id' | 'createdAt'>) => void, onCancel: () => void, error: string | null }> = ({ onSave, onCancel, error }) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const [formData, setFormData] = useState({
+        title: '',
+        message: '',
+        level: 'Information' as NoticeLevel,
+        expiresAt: tomorrow.toISOString().split('T')[0],
+    });
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const expiryDate = new Date(formData.expiresAt);
+        expiryDate.setHours(23, 59, 59, 999);
+        onSave({ ...formData, expiresAt: expiryDate.toISOString() });
+    };
+    
+    const noticeLevels: NoticeLevel[] = ['Information', 'Warning', 'Urgent'];
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div>
+                <Label htmlFor="title">Title</Label>
+                <Input id="title" name="title" type="text" value={formData.title} onChange={handleChange} required />
+            </div>
+            <div>
+                <Label htmlFor="message">Message</Label>
+                <Textarea id="message" name="message" value={formData.message} onChange={handleChange} required rows={4} />
+            </div>
+             <div>
+                <Label htmlFor="level">Notice Level</Label>
+                <Select id="level" name="level" value={formData.level} onChange={handleChange} required>
+                    {noticeLevels.map(level => <option key={level} value={level}>{level}</option>)}
+                </Select>
+            </div>
+             <div>
+                <Label htmlFor="expiresAt">Expiration Date</Label>
+                <Input id="expiresAt" name="expiresAt" type="date" value={formData.expiresAt} onChange={handleChange} required />
+            </div>
+            <div className="flex justify-end space-x-2">
+                <Button type="button" onClick={onCancel} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                <Button type="submit">Publish Notice</Button>
+            </div>
+        </form>
     );
 };
