@@ -34,6 +34,7 @@ interface SportsContextType extends SportsState {
     addPlayer: (player: Omit<Player, 'id'> & { photoFile?: File }) => Promise<void>;
     updatePlayer: (player: Player & { photoFile?: File }) => Promise<void>;
     deletePlayer: (id: number) => Promise<void>;
+    deleteAllPlayers: () => Promise<void>;
     addFixture: (fixture: Omit<Fixture, 'id' | 'score'>) => Promise<void>;
     updateFixture: (fixture: Fixture) => Promise<void>;
     deleteFixture: (id: number) => Promise<void>;
@@ -403,6 +404,19 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         setState(s => ({...s, players: s.players.filter(p => p.id !== id) }));
     }, [supabase]);
     
+    const deleteAllPlayers = useCallback(async () => {
+        // Delete related player transfers first to avoid foreign key constraint errors
+        const { error: transferError } = await supabase.from('player_transfers').delete().neq('id', -1);
+        if (transferError) throw transferError;
+    
+        // Then delete players
+        const { error } = await supabase.from('players').delete().neq('id', -1);
+        if (error) throw error;
+        
+        // Update state
+        setState(s => ({ ...s, players: [], playerTransfers: [] }));
+    }, [supabase]);
+
     const addFixture = useCallback(async (fixture: Omit<Fixture, 'id' | 'score'>) => {
         const { stage, referee, ...rest } = fixture;
         let dbReferee = referee;
@@ -900,6 +914,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         addPlayer,
         updatePlayer,
         deletePlayer,
+        deleteAllPlayers,
         addFixture,
         updateFixture,
         deleteFixture,
@@ -929,7 +944,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }), [
         state, addTournament, updateTournament, deleteTournament, addClub,
         updateClub, deleteClub, addTeam, updateTeam, deleteTeam, addPlayer,
-        updatePlayer, deletePlayer, addFixture, updateFixture, deleteFixture,
+        updatePlayer, deletePlayer, deleteAllPlayers, addFixture, updateFixture, deleteFixture,
         addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter,
         addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer,
         updateRules, bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,

@@ -1738,6 +1738,85 @@ const ExportAdmin = () => {
     );
 };
 
+const DangerZoneAdmin = () => {
+    const { deleteAllPlayers } = useSports();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
+
+    const handleDelete = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            await deleteAllPlayers();
+            setIsModalOpen(false);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openModal = () => {
+        setConfirmText('');
+        setError('');
+        setLoading(false);
+        setIsModalOpen(true);
+    };
+
+    return (
+        <>
+            <AdminSection title="Danger Zone">
+                <div className="border border-red-500/50 p-4 rounded-md bg-red-900/10">
+                    <div className="flex justify-between items-center flex-wrap gap-4">
+                        <div>
+                            <h3 className="font-bold text-red-400">Delete All Players</h3>
+                            <p className="text-sm text-text-secondary mt-1 max-w-lg">
+                                This will permanently remove all player records and their associated transfer histories from the database. This action cannot be undone.
+                            </p>
+                        </div>
+                        <Button onClick={openModal} className="bg-red-600 hover:bg-red-500">
+                            Delete All Players
+                        </Button>
+                    </div>
+                </div>
+            </AdminSection>
+            {isModalOpen && (
+                <FormModal title="Confirm Permanent Deletion" onClose={() => setIsModalOpen(false)}>
+                    <div className="space-y-4">
+                        {error && <ErrorMessage message={error} />}
+                        <p className="text-text-secondary">
+                            You are about to delete <strong>all players</strong>. This is irreversible. To proceed, please type <strong className="text-red-400">DELETE</strong> into the box below.
+                        </p>
+                        <div>
+                            <Label htmlFor="confirm-delete" className="sr-only">Confirmation Text</Label>
+                            <Input
+                                id="confirm-delete"
+                                type="text"
+                                value={confirmText}
+                                onChange={(e) => setConfirmText(e.target.value)}
+                                className="border-red-500 focus:border-red-400 focus:ring-red-400"
+                                placeholder="Type DELETE to confirm"
+                            />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                            <Button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                            <Button
+                                onClick={handleDelete}
+                                disabled={confirmText !== 'DELETE' || loading}
+                                className="bg-red-600 hover:bg-red-500"
+                            >
+                                {loading ? 'Deleting...' : 'I understand, delete all players'}
+                            </Button>
+                        </div>
+                    </div>
+                </FormModal>
+            )}
+        </>
+    );
+};
+
 interface AdminTab {
     id: string;
     label: string;
@@ -1821,6 +1900,11 @@ export const AdminView: React.FC = () => {
                 </div>
             </div>
             {activeTab ? <div>{renderContent()}</div> : null}
+            {userProfile?.role === 'admin' && (
+                <div className="mt-12">
+                    <DangerZoneAdmin />
+                </div>
+            )}
         </div>
     );
 };
