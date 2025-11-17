@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dvoc-tanzania-cache-v3'; // Increment version to force update
+const CACHE_NAME = 'dvoc-tanzania-cache-v4'; // Increment version to force update & clear old caches
 const APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -15,7 +15,9 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache and caching app shell');
-        return cache.addAll(APP_SHELL_URLS);
+        // Only cache local assets during install for robustness. External assets are cached on fetch.
+        const localAppShellUrls = APP_SHELL_URLS.filter(url => !url.startsWith('http'));
+        return cache.addAll(localAppShellUrls);
       })
       .catch(error => {
         console.error('Failed to cache app shell during install:', error);
@@ -43,41 +45,47 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Ignore Supabase API calls and non-GET requests entirely.
+  // Ignore Supabase API calls and non-GET requests. Let the browser handle them.
   if (request.method !== 'GET' || url.hostname.includes('supabase.co')) {
     return;
   }
 
-  // Use Stale-While-Revalidate for app shell resources
-  if (APP_SHELL_URLS.map(u => new URL(u, self.location.origin).pathname).includes(url.pathname) || request.mode === 'navigate') {
+  // Strategy 1: Network-First for navigation requests (the app's HTML page).
+  // This is crucial for authentication state consistency.
+  if (request.mode === 'navigate') {
     event.respondWith(
-      caches.open(CACHE_NAME).then(cache => {
-        return cache.match(request.mode === 'navigate' ? '/index.html' : request).then(cachedResponse => {
-          const fetchPromise = fetch(request).then(networkResponse => {
-            if (networkResponse.ok) {
-              cache.put(request, networkResponse.clone());
-            }
-            return networkResponse;
-          }).catch(() => {
-            // This catch is for when the network request itself fails.
-            // If we have a cached response, we've already returned it.
-            // If not, the user will see the browser's offline page.
-          });
-          // Return cached response immediately if available, while the network fetch happens in the background.
-          return cachedResponse || fetchPromise;
-        });
-      })
+      fetch(request)
+        .then(networkResponse => {
+          // If the fetch is successful, cache the response for offline use.
+          if (networkResponse.ok) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              // For navigation, we cache the request for the specific path,
+              // but we'll fall back to '/index.html'.
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // If the network fails, serve the main index.html from the cache.
+          return caches.match('/index.html');
+        })
     );
     return;
   }
-
-  // Use Cache First for other static assets (e.g., images)
+  
+  // Strategy 2: Cache-First for all other static assets (CSS, JS, images, fonts).
+  // This is good for performance as they are served instantly from the cache.
   event.respondWith(
     caches.match(request).then(cachedResponse => {
+      // Return the cached response if it exists.
       if (cachedResponse) {
         return cachedResponse;
       }
+      // Otherwise, fetch from the network.
       return fetch(request).then(networkResponse => {
+        // Cache the new response for future use if it's a valid response.
         if (networkResponse.ok) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then(cache => {
