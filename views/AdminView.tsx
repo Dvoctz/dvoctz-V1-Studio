@@ -79,6 +79,7 @@ const TournamentsAdmin = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isConcluding, setIsConcluding] = useState<number | null>(null);
     const [managingDrawFor, setManagingDrawFor] = useState<Tournament | null>(null);
+    const [managingFinalFor, setManagingFinalFor] = useState<Tournament | null>(null);
 
     const handleSave = async (tournament: Tournament | Partial<Tournament>) => {
         setError(null);
@@ -125,6 +126,17 @@ const TournamentsAdmin = () => {
         return quarterFinals.every(f => f.status === 'completed');
     };
 
+    const canManageFinal = (tournament: Tournament): boolean => {
+        if (tournament.phase !== 'knockout') return false;
+        const semis = fixtures.filter(f => f.tournamentId === tournament.id && f.stage === 'semi-final');
+        if (semis.length !== 2) return false;
+        if (!semis.every(f => f.status === 'completed')) return false;
+        const final = fixtures.find(f => f.tournamentId === tournament.id && f.stage === 'final');
+        if (final) return false;
+        return true;
+    };
+
+
     const filteredTournaments = useMemo(() => tournaments.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())), [tournaments, searchTerm]);
 
     return (
@@ -162,6 +174,11 @@ const TournamentsAdmin = () => {
                                     Manage Semis
                                 </Button>
                             )}
+                            {canManageFinal(t) && (
+                                <Button onClick={() => setManagingFinalFor(t)} className="bg-yellow-500 hover:bg-yellow-400">
+                                    Manage Final
+                                </Button>
+                            )}
                             <Button onClick={() => setManagingSponsorsFor(t)} className="bg-green-600 hover:bg-green-500">Sponsors</Button>
                             <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500">Edit</Button>
                             <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500">Delete</Button>
@@ -179,6 +196,9 @@ const TournamentsAdmin = () => {
             )}
             {managingDrawFor && (
                 <SemifinalDrawModal tournament={managingDrawFor} onClose={() => setManagingDrawFor(null)} />
+            )}
+            {managingFinalFor && (
+                <FinalDrawModal tournament={managingFinalFor} onClose={() => setManagingFinalFor(null)} />
             )}
         </AdminSection>
     );
@@ -215,6 +235,76 @@ const TournamentForm: React.FC<{ tournament: Tournament | Partial<Tournament>, o
                 <Button type="submit">Save</Button>
             </div>
         </form>
+    );
+};
+
+const FinalDrawModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
+    const { fixtures, getTeamById, addFixture } = useSports();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const winners = useMemo(() => {
+        const semis = fixtures.filter(f => f.tournamentId === tournament.id && f.stage === 'semi-final' && f.status === 'completed');
+        if (semis.length !== 2) return [];
+
+        return semis.map(f => {
+            if (!f.score) return null;
+            // The winner is the one with the higher set score
+            return f.score.team1Score > f.score.team2Score ? f.team1Id : f.team2Id;
+        }).filter((id): id is number => id !== null); // Type guard to filter out nulls
+    }, [fixtures, tournament.id]);
+
+    const team1 = winners.length > 0 ? getTeamById(winners[0]) : null;
+    const team2 = winners.length > 1 ? getTeamById(winners[1]) : null;
+
+    const handleCreateFinal = async () => {
+        if (!team1 || !team2) {
+            setError("Could not determine both final participants from semi-final results.");
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        try {
+            const now = new Date().toISOString();
+            const finalFixture: Omit<Fixture, 'id' | 'score'> = {
+                tournamentId: tournament.id,
+                team1Id: team1.id,
+                team2Id: team2.id,
+                ground: 'TBD',
+                dateTime: now,
+                status: 'upcoming',
+                stage: 'final',
+            };
+            await addFixture(finalFixture);
+            onClose();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <FormModal title={`Set Final for ${tournament.name}`} onClose={onClose}>
+            <div className="space-y-4">
+                {error && <ErrorMessage message={error} />}
+                <p className="text-text-secondary">The following teams have won their semi-final matches. Confirm to create the final fixture.</p>
+                
+                <div className="bg-accent p-4 rounded-md text-center space-y-2">
+                    <p className="text-xl font-bold text-white">{team1?.name || 'Winner 1 TBD'}</p>
+                    <p className="text-lg text-text-secondary">vs</p>
+                    <p className="text-xl font-bold text-white">{team2?.name || 'Winner 2 TBD'}</p>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                    <Button type="button" onClick={onClose} className="bg-gray-600 hover:bg-gray-500">Cancel</Button>
+                    <Button onClick={handleCreateFinal} disabled={loading || !team1 || !team2}>
+                        {loading ? "Creating..." : "Create Final Fixture"}
+                    </Button>
+                </div>
+            </div>
+        </FormModal>
     );
 };
 
