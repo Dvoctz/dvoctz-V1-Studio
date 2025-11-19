@@ -432,48 +432,104 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase, fetchData]);
 
     const bulkAddOrUpdatePlayers = useCallback(async (playersData: CsvPlayer[]) => {
-        // Fetch latest data to prevent stale state issues
-        const currentTeams = await fetchData('teams');
-        const currentClubs = await fetchData('clubs');
+        // 1. Refresh Data
+        // Force refresh to ensure we have the latest
+        setState(s => ({ ...s, clubs: null, teams: null }));
+        let currentClubs = await fetchData('clubs');
+        let currentTeams = await fetchData('teams');
 
-        const teamNameMap = new Map<string, number>();
-        const teamClubMap = new Map<string, number>();
-        (currentTeams || []).forEach(team => {
-            const key = team.name.trim().toLowerCase();
-            teamNameMap.set(key, team.id);
-            teamClubMap.set(key, team.clubId);
-        });
+        const normalize = (s: string) => s.trim().toLowerCase();
         
-        const clubNameMap = new Map<string, number>();
-        (currentClubs || []).forEach(club => {
-            const key = club.name.trim().toLowerCase();
-            clubNameMap.set(key, club.id);
+        // 2. Handle Missing Clubs
+        const uniqueCsvClubs = new Set<string>();
+        playersData.forEach(p => {
+            if (p.clubName) uniqueCsvClubs.add(p.clubName.trim());
         });
 
+        let clubMap = new Map<string, Club>();
+        (currentClubs || []).forEach(c => clubMap.set(normalize(c.name), c));
+
+        const newClubsToInsert: any[] = [];
+        uniqueCsvClubs.forEach(csvClubName => {
+            if (!clubMap.has(normalize(csvClubName))) {
+                newClubsToInsert.push({ name: csvClubName, logo_url: '' });
+            }
+        });
+
+        if (newClubsToInsert.length > 0) {
+            const { error } = await supabase.from('clubs').insert(newClubsToInsert);
+            if (error) throw new Error(`Failed to create missing clubs: ${error.message}`);
+            
+            // Refresh clubs after insert
+            setState(s => ({ ...s, clubs: null }));
+            currentClubs = await fetchData('clubs');
+            // Rebuild map
+            clubMap = new Map();
+            (currentClubs || []).forEach(c => clubMap.set(normalize(c.name), c));
+        }
+
+        // 3. Handle Missing Teams
+        // We need to associate each missing team with a club.
+        const teamsToCreate = new Map<string, string>(); // TeamName -> ClubName
+        playersData.forEach(p => {
+            if (p.teamName && p.clubName) {
+                 teamsToCreate.set(p.teamName.trim(), p.clubName.trim());
+            }
+        });
+
+        let teamMap = new Map<string, Team>();
+        (currentTeams || []).forEach(t => teamMap.set(normalize(t.name), t));
+
+        const newTeamsToInsert: any[] = [];
+        teamsToCreate.forEach((csvClubName, csvTeamName) => {
+             if (!teamMap.has(normalize(csvTeamName))) {
+                 const club = clubMap.get(normalize(csvClubName));
+                 if (club) {
+                     newTeamsToInsert.push({
+                         name: csvTeamName,
+                         short_name: csvTeamName.substring(0, 3).toUpperCase(),
+                         division: 'Division 1',
+                         club_id: club.id,
+                         logo_url: ''
+                     });
+                 }
+             }
+        });
+
+        if (newTeamsToInsert.length > 0) {
+            const { error } = await supabase.from('teams').insert(newTeamsToInsert);
+             if (error) throw new Error(`Failed to create missing teams: ${error.message}`);
+             
+             // Refresh teams after insert
+             setState(s => ({ ...s, teams: null }));
+             currentTeams = await fetchData('teams');
+             // Rebuild map
+             teamMap = new Map();
+             (currentTeams || []).forEach(t => teamMap.set(normalize(t.name), t));
+        }
+
+        // 4. Process Players
         const playersToUpsert = playersData.map(p => {
+            const pTeamName = p.teamName ? normalize(p.teamName) : '';
+            const pClubName = p.clubName ? normalize(p.clubName) : '';
+
             let teamId: number | null = null;
             let clubId: number | null = null;
 
-            const cleanTeamName = p.teamName ? p.teamName.trim().toLowerCase() : '';
-            const cleanClubName = p.clubName ? p.clubName.trim().toLowerCase() : '';
-
-            // 1. Try to match Team Name first
-            if (cleanTeamName) {
-                teamId = teamNameMap.get(cleanTeamName) || null;
-                if (teamId) {
-                    // Infer Club ID from Team
-                    clubId = teamClubMap.get(cleanTeamName) || null;
-                }
+            if (pTeamName && teamMap.has(pTeamName)) {
+                const team = teamMap.get(pTeamName)!;
+                teamId = team.id;
+                clubId = team.clubId;
+            } else if (pClubName && clubMap.has(pClubName)) {
+                const club = clubMap.get(pClubName)!;
+                clubId = club.id;
             }
 
-            // 2. If Team ID is missing, check for explicit Club Name (Pool Player)
-            if (!teamId && cleanClubName) {
-                clubId = clubNameMap.get(cleanClubName) || null;
-            }
-
-            // 3. Validation
+            // If we still can't find it, it's a critical error, but given step 2 & 3, this should only happen if database insert failed silently or logic bug.
             if (!teamId && !clubId) {
-                throw new Error(`Neither Team "${p.teamName}" nor Club "${p.clubName}" found for player "${p.name}".`);
+                console.error(`Could not resolve Club/Team for player`, p);
+                 // Fallback: Throwing error ensures data integrity.
+                 throw new Error(`Could not resolve Club "${p.clubName}" or Team "${p.teamName}" for player "${p.name}" even after attempting creation.`);
             }
 
             return { 
@@ -482,13 +538,21 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 photo_url: p.photoUrl, 
                 team_id: teamId, 
                 club_id: clubId,
-                stats: { matches: parseInt(p.matches || '0', 10), aces: parseInt(p.aces || '0', 10), kills: parseInt(p.kills || '0', 10), blocks: parseInt(p.blocks || '0', 10) } 
+                stats: { 
+                    matches: parseInt(p.matches || '0', 10), 
+                    aces: parseInt(p.aces || '0', 10), 
+                    kills: parseInt(p.kills || '0', 10), 
+                    blocks: parseInt(p.blocks || '0', 10) 
+                } 
             };
         });
         
         const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,team_id' });
         if (error) throw error;
+        // Refresh players
+        setState(s => ({ ...s, players: null }));
         await fetchData('players');
+
     }, [supabase, fetchData]);
     
     const updateSponsorsForTournament = useCallback(async (tournamentId: number, sponsorIds: number[]) => {
