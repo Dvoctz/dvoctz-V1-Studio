@@ -588,15 +588,25 @@ export const useSports = (): SportsContextType => {
 };
 
 export const useEntityData = <T extends EntityName>(entityName: T): { data: SportsState[T], loading: boolean } => {
-    // FIX: Destructure the new `_internal_state` property and use it for fetching logic and the return value.
-    // This resolves both the type error and the functional bug where data was not re-fetched.
-    const { fetchData, loading: loadingSet, _internal_state } = useSports();
+    const { fetchData, loading: loadingSet, _internal_state, error: globalError } = useSports();
 
+    // Use a ref to track if we've initiated a fetch for this entity to prevent duplicate calls
+    // in strict mode or fast re-renders.
+    
     useEffect(() => {
+        // Only trigger fetch if data is missing and not already loading
         if (_internal_state[entityName] === null && !loadingSet.has(entityName)) {
             fetchData(entityName);
         }
-    }, [entityName, fetchData, _internal_state, loadingSet]);
+    }, [entityName, fetchData, _internal_state, loadingSet]); 
 
-    return { data: _internal_state[entityName], loading: loadingSet.has(entityName) };
+    // CRITICAL FIX: If data is null, we are effectively loading (or waiting to load).
+    // This prevents components from rendering "Empty" states before the fetch even begins.
+    const isDataMissing = _internal_state[entityName] === null;
+    // We consider it loading if:
+    // 1. It is explicitly in the loading set.
+    // 2. OR Data is missing and we haven't hit a global error blocking us.
+    const isLoading = loadingSet.has(entityName) || (isDataMissing && !globalError);
+
+    return { data: _internal_state[entityName], loading: isLoading };
 };

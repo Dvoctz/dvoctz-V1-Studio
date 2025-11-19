@@ -172,9 +172,14 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
 };
 
 
-export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament, onBack }) => {
-  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament } = useSports();
+export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament: initialTournament, onBack }) => {
+  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, tournaments } = useSports();
   
+  // FIX: Get the absolute latest version of the tournament from context.
+  // The 'initialTournament' prop passed from the parent might be stale (e.g., it doesn't know the phase changed).
+  // This ensures that when data is loaded in the background, the view updates to reflect the new phase (e.g., knockout).
+  const tournament = useMemo(() => tournaments.find(t => t.id === initialTournament.id) || initialTournament, [tournaments, initialTournament]);
+
   // Ensure dependencies for this view are loaded
   const { loading: fixturesLoading } = useEntityData('fixtures');
   const { loading: teamsLoading } = useEntityData('teams');
