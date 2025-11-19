@@ -55,10 +55,14 @@ const FixtureCard: React.FC<{ fixture: Fixture; team1?: Team; team2?: Team; }> =
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
     const { getTeamById, getActiveNotice } = useSports();
     const { data: fixtures, loading: fixturesLoading } = useEntityData('fixtures');
+    // Ensure teams are loaded so cards render correctly
+    const { loading: teamsLoading } = useEntityData('teams');
     const { loading: noticesLoading } = useEntityData('notices');
 
     const upcomingFixtures = useMemo(() => (fixtures || []).filter(f => f.status === 'upcoming').slice(0, 3), [fixtures]);
     const activeNotice = getActiveNotice();
+
+    const isDataLoading = fixturesLoading || teamsLoading;
 
     return (
         <div className="space-y-12">
@@ -83,7 +87,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
              <div>
                 <h2 className="text-3xl font-bold text-center mb-6">Upcoming Matches</h2>
                 <div className="grid md:grid-cols-3 gap-6">
-                    {fixturesLoading ? (
+                    {isDataLoading ? (
                         <>
                             <FixtureCardSkeleton />
                             <FixtureCardSkeleton />

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Team, Player } from '../types';
 
 interface TeamDetailViewProps {
@@ -26,6 +26,10 @@ const PlayerRow: React.FC<{ player: Player; onSelect: () => void; }> = ({ player
 
 export const TeamDetailView: React.FC<TeamDetailViewProps> = ({ team, onSelectPlayer, onBack }) => {
   const { getPlayersByTeam } = useSports();
+  
+  // Ensure players are loaded to display the roster
+  const { loading: playersLoading } = useEntityData('players');
+  
   const teamPlayers = useMemo(() => getPlayersByTeam(team.id), [getPlayersByTeam, team.id]);
 
   return (
@@ -53,13 +57,19 @@ export const TeamDetailView: React.FC<TeamDetailViewProps> = ({ team, onSelectPl
 
       <div>
         <h2 className="text-2xl font-bold mb-4">Player Roster</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {teamPlayers.length > 0 ? (
-            teamPlayers.map(player => <PlayerRow key={player.id} player={player} onSelect={() => onSelectPlayer(player)} />)
-          ) : (
-            <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players registered for this team yet.</p>
-          )}
-        </div>
+        {playersLoading ? (
+             <div className="flex justify-center py-8">
+                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-highlight"></div>
+             </div>
+        ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teamPlayers.length > 0 ? (
+                teamPlayers.map(player => <PlayerRow key={player.id} player={player} onSelect={() => onSelectPlayer(player)} />)
+              ) : (
+                <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players registered for this team yet.</p>
+              )}
+            </div>
+        )}
       </div>
     </div>
   );

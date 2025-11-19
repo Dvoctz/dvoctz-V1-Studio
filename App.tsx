@@ -13,7 +13,7 @@ import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
 import { RulesView } from './views/RulesView';
 import type { View, Tournament, Team, Club, Player } from './types';
-import { SportsDataProvider } from './context/SportsDataContext';
+import { SportsDataProvider, useEntityData } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { initializeSupabase } from './supabaseClient';
 import { SupabaseProvider } from './context/SupabaseContext';
@@ -33,6 +33,19 @@ const AppContent: React.FC = () => {
   const { currentUser, userProfile, loading: authLoading } = useAuth();
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
   const [viewBeforeLogin, setViewBeforeLogin] = useState<View | null>(null);
+
+  // AGGRESSIVE PRELOAD: Fetch all core data entities immediately upon app launch.
+  // This solves the issue where data appears "empty" until a user visits a specific tab.
+  // By loading everything upfront, we ensure the "Past Fixtures" and "Sponsors" are ready
+  // whenever the user navigates to them.
+  useEntityData('teams');
+  useEntityData('clubs');
+  useEntityData('sponsors');
+  useEntityData('tournaments');
+  useEntityData('fixtures');
+  useEntityData('players');
+  useEntityData('tournamentSponsors');
+  useEntityData('notices');
 
   useEffect(() => {
     if (authLoading) return;

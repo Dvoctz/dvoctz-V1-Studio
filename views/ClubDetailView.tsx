@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Club, Team, Player } from '../types';
 import { AssignPlayerModal } from '../components/AssignPlayerModal';
@@ -82,6 +82,11 @@ const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: bo
 export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onSelectPlayer, onBack }) => {
   const { userProfile } = useAuth();
   const { getTeamsByClub, getPlayersByClub } = useSports();
+  
+  // Ensure players are fetched when viewing club details to populate the list
+  const { loading: playersLoading } = useEntityData('players');
+  const { loading: teamsLoading } = useEntityData('teams');
+
   const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -163,13 +168,19 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
 
       <div>
         {activeTab === 'teams' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {clubTeams.length > 0 ? (
-              clubTeams.map(team => <TeamRow key={team.id} team={team} onSelect={() => onSelectTeam(team)} />)
-            ) : (
-              <p className="text-center text-text-secondary md:col-span-2">No teams registered for this club yet.</p>
-            )}
-          </div>
+          teamsLoading ? (
+             <div className="flex justify-center py-8">
+                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-highlight"></div>
+             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {clubTeams.length > 0 ? (
+                clubTeams.map(team => <TeamRow key={team.id} team={team} onSelect={() => onSelectTeam(team)} />)
+                ) : (
+                <p className="text-center text-text-secondary md:col-span-2">No teams registered for this club yet.</p>
+                )}
+            </div>
+          )
         )}
         
         {activeTab === 'players' && (
@@ -221,22 +232,28 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredPlayers.length > 0 ? (
-                        filteredPlayers.map(player => (
-                            <PlayerCard 
-                                key={player.id} 
-                                player={player} 
-                                isManaging={isManaging}
-                                isSelected={selectedPlayerIds.has(player.id)}
-                                onSelect={onSelectPlayer}
-                                onToggleSelection={handleTogglePlayerSelection}
-                            />
-                        ))
-                    ) : (
-                         <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players found for this club.</p>
-                    )}
-                </div>
+                {playersLoading || teamsLoading ? (
+                    <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-highlight"></div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredPlayers.length > 0 ? (
+                            filteredPlayers.map(player => (
+                                <PlayerCard 
+                                    key={player.id} 
+                                    player={player} 
+                                    isManaging={isManaging}
+                                    isSelected={selectedPlayerIds.has(player.id)}
+                                    onSelect={onSelectPlayer}
+                                    onToggleSelection={handleTogglePlayerSelection}
+                                />
+                            ))
+                        ) : (
+                             <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players found for this club.</p>
+                        )}
+                    </div>
+                )}
             </div>
         )}
       </div>

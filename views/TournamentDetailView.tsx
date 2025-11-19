@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Fixture, Tournament, Team, TeamStanding } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
 import { KnockoutBracket } from '../components/KnockoutBracket';
@@ -174,6 +174,13 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament, onBack }) => {
   const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament } = useSports();
+  
+  // Ensure dependencies for this view are loaded
+  const { loading: fixturesLoading } = useEntityData('fixtures');
+  const { loading: teamsLoading } = useEntityData('teams');
+  const { loading: sponsorsLoading } = useEntityData('sponsors');
+  const { loading: tsLoading } = useEntityData('tournamentSponsors');
+  
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
@@ -209,6 +216,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
 
   const team1 = selectedFixture ? getTeamById(selectedFixture.team1Id) : null;
   const team2 = selectedFixture ? getTeamById(selectedFixture.team2Id) : null;
+  
+  const isDataLoading = fixturesLoading || teamsLoading || sponsorsLoading || tsLoading;
 
   const TabButton: React.FC<{ tab: 'fixtures' | 'standings' | 'knockout'; children: React.ReactNode }> = ({ tab, children }) => (
     <button
@@ -219,10 +228,18 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
     </button>
   );
 
+  if (isDataLoading) {
+      return (
+          <div className="flex justify-center py-24">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-highlight"></div>
+          </div>
+      );
+  }
+
   return (
     <div>
         <button onClick={onBack} className="flex items-center space-x-2 text-text-secondary hover:text-highlight mb-6 transition-colors">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24" stroke="currentColor">
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             <span>Back to Tournaments</span>
@@ -290,22 +307,22 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
       </div>
 
       <div className="space-y-6">
-        {activeTab === 'fixtures' ? (
-          fixtures.length > 0 ? (
-            fixtures.map(f => <FixtureItem key={f.id} fixture={f} onScorecardClick={setSelectedFixture} />)
-          ) : (
-            <p className="text-center text-text-secondary">No round-robin fixtures scheduled for this tournament yet.</p>
-          )
-        ) : activeTab === 'standings' ? (
-            <>
-                <StandingsTable standings={standings} />
-                 {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
-                    <p className="text-center text-yellow-400 p-4 bg-secondary rounded-lg mt-4">The league phase is complete. The top teams have advanced to the knockout stage.</p>
-                )}
-            </>
-        ) : (
-            <KnockoutBracket tournament={tournament} />
-        )}
+            {activeTab === 'fixtures' ? (
+                fixtures.length > 0 ? (
+                fixtures.map(f => <FixtureItem key={f.id} fixture={f} onScorecardClick={setSelectedFixture} />)
+                ) : (
+                <p className="text-center text-text-secondary">No round-robin fixtures scheduled for this tournament yet.</p>
+                )
+            ) : activeTab === 'standings' ? (
+                <>
+                    <StandingsTable standings={standings} />
+                        {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
+                        <p className="text-center text-yellow-400 p-4 bg-secondary rounded-lg mt-4">The league phase is complete. The top teams have advanced to the knockout stage.</p>
+                    )}
+                </>
+            ) : (
+                <KnockoutBracket tournament={tournament} />
+            )}
       </div>
 
       {selectedFixture && team1 && team2 && (
