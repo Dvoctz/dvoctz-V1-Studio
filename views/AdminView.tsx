@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
@@ -250,13 +251,34 @@ const TeamsAdmin = () => {
             }
         });
     };
+
+    const handleExport = () => {
+        const exportData = teams.map(t => {
+            const club = clubs.find(c => c.id === t.clubId);
+            return {
+                Name: t.name,
+                ShortName: t.shortName,
+                Division: t.division,
+                ClubName: club ? club.name : '',
+                LogoUrl: t.logoUrl || ''
+            };
+        });
+        const csv = Papa.unparse(exportData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'teams_export.csv';
+        link.click();
+    };
+
     const filtered = useMemo(() => teams.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())), [teams, searchTerm]);
 
     return (
         <AdminSection title="Manage Teams">
             <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <Input placeholder="Search teams..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="!w-64 !mt-0" />
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap justify-end">
+                    <Button onClick={handleExport} className="bg-green-600 hover:bg-green-500">Export CSV</Button>
                      <label className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md text-sm font-medium cursor-pointer">
                         Bulk Upload CSV <input type="file" className="hidden" accept=".csv" onChange={handleBulkUpload} />
                     </label>
@@ -329,6 +351,30 @@ const PlayersAdmin = () => {
              try { await deleteAllPlayers(); alert('All players deleted.'); } catch(e: any) { alert(e.message); }
          }
     }
+
+    const handleExport = () => {
+        const exportData = players.map(p => {
+            const team = teams.find(t => t.id === p.teamId);
+            const club = clubs.find(c => c.id === p.clubId);
+            return {
+                Name: p.name,
+                Role: p.role,
+                TeamName: team ? team.name : '',
+                ClubName: club ? club.name : '',
+                Matches: p.stats?.matches || 0,
+                Aces: p.stats?.aces || 0,
+                Kills: p.stats?.kills || 0,
+                Blocks: p.stats?.blocks || 0,
+                PhotoUrl: p.photoUrl || ''
+            };
+        });
+        const csv = Papa.unparse(exportData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'players_export.csv';
+        link.click();
+    };
     
     const filtered = useMemo(() => players.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 50), [players, searchTerm]);
 
@@ -337,6 +383,7 @@ const PlayersAdmin = () => {
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
                 <Input placeholder="Search players..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="!w-full sm:!w-64 !mt-0" />
                 <div className="flex gap-2 flex-wrap justify-end">
+                    <Button onClick={handleExport} className="bg-green-600 hover:bg-green-500">Export CSV</Button>
                     <label className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md text-sm font-medium cursor-pointer">
                         CSV Upload <input type="file" className="hidden" accept=".csv" onChange={handleBulkUpload} />
                     </label>
@@ -656,156 +703,9 @@ const NoticeForm: React.FC<{ notice: any, onSave: any, onCancel: any, error: any
     );
 };
 
-// --- DATABASE ---
-const DatabaseAdmin = () => {
-    const script = `/* 
-   DATABASE OPTIMIZATION & MIGRATION SCRIPT
-   Run this in the Supabase SQL Editor.
-*/
-
--- 1. ADD CLUB_ID to Players (Migration for Club Pools)
--- Only run this block once to update the schema
-ALTER TABLE players ADD COLUMN IF NOT EXISTS club_id BIGINT REFERENCES clubs(id);
-
--- Migrate existing players: If they have a team, set their club_id to that team's club
-UPDATE players
-SET club_id = teams.club_id
-FROM teams
-WHERE players.team_id = teams.id AND players.club_id IS NULL;
-
--- 2. Game Rules Policies
-DROP POLICY IF EXISTS "Enable insert for admins" ON public.game_rules;
-DROP POLICY IF EXISTS "Enable update for admins" ON public.game_rules;
-DROP POLICY IF EXISTS "Enable delete for admins" ON public.game_rules;
-DROP POLICY IF EXISTS "Allow content managers to write" ON public.game_rules;
-DROP POLICY IF EXISTS "Allow public read access" ON public.game_rules;
-
-CREATE POLICY "Public read access" ON public.game_rules FOR SELECT USING (true);
-CREATE POLICY "Admin write access" ON public.game_rules FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin update access" ON public.game_rules FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin delete access" ON public.game_rules FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-
--- 3. Clubs Policies
-DROP POLICY IF EXISTS "Allow content managers to write" ON public.clubs;
-DROP POLICY IF EXISTS "Allow public read access" ON public.clubs;
-DROP POLICY IF EXISTS "Enable read access for all" ON public.clubs;
-DROP POLICY IF EXISTS "Enable insert for authenticated" ON public.clubs;
-
-CREATE POLICY "Public read access" ON public.clubs FOR SELECT USING (true);
-CREATE POLICY "Admin write access" ON public.clubs FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin update access" ON public.clubs FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin delete access" ON public.clubs FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-
--- 4. Teams Policies
-DROP POLICY IF EXISTS "Allow team managers to write" ON public.teams;
-DROP POLICY IF EXISTS "Allow public read access" ON public.teams;
-
-CREATE POLICY "Public read access" ON public.teams FOR SELECT USING (true);
-CREATE POLICY "Manager write access" ON public.teams FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
-CREATE POLICY "Manager update access" ON public.teams FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
-CREATE POLICY "Manager delete access" ON public.teams FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
-
--- 5. Players Policies
-DROP POLICY IF EXISTS "Allow team managers to write" ON public.players;
-DROP POLICY IF EXISTS "Allow public read access" ON public.players;
-
-CREATE POLICY "Public read access" ON public.players FOR SELECT USING (true);
-CREATE POLICY "Manager write access" ON public.players FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
-CREATE POLICY "Manager update access" ON public.players FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
-CREATE POLICY "Manager delete access" ON public.players FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
-
--- 6. Fixtures Policies
-DROP POLICY IF EXISTS "Allow fixture managers to write" ON public.fixtures;
-DROP POLICY IF EXISTS "Allow public read access" ON public.fixtures;
-
-CREATE POLICY "Public read access" ON public.fixtures FOR SELECT USING (true);
-CREATE POLICY "Manager write access" ON public.fixtures FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
-CREATE POLICY "Manager update access" ON public.fixtures FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
-CREATE POLICY "Manager delete access" ON public.fixtures FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
-
--- 7. Sponsors Policies
-DROP POLICY IF EXISTS "Allow content managers to write" ON public.sponsors;
-DROP POLICY IF EXISTS "Allow public read access" ON public.sponsors;
-
-CREATE POLICY "Public read access" ON public.sponsors FOR SELECT USING (true);
-CREATE POLICY "Admin write access" ON public.sponsors FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin update access" ON public.sponsors FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin delete access" ON public.sponsors FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-
--- 8. Notices Policies
-DROP POLICY IF EXISTS "Allow content managers to write" ON public.notices;
-DROP POLICY IF EXISTS "Allow public read access" ON public.notices;
-
-CREATE POLICY "Public read access" ON public.notices FOR SELECT USING (true);
-CREATE POLICY "Admin write access" ON public.notices FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin update access" ON public.notices FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin delete access" ON public.notices FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-
--- 9. Tournaments Policies
-DROP POLICY IF EXISTS "Allow admins to write" ON public.tournaments;
-DROP POLICY IF EXISTS "Allow public read access" ON public.tournaments;
-
-CREATE POLICY "Public read access" ON public.tournaments FOR SELECT USING (true);
-CREATE POLICY "Admin write access" ON public.tournaments FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
-CREATE POLICY "Admin update access" ON public.tournaments FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
-CREATE POLICY "Admin delete access" ON public.tournaments FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
-
--- 10. Tournament Sponsors Policies
-DROP POLICY IF EXISTS "Allow content managers to write" ON public.tournament_sponsors;
-DROP POLICY IF EXISTS "Allow public read access" ON public.tournament_sponsors;
-
-CREATE POLICY "Public read access" ON public.tournament_sponsors FOR SELECT USING (true);
-CREATE POLICY "Admin write access" ON public.tournament_sponsors FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin update access" ON public.tournament_sponsors FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-CREATE POLICY "Admin delete access" ON public.tournament_sponsors FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
-
--- 11. Player Transfers Policies
-DROP POLICY IF EXISTS "Allow admins to write" ON public.player_transfers;
-DROP POLICY IF EXISTS "Allow public read access" ON public.player_transfers;
-
-CREATE POLICY "Public read access" ON public.player_transfers FOR SELECT USING (true);
-CREATE POLICY "Admin write access" ON public.player_transfers FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
-CREATE POLICY "Admin update access" ON public.player_transfers FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
-CREATE POLICY "Admin delete access" ON public.player_transfers FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));`;
-
-    const [copied, setCopied] = useState(false);
-
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(script);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <AdminSection title="Database Optimization">
-            <div className="space-y-4">
-                <p className="text-text-secondary">
-                    Run the following SQL script in your Supabase SQL Editor.
-                    <br />
-                    <strong className="text-yellow-400">IMPORTANT: This script adds the 'club_id' column to players for the new Club Pool feature.</strong>
-                    It also fixes reported performance issues.
-                </p>
-                <div className="relative">
-                    <textarea
-                        readOnly
-                        value={script}
-                        className="w-full h-96 bg-primary p-4 rounded-md text-xs font-mono text-text-primary border border-accent focus:ring-highlight focus:border-highlight"
-                    />
-                    <button
-                        onClick={copyToClipboard}
-                        className="absolute top-2 right-2 bg-highlight hover:bg-teal-400 text-white text-xs px-3 py-1 rounded shadow transition-colors"
-                    >
-                        {copied ? 'Copied!' : 'Copy SQL'}
-                    </button>
-                </div>
-            </div>
-        </AdminSection>
-    );
-};
-
 // --- MAIN ADMIN VIEW ---
 export const AdminView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'notices' | 'database'>('tournaments');
+    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'notices'>('tournaments');
     const { userProfile } = useAuth();
 
     const tabs = [
@@ -816,7 +716,6 @@ export const AdminView: React.FC = () => {
         { id: 'fixtures', label: 'Fixtures' },
         { id: 'sponsors', label: 'Sponsors' },
         { id: 'notices', label: 'Notices' },
-        { id: 'database', label: 'Database' },
     ];
 
     return (
@@ -846,7 +745,6 @@ export const AdminView: React.FC = () => {
                 {activeTab === 'fixtures' && <FixturesAdmin />}
                 {activeTab === 'sponsors' && <SponsorsAdmin />}
                 {activeTab === 'notices' && <NoticesAdmin />}
-                {activeTab === 'database' && <DatabaseAdmin />}
             </div>
         </div>
     );
