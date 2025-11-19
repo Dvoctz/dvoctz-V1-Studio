@@ -22,7 +22,7 @@ interface SportsState {
 }
 
 export type CsvTeam = Omit<Team, 'id' | 'clubId'> & { clubName: string };
-export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'stats'> & { teamName: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
+export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'clubId' | 'stats'> & { teamName?: string; clubName?: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
 
 
 interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules'> {
@@ -36,7 +36,6 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     playerTransfers: PlayerTransfer[];
     notices: Notice[];
     rules: string;
-    // FIX: Expose the raw internal state to allow hooks like useEntityData to check for null values and trigger fetches.
     _internal_state: SportsState;
     fetchData: <T extends EntityName>(entityName: T) => Promise<SportsState[T]>;
     addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
@@ -88,7 +87,7 @@ const SportsDataContext = createContext<SportsContextType | undefined>(undefined
 // MAPPING FUNCTIONS to convert snake_case from DB to camelCase for the app
 const mapClub = (c: any): Club => ({ id: c.id, name: c.name, logoUrl: c.logo_url });
 const mapTeam = (t: any): Team => ({ id: t.id, name: t.name, shortName: t.short_name, logoUrl: t.logo_url, division: t.division, clubId: t.club_id });
-const mapPlayer = (p: any): Player => ({ id: p.id, name: p.name, teamId: p.team_id, photoUrl: p.photo_url, role: p.role, stats: p.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 } });
+const mapPlayer = (p: any): Player => ({ id: p.id, name: p.name, teamId: p.team_id, clubId: p.club_id, photoUrl: p.photo_url, role: p.role, stats: p.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 } });
 const mapSponsor = (s: any): Sponsor => ({ id: s.id, name: s.name, website: s.website, logoUrl: s.logo_url, showInFooter: s.show_in_footer || false });
 const mapTournament = (t: any): Omit<Tournament, 'phase'> => ({ id: t.id, name: t.name, division: t.division });
 const mapNotice = (n: any): Notice => ({ id: n.id, title: n.title, message: n.message, level: n.level, expiresAt: n.expires_at, createdAt: n.created_at });
@@ -166,8 +165,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             } else if (entityName === 'rules') {
                 processedData = data?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.';
             } else {
-                // FIX: The generic type 'T' is too broad for direct indexing. An explicit type assertion
-                // for the key assures TypeScript that `entityName` will be one of the map's keys here.
                 const mapFn = { clubs: mapClub, teams: mapTeam, players: mapPlayer, sponsors: mapSponsor, notices: mapNotice, playerTransfers: mapPlayerTransfer, tournamentSponsors: (d: any) => d }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors'];
                 processedData = (data || []).map(mapFn);
             }
@@ -262,8 +259,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const addPlayer = useCallback(async (playerData: Omit<Player, 'id'> & { photoFile?: File }) => {
         let finalPhotoUrl = playerData.photoUrl;
         if (playerData.photoFile) finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
-        const { name, teamId, role, stats } = playerData;
-        const { data, error } = await supabase.from('players').insert({ name, team_id: teamId, role, stats, photo_url: finalPhotoUrl }).select().single();
+        const { name, teamId, clubId, role, stats } = playerData;
+        // If clubId is not explicit but teamId is present, try to infer it from team (safety check, though logic should be robust)
+        const { data, error } = await supabase.from('players').insert({ name, team_id: teamId, club_id: clubId, role, stats, photo_url: finalPhotoUrl }).select().single();
         if (error) throw error;
         setState(s => ({...s, players: [...(s.players || []), mapPlayer(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase]);
@@ -272,14 +270,17 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const originalPlayer = (state.players || []).find(p => p.id === playerData.id);
         let finalPhotoUrl = playerData.photoUrl;
         if (playerData.photoFile) finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
+        
+        // Transfer Logic
         if (originalPlayer && originalPlayer.teamId !== playerData.teamId) {
             const newTransfer = { player_id: playerData.id, from_team_id: originalPlayer.teamId, to_team_id: playerData.teamId, transfer_date: new Date().toISOString().split('T')[0], is_automated: true, notes: 'Player details updated via admin panel.' };
             const { data: insertedTransfer, error: transferError } = await supabase.from('player_transfers').insert(newTransfer).select().single();
             if (transferError) throw transferError;
             if (insertedTransfer) setState(s => ({ ...s, playerTransfers: [...(s.playerTransfers || []), mapPlayerTransfer(insertedTransfer)] }));
         }
-        const { id, name, teamId, role, stats } = playerData;
-        const { data, error } = await supabase.from('players').update({ name, team_id: teamId, role, stats, photo_url: finalPhotoUrl }).eq('id', id).select().single();
+
+        const { id, name, teamId, clubId, role, stats } = playerData;
+        const { data, error } = await supabase.from('players').update({ name, team_id: teamId, club_id: clubId, role, stats, photo_url: finalPhotoUrl }).eq('id', id).select().single();
         if (error) throw error;
         setState(s => ({...s, players: (s.players || []).map(p => p.id === id ? mapPlayer(data) : p).sort((a,b) => a.name.localeCompare(b.name)) }));
     }, [supabase, state.players]);
@@ -291,24 +292,15 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const deleteAllPlayers = useCallback(async () => {
-        // Safety mechanism: Timeout after 15 seconds to prevent infinite loading
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), 15000));
-
         const deleteOperation = async () => {
-            // Delete transfers first because of Foreign Key constraints
             const { error: transferError } = await supabase.from('player_transfers').delete().neq('id', -1);
             if (transferError) throw new Error(`Failed to delete transfers: ${transferError.message}`);
-            
-            // Delete players
             const { error: playerError } = await supabase.from('players').delete().neq('id', -1);
             if (playerError) throw new Error(`Failed to delete players: ${playerError.message}`);
             return true;
         };
-
-        // Race the delete operation against the timeout
         await Promise.race([deleteOperation(), timeout]);
-
-        // Update local state on success
         setState(s => ({ ...s, players: [], playerTransfers: [] }));
     }, [supabase]);
 
@@ -430,16 +422,52 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
     const bulkAddOrUpdatePlayers = useCallback(async (playersData: CsvPlayer[]) => {
         const teamNameMap = new Map<string, number>();
-        (state.teams || []).forEach(team => teamNameMap.set(team.name.toLowerCase(), team.id));
-        const playersToUpsert = playersData.map(p => {
-            const teamId = teamNameMap.get(p.teamName.toLowerCase());
-            if (!teamId) throw new Error(`Team "${p.teamName}" not found for player "${p.name}".`);
-            return { name: p.name, role: p.role, photo_url: p.photoUrl, team_id: teamId, stats: { matches: parseInt(p.matches || '0', 10), aces: parseInt(p.aces || '0', 10), kills: parseInt(p.kills || '0', 10), blocks: parseInt(p.blocks || '0', 10) } };
+        const teamClubMap = new Map<string, number>();
+        (state.teams || []).forEach(team => {
+            teamNameMap.set(team.name.toLowerCase(), team.id);
+            teamClubMap.set(team.name.toLowerCase(), team.clubId);
         });
+        
+        const clubNameMap = new Map<string, number>();
+        (state.clubs || []).forEach(club => clubNameMap.set(club.name.toLowerCase(), club.id));
+
+        const playersToUpsert = playersData.map(p => {
+            let teamId: number | null = null;
+            let clubId: number | null = null;
+
+            // 1. Try to match Team Name first
+            if (p.teamName && p.teamName.trim()) {
+                teamId = teamNameMap.get(p.teamName.toLowerCase()) || null;
+                if (teamId) {
+                    // Infer Club ID from Team
+                    clubId = teamClubMap.get(p.teamName.toLowerCase()) || null;
+                }
+            }
+
+            // 2. If Team ID is missing, check for explicit Club Name (Pool Player)
+            if (!teamId && p.clubName && p.clubName.trim()) {
+                clubId = clubNameMap.get(p.clubName.toLowerCase()) || null;
+            }
+
+            // 3. Validation
+            if (!teamId && !clubId) {
+                throw new Error(`Neither Team "${p.teamName}" nor Club "${p.clubName}" found for player "${p.name}".`);
+            }
+
+            return { 
+                name: p.name, 
+                role: p.role, 
+                photo_url: p.photoUrl, 
+                team_id: teamId, 
+                club_id: clubId,
+                stats: { matches: parseInt(p.matches || '0', 10), aces: parseInt(p.aces || '0', 10), kills: parseInt(p.kills || '0', 10), blocks: parseInt(p.blocks || '0', 10) } 
+            };
+        });
+        
         const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,team_id' });
         if (error) throw error;
         await fetchData('players');
-    }, [supabase, state.teams, fetchData]);
+    }, [supabase, state.teams, state.clubs, fetchData]);
     
     const updateSponsorsForTournament = useCallback(async (tournamentId: number, sponsorIds: number[]) => {
         const { error: deleteError } = await supabase.from('tournament_sponsors').delete().eq('tournament_id', tournamentId);
@@ -461,15 +489,15 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const { data: insertedTransfers, error: transferError } = await supabase.from('player_transfers').insert(newTransfers).select();
             if (transferError) throw transferError;
             if (insertedTransfers) {
-                 // Explicit cast for safety
                  const typedTransfers = insertedTransfers as unknown as DbPlayerTransfer[];
                  setState(s => ({ ...s, playerTransfers: [...(s.playerTransfers || []), ...typedTransfers.map(mapPlayerTransfer)] }));
             }
         }
+        // Note: when assigning to a team, we might also need to ensure club_id matches the new team's club.
+        // However, players in a pool already have the club_id, so this is likely fine for now.
         const { data: updatedPlayers, error } = await supabase.from('players').update({ team_id: teamId }).in('id', playerIds).select();
         if (error) throw error;
         if (updatedPlayers) {
-            // Explicitly cast to any[] to handle untyped response and allow mapping
             const typedUpdatedPlayers = updatedPlayers as any[];
             const updatedPlayerMap = new Map<number, Player>(typedUpdatedPlayers.map(p => [p.id, mapPlayer(p)]));
             setState(s => {
@@ -558,10 +586,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const getTeamById = useCallback((teamId: number | null) => (state.teams || []).find(t => t.id === teamId), [state.teams]);
     const getTeamsByClub = useCallback((clubId: number) => (state.teams || []).filter(t => t.clubId === clubId), [state.teams]);
     const getPlayersByTeam = useCallback((teamId: number) => (state.players || []).filter(p => p.teamId === teamId), [state.players]);
+    
+    // Updated to include players who are either on a team in this club OR directly in the club pool
     const getPlayersByClub = useCallback((clubId: number): Player[] => {
-        const clubTeamIds = (state.teams || []).filter(t => t.clubId === clubId).map(t => t.id);
-        return (state.players || []).filter(p => p.teamId && clubTeamIds.includes(p.teamId)).sort((a, b) => a.name.localeCompare(b.name));
-    }, [state.teams, state.players]);
+        return (state.players || []).filter(p => p.clubId === clubId).sort((a, b) => a.name.localeCompare(b.name));
+    }, [state.players]);
+    
     const getTransfersByPlayerId = useCallback((playerId: number) => (state.playerTransfers || []).filter(t => t.playerId === playerId).sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime()), [state.playerTransfers]);
 
     const contextValue = {
@@ -603,30 +633,27 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
 export const useSports = (): SportsContextType => {
     const context = useContext(SportsDataContext);
-    if (context === undefined) throw new Error('useSports must be used within a SportsDataProvider');
+    if (context === undefined) {
+        throw new Error('useSports must be used within a SportsDataProvider');
+    }
     return context;
 };
 
-export const useEntityData = <T extends EntityName>(entityName: T): { data: SportsState[T], loading: boolean } => {
-    const { fetchData, loading: loadingSet, _internal_state, error: globalError } = useSports();
+export const useEntityData = <T extends EntityName>(entityName: T) => {
+    const { _internal_state, fetchData } = useSports();
+    const data = _internal_state[entityName];
+    const isLoading = _internal_state.loading.has(entityName);
+    const isLoaded = data !== null;
 
-    // Use a ref to track if we've initiated a fetch for this entity to prevent duplicate calls
-    // in strict mode or fast re-renders.
-    
     useEffect(() => {
-        // Only trigger fetch if data is missing and not already loading
-        if (_internal_state[entityName] === null && !loadingSet.has(entityName)) {
-            fetchData(entityName);
+        if (!isLoaded && !isLoading) {
+            fetchData(entityName).catch(err => console.error(`Failed to load ${entityName}:`, err));
         }
-    }, [entityName, fetchData, _internal_state, loadingSet]); 
+    }, [entityName, isLoaded, isLoading, fetchData]);
 
-    // CRITICAL FIX: If data is null, we are effectively loading (or waiting to load).
-    // This prevents components from rendering "Empty" states before the fetch even begins.
-    const isDataMissing = _internal_state[entityName] === null;
-    // We consider it loading if:
-    // 1. It is explicitly in the loading set.
-    // 2. OR Data is missing and we haven't hit a global error blocking us.
-    const isLoading = loadingSet.has(entityName) || (isDataMissing && !globalError);
-
-    return { data: _internal_state[entityName], loading: isLoading };
+    return {
+        data: data as SportsState[T],
+        loading: isLoading || !isLoaded,
+        error: _internal_state.error
+    };
 };

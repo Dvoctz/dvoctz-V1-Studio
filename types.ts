@@ -6,6 +6,7 @@ export interface Player {
   id: number;
   name: string;
   teamId: number | null;
+  clubId: number | null; // Added to support Club Pools
   photoUrl: string | null;
   role: PlayerRole;
   stats?: {

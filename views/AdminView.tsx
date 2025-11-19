@@ -171,11 +171,26 @@ const ClubsAdmin = () => {
     const handleDelete = async (id: number) => { if(window.confirm('Delete club?')) try { await deleteClub(id); } catch(e: any) { alert(e.message); } };
     const filtered = useMemo(() => clubs.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())), [clubs, searchTerm]);
 
+    const handleExport = () => {
+        const csv = Papa.unparse(clubs.map(c => ({
+            Name: c.name,
+            LogoUrl: c.logoUrl || ''
+        })));
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'clubs_export.csv';
+        link.click();
+    };
+
     return (
         <AdminSection title="Manage Clubs">
             <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <Input placeholder="Search clubs..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="!w-64 !mt-0" />
-                <Button onClick={() => setEditing({})}>Add Club</Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleExport} className="bg-green-600 hover:bg-green-500">Export CSV</Button>
+                    <Button onClick={() => setEditing({})}>Add Club</Button>
+                </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.map(c => (
@@ -285,7 +300,7 @@ const TeamForm: React.FC<{ team: any, clubs: Club[], onSave: any, onCancel: any,
 
 // --- PLAYERS ---
 const PlayersAdmin = () => {
-    const { players, teams, addPlayer, updatePlayer, deletePlayer, bulkAddOrUpdatePlayers, deleteAllPlayers } = useSports();
+    const { players, teams, clubs, addPlayer, updatePlayer, deletePlayer, bulkAddOrUpdatePlayers, deleteAllPlayers } = useSports();
     const [editing, setEditing] = useState<Player | Partial<Player> | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -302,7 +317,7 @@ const PlayersAdmin = () => {
             header: true,
             complete: async (results) => {
                 try {
-                    const csvPlayers = results.data.filter((r: any) => r.name && r.teamName) as CsvPlayer[];
+                    const csvPlayers = results.data.filter((r: any) => r.name && (r.teamName || r.clubName)) as CsvPlayer[];
                     await bulkAddOrUpdatePlayers(csvPlayers);
                     alert(`Successfully processed ${csvPlayers.length} players.`);
                 } catch (e: any) { alert(`Upload failed: ${e.message}`); }
@@ -334,7 +349,9 @@ const PlayersAdmin = () => {
                     <div key={p.id} className="flex justify-between items-center p-2 bg-accent rounded text-sm">
                         <div>
                             <p className="font-bold text-white">{p.name}</p>
-                            <p className="text-xs text-text-secondary">{p.role} - {teams.find(t => t.id === p.teamId)?.name || 'Free Agent'}</p>
+                            <p className="text-xs text-text-secondary">
+                                {p.role} - {teams.find(t => t.id === p.teamId)?.name || <span className="text-yellow-400">Club Pool (Unassigned)</span>}
+                            </p>
                         </div>
                         <div className="flex gap-2">
                              <Button onClick={() => setEditing(p)} className="bg-blue-600 text-xs px-2 py-1">Edit</Button>
@@ -344,20 +361,38 @@ const PlayersAdmin = () => {
                 ))}
                 {players.length > 50 && filtered.length === 50 && <p className="text-center text-xs text-text-secondary">Showing first 50 results...</p>}
             </div>
-            {editing && <FormModal title={editing.id ? "Edit Player" : "Add Player"} onClose={() => setEditing(null)}><PlayerForm player={editing} teams={teams} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
+            {editing && <FormModal title={editing.id ? "Edit Player" : "Add Player"} onClose={() => setEditing(null)}><PlayerForm player={editing} teams={teams} clubs={clubs} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
         </AdminSection>
     );
 };
 
-const PlayerForm: React.FC<{ player: any, teams: Team[], onSave: any, onCancel: any, error: any }> = ({ player, teams, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState({ name: '', role: 'Main Netty', teamId: '', stats: { matches: 0, aces: 0, kills: 0, blocks: 0 }, ...player });
+const PlayerForm: React.FC<{ player: any, teams: Team[], clubs: Club[], onSave: any, onCancel: any, error: any }> = ({ player, teams, clubs, onSave, onCancel, error }) => {
+    const [formData, setFormData] = useState({ name: '', role: 'Main Netty', teamId: null as number | null, clubId: null as number | null, stats: { matches: 0, aces: 0, kills: 0, blocks: 0 }, ...player });
     const [file, setFile] = useState<File | null>(null);
+
+    // If editing existing player with team but no clubId set locally, infer it
+    useEffect(() => {
+        if (formData.teamId && !formData.clubId) {
+            const team = teams.find(t => t.id === formData.teamId);
+            if (team) setFormData(prev => ({ ...prev, clubId: team.clubId }));
+        }
+    }, [formData.teamId, teams]);
     
-    // Handle teamId specially since select value is string but model expects number | null
+    const handleClubChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        const newClubId = val === '' ? null : Number(val);
+        setFormData(prev => ({ ...prev, clubId: newClubId, teamId: null })); // Reset team if club changes
+    };
+
     const handleTeamChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
         setFormData({ ...formData, teamId: val === '' ? null : Number(val) });
     };
+
+    const availableTeams = useMemo(() => {
+        if (!formData.clubId) return [];
+        return teams.filter(t => t.clubId === formData.clubId);
+    }, [teams, formData.clubId]);
 
     return (
         <form onSubmit={e => { e.preventDefault(); onSave({ ...formData, photoFile: file }); }} className="space-y-4">
@@ -369,13 +404,26 @@ const PlayerForm: React.FC<{ player: any, teams: Team[], onSave: any, onCancel: 
                     {['Main Netty', 'Left Front', 'Right Front', 'Net Center', 'Back Center', 'Left Back', 'Right Back', 'Right Netty', 'Left Netty', 'Service Man'].map(r => <option key={r} value={r}>{r}</option>)}
                 </Select>
             </div>
+            
+            {/* Step 1: Select Club */}
             <div>
-                <Label>Team</Label>
-                <Select value={formData.teamId ?? ''} onChange={handleTeamChange}>
-                    <option value="">Free Agent</option>
-                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <Label>Club (Required)</Label>
+                <Select value={formData.clubId ?? ''} onChange={handleClubChange} required>
+                    <option value="" disabled>Select a Club</option>
+                    {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
             </div>
+
+            {/* Step 2: Select Team (Filtered by Club) */}
+            <div>
+                <Label>Team (Optional)</Label>
+                <Select value={formData.teamId ?? ''} onChange={handleTeamChange} disabled={!formData.clubId}>
+                    <option value="">Unassigned (Club Pool)</option>
+                    {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </Select>
+                {!formData.clubId && <p className="text-xs text-text-secondary mt-1">Please select a club first.</p>}
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
                  <div><Label>Matches</Label><Input type="number" value={formData.stats.matches} onChange={e => setFormData({...formData, stats: {...formData.stats, matches: Number(e.target.value)}})} /></div>
                  <div><Label>Aces</Label><Input type="number" value={formData.stats.aces} onChange={e => setFormData({...formData, stats: {...formData.stats, aces: Number(e.target.value)}})} /></div>
@@ -611,11 +659,21 @@ const NoticeForm: React.FC<{ notice: any, onSave: any, onCancel: any, error: any
 // --- DATABASE ---
 const DatabaseAdmin = () => {
     const script = `/* 
-   DATABASE OPTIMIZATION SCRIPT
-   Run this in the Supabase SQL Editor to fix performance warnings.
+   DATABASE OPTIMIZATION & MIGRATION SCRIPT
+   Run this in the Supabase SQL Editor.
 */
 
--- 1. Game Rules
+-- 1. ADD CLUB_ID to Players (Migration for Club Pools)
+-- Only run this block once to update the schema
+ALTER TABLE players ADD COLUMN IF NOT EXISTS club_id BIGINT REFERENCES clubs(id);
+
+-- Migrate existing players: If they have a team, set their club_id to that team's club
+UPDATE players
+SET club_id = teams.club_id
+FROM teams
+WHERE players.team_id = teams.id AND players.club_id IS NULL;
+
+-- 2. Game Rules Policies
 DROP POLICY IF EXISTS "Enable insert for admins" ON public.game_rules;
 DROP POLICY IF EXISTS "Enable update for admins" ON public.game_rules;
 DROP POLICY IF EXISTS "Enable delete for admins" ON public.game_rules;
@@ -627,10 +685,9 @@ CREATE POLICY "Admin write access" ON public.game_rules FOR INSERT WITH CHECK ((
 CREATE POLICY "Admin update access" ON public.game_rules FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 CREATE POLICY "Admin delete access" ON public.game_rules FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 
--- 2. Clubs
+-- 3. Clubs Policies
 DROP POLICY IF EXISTS "Allow content managers to write" ON public.clubs;
 DROP POLICY IF EXISTS "Allow public read access" ON public.clubs;
--- Clean up any other potential policies
 DROP POLICY IF EXISTS "Enable read access for all" ON public.clubs;
 DROP POLICY IF EXISTS "Enable insert for authenticated" ON public.clubs;
 
@@ -639,7 +696,7 @@ CREATE POLICY "Admin write access" ON public.clubs FOR INSERT WITH CHECK ((selec
 CREATE POLICY "Admin update access" ON public.clubs FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 CREATE POLICY "Admin delete access" ON public.clubs FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 
--- 3. Teams
+-- 4. Teams Policies
 DROP POLICY IF EXISTS "Allow team managers to write" ON public.teams;
 DROP POLICY IF EXISTS "Allow public read access" ON public.teams;
 
@@ -648,7 +705,7 @@ CREATE POLICY "Manager write access" ON public.teams FOR INSERT WITH CHECK ((sel
 CREATE POLICY "Manager update access" ON public.teams FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
 CREATE POLICY "Manager delete access" ON public.teams FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
 
--- 4. Players
+-- 5. Players Policies
 DROP POLICY IF EXISTS "Allow team managers to write" ON public.players;
 DROP POLICY IF EXISTS "Allow public read access" ON public.players;
 
@@ -657,7 +714,7 @@ CREATE POLICY "Manager write access" ON public.players FOR INSERT WITH CHECK ((s
 CREATE POLICY "Manager update access" ON public.players FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
 CREATE POLICY "Manager delete access" ON public.players FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
 
--- 5. Fixtures
+-- 6. Fixtures Policies
 DROP POLICY IF EXISTS "Allow fixture managers to write" ON public.fixtures;
 DROP POLICY IF EXISTS "Allow public read access" ON public.fixtures;
 
@@ -666,7 +723,7 @@ CREATE POLICY "Manager write access" ON public.fixtures FOR INSERT WITH CHECK ((
 CREATE POLICY "Manager update access" ON public.fixtures FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
 CREATE POLICY "Manager delete access" ON public.fixtures FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
 
--- 6. Sponsors
+-- 7. Sponsors Policies
 DROP POLICY IF EXISTS "Allow content managers to write" ON public.sponsors;
 DROP POLICY IF EXISTS "Allow public read access" ON public.sponsors;
 
@@ -675,7 +732,7 @@ CREATE POLICY "Admin write access" ON public.sponsors FOR INSERT WITH CHECK ((se
 CREATE POLICY "Admin update access" ON public.sponsors FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 CREATE POLICY "Admin delete access" ON public.sponsors FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 
--- 7. Notices
+-- 8. Notices Policies
 DROP POLICY IF EXISTS "Allow content managers to write" ON public.notices;
 DROP POLICY IF EXISTS "Allow public read access" ON public.notices;
 
@@ -684,7 +741,7 @@ CREATE POLICY "Admin write access" ON public.notices FOR INSERT WITH CHECK ((sel
 CREATE POLICY "Admin update access" ON public.notices FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 CREATE POLICY "Admin delete access" ON public.notices FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 
--- 8. Tournaments
+-- 9. Tournaments Policies
 DROP POLICY IF EXISTS "Allow admins to write" ON public.tournaments;
 DROP POLICY IF EXISTS "Allow public read access" ON public.tournaments;
 
@@ -693,7 +750,7 @@ CREATE POLICY "Admin write access" ON public.tournaments FOR INSERT WITH CHECK (
 CREATE POLICY "Admin update access" ON public.tournaments FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
 CREATE POLICY "Admin delete access" ON public.tournaments FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
 
--- 9. Tournament Sponsors
+-- 10. Tournament Sponsors Policies
 DROP POLICY IF EXISTS "Allow content managers to write" ON public.tournament_sponsors;
 DROP POLICY IF EXISTS "Allow public read access" ON public.tournament_sponsors;
 
@@ -702,7 +759,7 @@ CREATE POLICY "Admin write access" ON public.tournament_sponsors FOR INSERT WITH
 CREATE POLICY "Admin update access" ON public.tournament_sponsors FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 CREATE POLICY "Admin delete access" ON public.tournament_sponsors FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
 
--- 10. Player Transfers
+-- 11. Player Transfers Policies
 DROP POLICY IF EXISTS "Allow admins to write" ON public.player_transfers;
 DROP POLICY IF EXISTS "Allow public read access" ON public.player_transfers;
 
@@ -723,8 +780,10 @@ CREATE POLICY "Admin delete access" ON public.player_transfers FOR DELETE USING 
         <AdminSection title="Database Optimization">
             <div className="space-y-4">
                 <p className="text-text-secondary">
-                    Run the following SQL script in your Supabase SQL Editor to fix the reported performance issues and warnings.
-                    This script optimizes Row Level Security (RLS) policies by consolidating them and caching authentication lookups.
+                    Run the following SQL script in your Supabase SQL Editor.
+                    <br />
+                    <strong className="text-yellow-400">IMPORTANT: This script adds the 'club_id' column to players for the new Club Pool feature.</strong>
+                    It also fixes reported performance issues.
                 </p>
                 <div className="relative">
                     <textarea

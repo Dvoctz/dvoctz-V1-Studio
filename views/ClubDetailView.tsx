@@ -71,7 +71,7 @@ const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: bo
                 {team ? (
                     <p className="text-xs text-text-secondary mt-1 truncate">Team: {team.name}</p>
                 ) : (
-                    <p className="text-xs text-yellow-400 mt-1 truncate">Free Agent</p>
+                    <p className="text-xs text-yellow-400 mt-1 truncate">Club Pool (Unassigned)</p>
                 )}
             </div>
         </div>
@@ -83,7 +83,6 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
   const { userProfile } = useAuth();
   const { getTeamsByClub, getPlayersByClub } = useSports();
   
-  // Ensure players are fetched when viewing club details to populate the list
   const { loading: playersLoading } = useEntityData('players');
   const { loading: teamsLoading } = useEntityData('teams');
 
@@ -104,6 +103,15 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
     if (!searchTerm) return clubPlayers;
     return clubPlayers.filter(player => player.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [clubPlayers, searchTerm]);
+
+  // Sort players: Assigned to team first, then pool players
+  const sortedPlayers = useMemo(() => {
+      return [...filteredPlayers].sort((a, b) => {
+          if (a.teamId && !b.teamId) return -1;
+          if (!a.teamId && b.teamId) return 1;
+          return 0;
+      });
+  }, [filteredPlayers]);
 
   const handleTogglePlayerSelection = (playerId: number) => {
       const newSelection = new Set(selectedPlayerIds);
@@ -237,21 +245,24 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-highlight"></div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredPlayers.length > 0 ? (
-                            filteredPlayers.map(player => (
-                                <PlayerCard 
-                                    key={player.id} 
-                                    player={player} 
-                                    isManaging={isManaging}
-                                    isSelected={selectedPlayerIds.has(player.id)}
-                                    onSelect={onSelectPlayer}
-                                    onToggleSelection={handleTogglePlayerSelection}
-                                />
-                            ))
-                        ) : (
-                             <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players found for this club.</p>
-                        )}
+                    <div className="space-y-6">
+                        {/* Grouped Display */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {sortedPlayers.length > 0 ? (
+                                sortedPlayers.map(player => (
+                                    <PlayerCard 
+                                        key={player.id} 
+                                        player={player} 
+                                        isManaging={isManaging}
+                                        isSelected={selectedPlayerIds.has(player.id)}
+                                        onSelect={onSelectPlayer}
+                                        onToggleSelection={handleTogglePlayerSelection}
+                                    />
+                                ))
+                            ) : (
+                                 <p className="text-center text-text-secondary md:col-span-2 lg:col-span-3">No players found for this club.</p>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
