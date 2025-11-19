@@ -460,12 +460,18 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         if (newTransfers.length > 0) {
             const { data: insertedTransfers, error: transferError } = await supabase.from('player_transfers').insert(newTransfers).select();
             if (transferError) throw transferError;
-            if (insertedTransfers) setState(s => ({ ...s, playerTransfers: [...(s.playerTransfers || []), ...insertedTransfers.map(mapPlayerTransfer)] }));
+            if (insertedTransfers) {
+                 // Explicit cast for safety
+                 const typedTransfers = insertedTransfers as unknown as DbPlayerTransfer[];
+                 setState(s => ({ ...s, playerTransfers: [...(s.playerTransfers || []), ...typedTransfers.map(mapPlayerTransfer)] }));
+            }
         }
         const { data: updatedPlayers, error } = await supabase.from('players').update({ team_id: teamId }).in('id', playerIds).select();
         if (error) throw error;
         if (updatedPlayers) {
-            const updatedPlayerMap = new Map(updatedPlayers.map(p => [p.id, mapPlayer(p)]));
+            // Explicitly cast to any[] to handle untyped response and allow mapping
+            const typedUpdatedPlayers = updatedPlayers as any[];
+            const updatedPlayerMap = new Map<number, Player>(typedUpdatedPlayers.map(p => [p.id, mapPlayer(p)]));
             setState(s => {
                 const newPlayers: Player[] = (s.players || []).map(p => updatedPlayerMap.get(p.id) || p);
                 return { ...s, players: newPlayers.sort((a,b) => a.name.localeCompare(b.name)) };

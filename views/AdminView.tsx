@@ -608,9 +608,145 @@ const NoticeForm: React.FC<{ notice: any, onSave: any, onCancel: any, error: any
     );
 };
 
+// --- DATABASE ---
+const DatabaseAdmin = () => {
+    const script = `/* 
+   DATABASE OPTIMIZATION SCRIPT
+   Run this in the Supabase SQL Editor to fix performance warnings.
+*/
+
+-- 1. Game Rules
+DROP POLICY IF EXISTS "Enable insert for admins" ON public.game_rules;
+DROP POLICY IF EXISTS "Enable update for admins" ON public.game_rules;
+DROP POLICY IF EXISTS "Enable delete for admins" ON public.game_rules;
+DROP POLICY IF EXISTS "Allow content managers to write" ON public.game_rules;
+DROP POLICY IF EXISTS "Allow public read access" ON public.game_rules;
+
+CREATE POLICY "Public read access" ON public.game_rules FOR SELECT USING (true);
+CREATE POLICY "Admin write access" ON public.game_rules FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin update access" ON public.game_rules FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin delete access" ON public.game_rules FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+
+-- 2. Clubs
+DROP POLICY IF EXISTS "Allow content managers to write" ON public.clubs;
+DROP POLICY IF EXISTS "Allow public read access" ON public.clubs;
+-- Clean up any other potential policies
+DROP POLICY IF EXISTS "Enable read access for all" ON public.clubs;
+DROP POLICY IF EXISTS "Enable insert for authenticated" ON public.clubs;
+
+CREATE POLICY "Public read access" ON public.clubs FOR SELECT USING (true);
+CREATE POLICY "Admin write access" ON public.clubs FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin update access" ON public.clubs FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin delete access" ON public.clubs FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+
+-- 3. Teams
+DROP POLICY IF EXISTS "Allow team managers to write" ON public.teams;
+DROP POLICY IF EXISTS "Allow public read access" ON public.teams;
+
+CREATE POLICY "Public read access" ON public.teams FOR SELECT USING (true);
+CREATE POLICY "Manager write access" ON public.teams FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
+CREATE POLICY "Manager update access" ON public.teams FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
+CREATE POLICY "Manager delete access" ON public.teams FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
+
+-- 4. Players
+DROP POLICY IF EXISTS "Allow team managers to write" ON public.players;
+DROP POLICY IF EXISTS "Allow public read access" ON public.players;
+
+CREATE POLICY "Public read access" ON public.players FOR SELECT USING (true);
+CREATE POLICY "Manager write access" ON public.players FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
+CREATE POLICY "Manager update access" ON public.players FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
+CREATE POLICY "Manager delete access" ON public.players FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'team_manager', 'content_editor')));
+
+-- 5. Fixtures
+DROP POLICY IF EXISTS "Allow fixture managers to write" ON public.fixtures;
+DROP POLICY IF EXISTS "Allow public read access" ON public.fixtures;
+
+CREATE POLICY "Public read access" ON public.fixtures FOR SELECT USING (true);
+CREATE POLICY "Manager write access" ON public.fixtures FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
+CREATE POLICY "Manager update access" ON public.fixtures FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
+CREATE POLICY "Manager delete access" ON public.fixtures FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'fixture_manager')));
+
+-- 6. Sponsors
+DROP POLICY IF EXISTS "Allow content managers to write" ON public.sponsors;
+DROP POLICY IF EXISTS "Allow public read access" ON public.sponsors;
+
+CREATE POLICY "Public read access" ON public.sponsors FOR SELECT USING (true);
+CREATE POLICY "Admin write access" ON public.sponsors FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin update access" ON public.sponsors FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin delete access" ON public.sponsors FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+
+-- 7. Notices
+DROP POLICY IF EXISTS "Allow content managers to write" ON public.notices;
+DROP POLICY IF EXISTS "Allow public read access" ON public.notices;
+
+CREATE POLICY "Public read access" ON public.notices FOR SELECT USING (true);
+CREATE POLICY "Admin write access" ON public.notices FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin update access" ON public.notices FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin delete access" ON public.notices FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+
+-- 8. Tournaments
+DROP POLICY IF EXISTS "Allow admins to write" ON public.tournaments;
+DROP POLICY IF EXISTS "Allow public read access" ON public.tournaments;
+
+CREATE POLICY "Public read access" ON public.tournaments FOR SELECT USING (true);
+CREATE POLICY "Admin write access" ON public.tournaments FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
+CREATE POLICY "Admin update access" ON public.tournaments FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
+CREATE POLICY "Admin delete access" ON public.tournaments FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
+
+-- 9. Tournament Sponsors
+DROP POLICY IF EXISTS "Allow content managers to write" ON public.tournament_sponsors;
+DROP POLICY IF EXISTS "Allow public read access" ON public.tournament_sponsors;
+
+CREATE POLICY "Public read access" ON public.tournament_sponsors FOR SELECT USING (true);
+CREATE POLICY "Admin write access" ON public.tournament_sponsors FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin update access" ON public.tournament_sponsors FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+CREATE POLICY "Admin delete access" ON public.tournament_sponsors FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin', 'content_editor')));
+
+-- 10. Player Transfers
+DROP POLICY IF EXISTS "Allow admins to write" ON public.player_transfers;
+DROP POLICY IF EXISTS "Allow public read access" ON public.player_transfers;
+
+CREATE POLICY "Public read access" ON public.player_transfers FOR SELECT USING (true);
+CREATE POLICY "Admin write access" ON public.player_transfers FOR INSERT WITH CHECK ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
+CREATE POLICY "Admin update access" ON public.player_transfers FOR UPDATE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));
+CREATE POLICY "Admin delete access" ON public.player_transfers FOR DELETE USING ((select auth.uid()) IN (SELECT id FROM public.user_profiles WHERE role IN ('admin')));`;
+
+    const [copied, setCopied] = useState(false);
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(script);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <AdminSection title="Database Optimization">
+            <div className="space-y-4">
+                <p className="text-text-secondary">
+                    Run the following SQL script in your Supabase SQL Editor to fix the reported performance issues and warnings.
+                    This script optimizes Row Level Security (RLS) policies by consolidating them and caching authentication lookups.
+                </p>
+                <div className="relative">
+                    <textarea
+                        readOnly
+                        value={script}
+                        className="w-full h-96 bg-primary p-4 rounded-md text-xs font-mono text-text-primary border border-accent focus:ring-highlight focus:border-highlight"
+                    />
+                    <button
+                        onClick={copyToClipboard}
+                        className="absolute top-2 right-2 bg-highlight hover:bg-teal-400 text-white text-xs px-3 py-1 rounded shadow transition-colors"
+                    >
+                        {copied ? 'Copied!' : 'Copy SQL'}
+                    </button>
+                </div>
+            </div>
+        </AdminSection>
+    );
+};
+
 // --- MAIN ADMIN VIEW ---
 export const AdminView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'notices'>('tournaments');
+    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'notices' | 'database'>('tournaments');
     const { userProfile } = useAuth();
 
     const tabs = [
@@ -621,6 +757,7 @@ export const AdminView: React.FC = () => {
         { id: 'fixtures', label: 'Fixtures' },
         { id: 'sponsors', label: 'Sponsors' },
         { id: 'notices', label: 'Notices' },
+        { id: 'database', label: 'Database' },
     ];
 
     return (
@@ -650,6 +787,7 @@ export const AdminView: React.FC = () => {
                 {activeTab === 'fixtures' && <FixturesAdmin />}
                 {activeTab === 'sponsors' && <SponsorsAdmin />}
                 {activeTab === 'notices' && <NoticesAdmin />}
+                {activeTab === 'database' && <DatabaseAdmin />}
             </div>
         </div>
     );
