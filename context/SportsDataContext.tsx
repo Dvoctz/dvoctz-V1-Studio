@@ -291,10 +291,24 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const deleteAllPlayers = useCallback(async () => {
-        const { error: transferError } = await supabase.from('player_transfers').delete().neq('id', -1);
-        if (transferError) throw transferError;
-        const { error } = await supabase.from('players').delete().neq('id', -1);
-        if (error) throw error;
+        // Safety mechanism: Timeout after 15 seconds to prevent infinite loading
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), 15000));
+
+        const deleteOperation = async () => {
+            // Delete transfers first because of Foreign Key constraints
+            const { error: transferError } = await supabase.from('player_transfers').delete().neq('id', -1);
+            if (transferError) throw new Error(`Failed to delete transfers: ${transferError.message}`);
+            
+            // Delete players
+            const { error: playerError } = await supabase.from('players').delete().neq('id', -1);
+            if (playerError) throw new Error(`Failed to delete players: ${playerError.message}`);
+            return true;
+        };
+
+        // Race the delete operation against the timeout
+        await Promise.race([deleteOperation(), timeout]);
+
+        // Update local state on success
         setState(s => ({ ...s, players: [], playerTransfers: [] }));
     }, [supabase]);
 

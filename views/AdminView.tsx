@@ -12,7 +12,7 @@ const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
     </div>
 );
 
-const Button: React.FC<{ onClick?: () => void; children: React.ReactNode; className?: string; disabled?: boolean; type?: 'button' | 'submit' }> = ({ onClick, children, className = 'bg-highlight hover:bg-teal-400', disabled = false, type = "button" }) => (
+const Button: React.FC<{ onClick?: (e?: React.MouseEvent) => void; children: React.ReactNode; className?: string; disabled?: boolean; type?: 'button' | 'submit' }> = ({ onClick, children, className = 'bg-highlight hover:bg-teal-400', disabled = false, type = "button" }) => (
     <button
         type={type}
         onClick={onClick}
@@ -1746,12 +1746,17 @@ const DangerZoneAdmin = () => {
     const [loading, setLoading] = useState(false);
     const [confirmText, setConfirmText] = useState('');
 
-    const handleDelete = async () => {
+    const handleDelete = async (e?: React.MouseEvent) => {
+        // Prevent any unintended form submission or default behavior
+        if (e) e.preventDefault();
+        
         setLoading(true);
         setError('');
         try {
             await deleteAllPlayers();
             setIsModalOpen(false);
+            // Reset state after successful close
+            setConfirmText('');
         } catch (err: any) {
             setError(err.message);
         } finally {
