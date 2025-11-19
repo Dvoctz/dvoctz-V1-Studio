@@ -38,7 +38,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
     setIsMenuOpen(false);
   };
   
-  const handleLogout = async () => {
+  const handleLogout = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     await logout();
     setIsMenuOpen(false);
     onNavigate('home');
@@ -75,11 +76,12 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
               {getAdminLinkText()}
             </NavLink>
              {currentUser && (
-              <button onClick={handleLogout} className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-300 text-text-secondary hover:bg-accent hover:text-text-primary">
+              <button type="button" onClick={handleLogout} className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-300 text-text-secondary hover:bg-accent hover:text-text-primary">
                 Logout
               </button>
             )}
             <button 
+                type="button"
                 onClick={handleRefresh} 
                 className="ml-2 p-2 text-text-secondary hover:bg-accent hover:text-white rounded-full transition-colors"
                 title="Refresh App Data"
@@ -93,6 +95,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
            {/* Mobile Controls */}
            <div className="md:hidden flex items-center">
             <button 
+                type="button"
                 onClick={handleRefresh} 
                 className="text-text-secondary hover:text-white focus:outline-none p-2 mr-1"
                 aria-label="Refresh App"
@@ -101,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                 </svg>
             </button>
-            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-text-secondary hover:text-white focus:outline-none p-2" aria-controls="mobile-menu" aria-expanded={isMenuOpen}>
+            <button type="button" onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-text-secondary hover:text-white focus:outline-none p-2" aria-controls="mobile-menu" aria-expanded={isMenuOpen}>
               <span className="sr-only">Open main menu</span>
               {isMenuOpen ? (
                 <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -128,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
               {getAdminLinkText()}
             </NavLink>
              {currentUser && (
-              <button onClick={handleLogout} className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-300 w-full text-left text-text-secondary hover:bg-accent hover:text-text-primary">
+              <button type="button" onClick={handleLogout} className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-300 w-full text-left text-text-secondary hover:bg-accent hover:text-text-primary">
                 Logout
               </button>
             )}

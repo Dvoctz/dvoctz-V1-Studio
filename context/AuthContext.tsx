@@ -104,8 +104,22 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
 
     const logout = async () => {
-        await supabase.auth.signOut();
-        // The onAuthStateChange listener will automatically update state.
+        // 1. Immediate Local Cleanup
+        // We clear the user state immediately so the UI updates to "logged out" mode instantly.
+        // This prevents the app from feeling "stuck" if the network request to Supabase takes time or fails.
+        setSession(null);
+        setCurrentUser(null);
+        setUserProfile(null);
+
+        try {
+            // 2. Server-side Cleanup
+            // We attempt to invalidate the session on the server.
+            // We don't await this for the UI update because the user intent is already clear.
+            await supabase.auth.signOut();
+        } catch (error) {
+            // If the network fails, we just log it. The user is already logged out locally.
+            console.error("Logout network request failed (non-critical):", error);
+        }
     };
 
     return (
