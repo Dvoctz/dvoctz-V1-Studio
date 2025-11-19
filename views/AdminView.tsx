@@ -237,14 +237,30 @@ const TeamsAdmin = () => {
         try { team.id ? await updateTeam(team) : await addTeam(team); setEditing(null); } catch(e: any) { setError(e.message); }
     };
     const handleDelete = async (id: number) => { if(window.confirm('Delete team?')) try { await deleteTeam(id); } catch(e: any) { alert(e.message); } };
+    
     const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         Papa.parse(file, {
             header: true,
+            skipEmptyLines: true,
             complete: async (results) => {
                 try {
-                    const csvTeams = results.data.filter((r: any) => r.name && r.clubName) as CsvTeam[];
+                    // Fix for mapping capitalized headers from export
+                    const rawData = results.data as any[];
+                    const csvTeams: CsvTeam[] = rawData.map(r => ({
+                        name: r.name || r.Name,
+                        shortName: r.shortName || r.ShortName,
+                        division: r.division || r.Division || 'Division 1',
+                        clubName: r.clubName || r.ClubName,
+                        logoUrl: r.logoUrl || r.LogoUrl
+                    })).filter(t => t.name && t.clubName);
+                    
+                    if (csvTeams.length === 0) {
+                         alert("No valid teams found. Check headers: Name, ClubName are required.");
+                         return;
+                    }
+
                     await bulkAddOrUpdateTeams(csvTeams);
                     alert(`Successfully processed ${csvTeams.length} teams.`);
                 } catch (e: any) { alert(`Upload failed: ${e.message}`); }
@@ -332,14 +348,34 @@ const PlayersAdmin = () => {
         try { player.id ? await updatePlayer(player) : await addPlayer(player); setEditing(null); } catch(e: any) { setError(e.message); }
     };
     const handleDelete = async (id: number) => { if(window.confirm('Delete player?')) try { await deletePlayer(id); } catch(e: any) { alert(e.message); } };
+    
     const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         Papa.parse(file, {
             header: true,
+            skipEmptyLines: true,
             complete: async (results) => {
                 try {
-                    const csvPlayers = results.data.filter((r: any) => r.name && (r.teamName || r.clubName)) as CsvPlayer[];
+                    // Fix for mapping capitalized headers from export
+                    const rawData = results.data as any[];
+                    const csvPlayers: CsvPlayer[] = rawData.map(r => ({
+                        name: r.name || r.Name,
+                        role: r.role || r.Role || 'Main Netty',
+                        teamName: r.teamName || r.TeamName,
+                        clubName: r.clubName || r.ClubName,
+                        matches: r.matches || r.Matches || '0',
+                        aces: r.aces || r.Aces || '0',
+                        kills: r.kills || r.Kills || '0',
+                        blocks: r.blocks || r.Blocks || '0',
+                        photoUrl: r.photoUrl || r.PhotoUrl
+                    })).filter(p => p.name && (p.teamName || p.clubName));
+
+                    if (csvPlayers.length === 0) {
+                        alert("No valid players found in CSV. Please check headers (Name, TeamName, ClubName) and ensure at least Name and either TeamName or ClubName are present.");
+                        return;
+                    }
+
                     await bulkAddOrUpdatePlayers(csvPlayers);
                     alert(`Successfully processed ${csvPlayers.length} players.`);
                 } catch (e: any) { alert(`Upload failed: ${e.message}`); }
