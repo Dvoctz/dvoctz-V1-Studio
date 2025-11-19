@@ -408,45 +408,67 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const bulkAddOrUpdateTeams = useCallback(async (teamsData: CsvTeam[]) => {
+        // Fetch current data to be sure
+        const currentClubs = await fetchData('clubs');
+        
         const clubNameMap = new Map<string, number>();
-        (state.clubs || []).forEach(club => clubNameMap.set(club.name.toLowerCase(), club.id));
+        (currentClubs || []).forEach(club => {
+             // Use trim and lowercase for robust matching
+             clubNameMap.set(club.name.trim().toLowerCase(), club.id);
+        });
+        
         const teamsToUpsert = teamsData.map(t => {
-            const clubId = clubNameMap.get(t.clubName.toLowerCase());
+            // Clean the input
+            const cleanClubName = t.clubName.trim().toLowerCase();
+            const clubId = clubNameMap.get(cleanClubName);
+            
             if (!clubId) throw new Error(`Club "${t.clubName}" not found for team "${t.name}".`);
             return { name: t.name, short_name: t.shortName, division: t.division, logo_url: t.logoUrl, club_id: clubId };
         });
+        
         const { error } = await supabase.from('teams').upsert(teamsToUpsert, { onConflict: 'name' });
         if (error) throw error;
         await fetchData('teams');
-    }, [supabase, state.clubs, fetchData]);
+    }, [supabase, fetchData]);
 
     const bulkAddOrUpdatePlayers = useCallback(async (playersData: CsvPlayer[]) => {
+        // Fetch latest data to prevent stale state issues
+        const currentTeams = await fetchData('teams');
+        const currentClubs = await fetchData('clubs');
+
         const teamNameMap = new Map<string, number>();
         const teamClubMap = new Map<string, number>();
-        (state.teams || []).forEach(team => {
-            teamNameMap.set(team.name.toLowerCase(), team.id);
-            teamClubMap.set(team.name.toLowerCase(), team.clubId);
+        (currentTeams || []).forEach(team => {
+            const key = team.name.trim().toLowerCase();
+            teamNameMap.set(key, team.id);
+            teamClubMap.set(key, team.clubId);
         });
         
         const clubNameMap = new Map<string, number>();
-        (state.clubs || []).forEach(club => clubNameMap.set(club.name.toLowerCase(), club.id));
+        (currentClubs || []).forEach(club => {
+            const key = club.name.trim().toLowerCase();
+            clubNameMap.set(key, club.id);
+        });
 
         const playersToUpsert = playersData.map(p => {
             let teamId: number | null = null;
             let clubId: number | null = null;
 
+            const cleanTeamName = p.teamName ? p.teamName.trim().toLowerCase() : '';
+            const cleanClubName = p.clubName ? p.clubName.trim().toLowerCase() : '';
+
             // 1. Try to match Team Name first
-            if (p.teamName && p.teamName.trim()) {
-                teamId = teamNameMap.get(p.teamName.toLowerCase()) || null;
+            if (cleanTeamName) {
+                teamId = teamNameMap.get(cleanTeamName) || null;
                 if (teamId) {
                     // Infer Club ID from Team
-                    clubId = teamClubMap.get(p.teamName.toLowerCase()) || null;
+                    clubId = teamClubMap.get(cleanTeamName) || null;
                 }
             }
 
             // 2. If Team ID is missing, check for explicit Club Name (Pool Player)
-            if (!teamId && p.clubName && p.clubName.trim()) {
-                clubId = clubNameMap.get(p.clubName.toLowerCase()) || null;
+            if (!teamId && cleanClubName) {
+                clubId = clubNameMap.get(cleanClubName) || null;
             }
 
             // 3. Validation
@@ -467,7 +489,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,team_id' });
         if (error) throw error;
         await fetchData('players');
-    }, [supabase, state.teams, state.clubs, fetchData]);
+    }, [supabase, fetchData]);
     
     const updateSponsorsForTournament = useCallback(async (tournamentId: number, sponsorIds: number[]) => {
         const { error: deleteError } = await supabase.from('tournament_sponsors').delete().eq('tournament_id', tournamentId);
