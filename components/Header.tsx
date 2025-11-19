@@ -40,9 +40,12 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
   
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
-    await logout();
+    // Close menu immediately
     setIsMenuOpen(false);
+    // Navigate home immediately
     onNavigate('home');
+    // Perform logout logic
+    await logout();
   }
   
   const handleRefresh = () => {
