@@ -43,6 +43,10 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
     setIsMenuOpen(false);
     onNavigate('home');
   }
+  
+  const handleRefresh = () => {
+      window.location.reload();
+  };
 
   const getAdminLinkText = () => {
     if (userProfile?.role === 'admin') return 'Admin Panel';
@@ -59,6 +63,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
             </svg>
             <span className="text-xl font-bold text-text-primary">DVOC Tanzania</span>
           </div>
+          
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-2">
             <NavLink view="home" currentView={currentView} onNavigate={onNavigate}>Home</NavLink>
             <NavLink view="tournaments" currentView={currentView} onNavigate={onNavigate}>Tournaments</NavLink>
@@ -73,8 +79,28 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
                 Logout
               </button>
             )}
+            <button 
+                onClick={handleRefresh} 
+                className="ml-2 p-2 text-text-secondary hover:bg-accent hover:text-white rounded-full transition-colors"
+                title="Refresh App Data"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
           </nav>
-           <div className="md:hidden">
+
+           {/* Mobile Controls */}
+           <div className="md:hidden flex items-center">
+            <button 
+                onClick={handleRefresh} 
+                className="text-text-secondary hover:text-white focus:outline-none p-2 mr-1"
+                aria-label="Refresh App"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-text-secondary hover:text-white focus:outline-none p-2" aria-controls="mobile-menu" aria-expanded={isMenuOpen}>
               <span className="sr-only">Open main menu</span>
               {isMenuOpen ? (
