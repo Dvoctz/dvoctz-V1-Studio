@@ -519,6 +519,137 @@ const PlayerForm: React.FC<{ player: any, teams: Team[], clubs: Club[], onSave: 
     );
 };
 
+// --- TRANSFERS (New Component) ---
+const TransfersAdmin = () => {
+    const { playerTransfers, players, teams, addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer } = useSports();
+    const [editing, setEditing] = useState<PlayerTransfer | Partial<PlayerTransfer> | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSave = async (transfer: any) => {
+        setError(null);
+        try {
+            if (transfer.id) {
+                await updatePlayerTransfer(transfer);
+            } else {
+                await addPlayerTransfer(transfer);
+            }
+            setEditing(null);
+        } catch(e: any) {
+            setError(e.message);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if(window.confirm('Are you sure you want to delete this transfer record?')) {
+            try { await deletePlayerTransfer(id); } catch(e: any) { alert(e.message); }
+        }
+    };
+
+    const filtered = useMemo(() => {
+        let list = playerTransfers || [];
+        if (searchTerm) {
+            list = list.filter(t => {
+                const p = players.find(player => player.id === t.playerId);
+                return p?.name.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+        }
+        return list.sort((a,b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime());
+    }, [playerTransfers, players, searchTerm]);
+
+    return (
+        <AdminSection title="Manage Transfers">
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <Input placeholder="Search by player name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="!w-64 !mt-0" />
+                <Button onClick={() => setEditing({})}>Record Transfer</Button>
+            </div>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+                {filtered.map(t => {
+                    const player = players.find(p => p.id === t.playerId);
+                    const fromTeam = teams.find(team => team.id === t.fromTeamId);
+                    const toTeam = teams.find(team => team.id === t.toTeamId);
+                    return (
+                        <div key={t.id} className="p-3 bg-accent rounded text-sm flex flex-col sm:flex-row justify-between gap-2">
+                            <div>
+                                <p className="font-bold text-white">{player?.name || 'Unknown Player'}</p>
+                                <p className="text-xs text-text-primary">
+                                    {new Date(t.transferDate).toLocaleDateString()}: <span className="text-text-secondary">{fromTeam?.name || 'Free Agent'}</span> &rarr; <span className="text-highlight">{toTeam?.name || 'Free Agent'}</span>
+                                </p>
+                                {t.notes && <p className="text-xs text-text-secondary italic mt-1">"{t.notes}"</p>}
+                                {t.isAutomated && <span className="inline-block mt-1 text-[10px] uppercase bg-gray-600 text-white px-1 rounded">Automated</span>}
+                            </div>
+                            <div className="flex gap-2 self-start">
+                                <Button onClick={() => setEditing(t)} className="bg-blue-600 text-xs px-2 py-1">Edit</Button>
+                                <Button onClick={() => handleDelete(t.id)} className="bg-red-600 text-xs px-2 py-1">Del</Button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            {editing && <FormModal title={editing.id ? "Edit Transfer" : "Record Transfer"} onClose={() => setEditing(null)}>
+                <TransferForm transfer={editing} players={players} teams={teams} onSave={handleSave} onCancel={() => setEditing(null)} error={error} />
+            </FormModal>}
+        </AdminSection>
+    );
+};
+
+const TransferForm: React.FC<{ transfer: any, players: Player[], teams: Team[], onSave: any, onCancel: any, error: any }> = ({ transfer, players, teams, onSave, onCancel, error }) => {
+    const [formData, setFormData] = useState({
+        playerId: players[0]?.id,
+        fromTeamId: null as number | null,
+        toTeamId: null as number | null,
+        transferDate: new Date().toISOString().split('T')[0],
+        notes: '',
+        ...transfer
+    });
+
+    // When player changes, if it's a new entry, default 'fromTeam' to current team
+    useEffect(() => {
+        if (!transfer.id && formData.playerId) {
+            const p = players.find(player => player.id === Number(formData.playerId));
+            if (p) {
+                setFormData(prev => ({...prev, fromTeamId: p.teamId}));
+            }
+        }
+    }, [formData.playerId, players, transfer.id]);
+
+    return (
+        <form onSubmit={e => { e.preventDefault(); onSave(formData); }} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div>
+                <Label>Player</Label>
+                {/* Disable player selection if editing existing transfer to prevent confusion */}
+                <Select value={formData.playerId} onChange={e => setFormData({...formData, playerId: Number(e.target.value)})} disabled={!!transfer.id}>
+                    {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <Label>From Team</Label>
+                    <Select value={formData.fromTeamId ?? ''} onChange={e => setFormData({...formData, fromTeamId: e.target.value ? Number(e.target.value) : null})}>
+                        <option value="">Free Agent</option>
+                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                </div>
+                <div>
+                    <Label>To Team</Label>
+                    <Select value={formData.toTeamId ?? ''} onChange={e => setFormData({...formData, toTeamId: e.target.value ? Number(e.target.value) : null})}>
+                        <option value="">Free Agent</option>
+                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                </div>
+            </div>
+            <div><Label>Date</Label><Input type="date" value={formData.transferDate} onChange={e => setFormData({...formData, transferDate: e.target.value})} required /></div>
+            <div><Label>Notes</Label><Textarea value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} rows={3} /></div>
+            
+            <div className="flex justify-end gap-2">
+                <Button onClick={onCancel} className="bg-gray-600">Cancel</Button>
+                <Button type="submit">Save</Button>
+            </div>
+        </form>
+    );
+};
+
 // --- FIXTURES ---
 const FixturesAdmin = () => {
     const { fixtures, tournaments, teams, addFixture, updateFixture, deleteFixture } = useSports();
@@ -741,7 +872,7 @@ const NoticeForm: React.FC<{ notice: any, onSave: any, onCancel: any, error: any
 
 // --- MAIN ADMIN VIEW ---
 export const AdminView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'notices'>('tournaments');
+    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'transfers' | 'fixtures' | 'sponsors' | 'notices'>('tournaments');
     const { userProfile } = useAuth();
 
     const tabs = [
@@ -749,6 +880,7 @@ export const AdminView: React.FC = () => {
         { id: 'clubs', label: 'Clubs' },
         { id: 'teams', label: 'Teams' },
         { id: 'players', label: 'Players' },
+        { id: 'transfers', label: 'Transfers' },
         { id: 'fixtures', label: 'Fixtures' },
         { id: 'sponsors', label: 'Sponsors' },
         { id: 'notices', label: 'Notices' },
@@ -778,6 +910,7 @@ export const AdminView: React.FC = () => {
                 {activeTab === 'clubs' && <ClubsAdmin />}
                 {activeTab === 'teams' && <TeamsAdmin />}
                 {activeTab === 'players' && <PlayersAdmin />}
+                {activeTab === 'transfers' && <TransfersAdmin />}
                 {activeTab === 'fixtures' && <FixturesAdmin />}
                 {activeTab === 'sponsors' && <SponsorsAdmin />}
                 {activeTab === 'notices' && <NoticesAdmin />}
