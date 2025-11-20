@@ -66,6 +66,60 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
     </div>
 );
 
+const ImageUploadOrUrl: React.FC<{ 
+    label: string; 
+    urlValue: string; 
+    onUrlChange: (val: string) => void; 
+    onFileChange: (file: File | null) => void;
+}> = ({ label, urlValue, onUrlChange, onFileChange }) => {
+    const [mode, setMode] = useState<'file' | 'url'>('file');
+
+    return (
+        <div>
+            <Label>{label}</Label>
+            <div className="flex gap-4 mb-2 text-sm">
+                <button 
+                    type="button"
+                    onClick={() => setMode('file')}
+                    className={`${mode === 'file' ? 'text-highlight font-bold border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+                >
+                    Upload File
+                </button>
+                <button 
+                    type="button"
+                    onClick={() => { setMode('url'); onFileChange(null); }} 
+                    className={`${mode === 'url' ? 'text-highlight font-bold border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+                >
+                    Image URL
+                </button>
+            </div>
+            
+            {mode === 'file' ? (
+                <div>
+                    <Input type="file" accept="image/*" onChange={e => onFileChange(e.target.files?.[0] || null)} />
+                    {urlValue && (
+                        <div className="mt-2 flex items-center gap-2">
+                             <span className="text-xs text-text-secondary">Current:</span>
+                             <a href={urlValue} target="_blank" rel="noreferrer" className="text-xs text-highlight truncate max-w-[200px] block">{urlValue}</a>
+                        </div>
+                    )}
+                    <p className="text-[10px] text-text-secondary mt-1">Upload will override current URL.</p>
+                </div>
+            ) : (
+                <div>
+                     <Input 
+                        type="url" 
+                        placeholder="https://example.com/image.png" 
+                        value={urlValue} 
+                        onChange={e => onUrlChange(e.target.value)} 
+                    />
+                    <p className="text-[10px] text-text-secondary mt-1">Enter a direct link to an image.</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // --- TOURNAMENTS ---
 const TournamentsAdmin = () => {
     const { tournaments, addTournament, updateTournament, deleteTournament, concludeLeaguePhase, fixtures } = useSports();
@@ -213,13 +267,18 @@ const ClubsAdmin = () => {
 };
 
 const ClubForm: React.FC<{ club: any, onSave: any, onCancel: any, error: any }> = ({ club, onSave, onCancel, error }) => {
-    const [name, setName] = useState(club.name || '');
+    const [formData, setFormData] = useState({ name: '', logoUrl: '', ...club });
     const [file, setFile] = useState<File | null>(null);
     return (
-        <form onSubmit={e => { e.preventDefault(); onSave({ ...club, name, logoFile: file }); }} className="space-y-4">
+        <form onSubmit={e => { e.preventDefault(); onSave({ ...formData, logoFile: file }); }} className="space-y-4">
             {error && <ErrorMessage message={error} />}
-            <div><Label>Name</Label><Input value={name} onChange={e => setName(e.target.value)} required /></div>
-            <div><Label>Logo</Label><Input type="file" onChange={e => setFile(e.target.files?.[0] || null)} /></div>
+            <div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
+            <ImageUploadOrUrl 
+                label="Logo" 
+                urlValue={formData.logoUrl || ''} 
+                onUrlChange={(val) => setFormData({...formData, logoUrl: val})}
+                onFileChange={setFile}
+            />
             <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
         </form>
     );
@@ -321,7 +380,7 @@ const TeamsAdmin = () => {
 };
 
 const TeamForm: React.FC<{ team: any, clubs: Club[], onSave: any, onCancel: any, error: any }> = ({ team, clubs, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState({ name: '', shortName: '', division: 'Division 1', clubId: clubs[0]?.id || 0, ...team });
+    const [formData, setFormData] = useState({ name: '', shortName: '', division: 'Division 1', clubId: clubs[0]?.id || 0, logoUrl: '', ...team });
     const [file, setFile] = useState<File | null>(null);
     return (
         <form onSubmit={e => { e.preventDefault(); onSave({ ...formData, logoFile: file }); }} className="space-y-4">
@@ -329,8 +388,13 @@ const TeamForm: React.FC<{ team: any, clubs: Club[], onSave: any, onCancel: any,
             <div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
             <div><Label>Short Name</Label><Input value={formData.shortName} onChange={e => setFormData({...formData, shortName: e.target.value})} required /></div>
             <div><Label>Division</Label><Select value={formData.division} onChange={e => setFormData({...formData, division: e.target.value})}><option>Division 1</option><option>Division 2</option></Select></div>
-            <div><Label>Club</Label><Select value={formData.clubId} onChange={e => setFormData({...formData, clubId: Number(e.target.value)})} required>{clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></div>
-            <div><Label>Logo</Label><Input type="file" onChange={e => setFile(e.target.files?.[0] || null)} /></div>
+            <div><Label>Club</Label><Select value={formData.clubId} onChange={e => setFormData({...formData, clubId: Number(e.target.value)})}>{clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></div>
+            <ImageUploadOrUrl 
+                label="Logo" 
+                urlValue={formData.logoUrl || ''} 
+                onUrlChange={(val) => setFormData({...formData, logoUrl: val})}
+                onFileChange={setFile}
+            />
             <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
         </form>
     );
@@ -450,7 +514,7 @@ const PlayersAdmin = () => {
 };
 
 const PlayerForm: React.FC<{ player: any, teams: Team[], clubs: Club[], onSave: any, onCancel: any, error: any }> = ({ player, teams, clubs, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState({ name: '', role: 'Main Netty', teamId: null as number | null, clubId: null as number | null, stats: { matches: 0, aces: 0, kills: 0, blocks: 0 }, ...player });
+    const [formData, setFormData] = useState({ name: '', role: 'Main Netty', teamId: null as number | null, clubId: null as number | null, stats: { matches: 0, aces: 0, kills: 0, blocks: 0 }, photoUrl: '', ...player });
     const [file, setFile] = useState<File | null>(null);
 
     // If editing existing player with team but no clubId set locally, infer it
@@ -513,7 +577,12 @@ const PlayerForm: React.FC<{ player: any, teams: Team[], clubs: Club[], onSave: 
                  <div><Label>Kills</Label><Input type="number" value={formData.stats.kills} onChange={e => setFormData({...formData, stats: {...formData.stats, kills: Number(e.target.value)}})} /></div>
                  <div><Label>Blocks</Label><Input type="number" value={formData.stats.blocks} onChange={e => setFormData({...formData, stats: {...formData.stats, blocks: Number(e.target.value)}})} /></div>
             </div>
-            <div><Label>Photo</Label><Input type="file" onChange={e => setFile(e.target.files?.[0] || null)} /></div>
+            <ImageUploadOrUrl 
+                label="Photo" 
+                urlValue={formData.photoUrl || ''} 
+                onUrlChange={(val) => setFormData({...formData, photoUrl: val})}
+                onFileChange={setFile}
+            />
             <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
         </form>
     );
@@ -867,7 +936,7 @@ const SponsorsAdmin = () => {
 };
 
 const SponsorForm: React.FC<{ sponsor: any, onSave: any, onCancel: any, error: any }> = ({ sponsor, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState({ name: '', website: '', showInFooter: false, ...sponsor });
+    const [formData, setFormData] = useState({ name: '', website: '', showInFooter: false, logoUrl: '', ...sponsor });
     const [file, setFile] = useState<File | null>(null);
     return (
         <form onSubmit={e => { e.preventDefault(); onSave({ ...formData, logoFile: file }); }} className="space-y-4">
@@ -875,7 +944,12 @@ const SponsorForm: React.FC<{ sponsor: any, onSave: any, onCancel: any, error: a
             <div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
             <div><Label>Website</Label><Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} /></div>
             <div><label className="flex items-center gap-2 text-text-primary"><input type="checkbox" checked={formData.showInFooter} onChange={e => setFormData({...formData, showInFooter: e.target.checked})} /> Show in Footer</label></div>
-            <div><Label>Logo</Label><Input type="file" onChange={e => setFile(e.target.files?.[0] || null)} /></div>
+            <ImageUploadOrUrl 
+                label="Logo" 
+                urlValue={formData.logoUrl || ''} 
+                onUrlChange={(val) => setFormData({...formData, logoUrl: val})}
+                onFileChange={setFile}
+            />
             <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
         </form>
     );
