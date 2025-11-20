@@ -519,12 +519,13 @@ const PlayerForm: React.FC<{ player: any, teams: Team[], clubs: Club[], onSave: 
     );
 };
 
-// --- TRANSFERS (New Component) ---
+// --- TRANSFERS ---
 const TransfersAdmin = () => {
     const { playerTransfers, players, teams, addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer } = useSports();
     const [editing, setEditing] = useState<PlayerTransfer | Partial<PlayerTransfer> | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
     const handleSave = async (transfer: any) => {
         setError(null);
@@ -546,6 +547,17 @@ const TransfersAdmin = () => {
         }
     };
 
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if(window.confirm(`Are you sure you want to delete ${selectedIds.size} transfer records? This cannot be undone.`)) {
+            const idsToDelete = Array.from(selectedIds) as number[];
+            for (const id of idsToDelete) {
+                 try { await deletePlayerTransfer(id); } catch(e: any) { console.error(e); }
+            }
+            setSelectedIds(new Set());
+        }
+    };
+
     const filtered = useMemo(() => {
         let list = playerTransfers || [];
         if (searchTerm) {
@@ -557,28 +569,73 @@ const TransfersAdmin = () => {
         return list.sort((a,b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime());
     }, [playerTransfers, players, searchTerm]);
 
+    const handleToggleSelect = (id: number) => {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedIds(newSet);
+    };
+
+    const handleSelectAll = () => {
+        if (selectedIds.size === filtered.length && filtered.length > 0) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filtered.map(t => t.id)));
+        }
+    };
+
     return (
         <AdminSection title="Manage Transfers">
-            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <Input placeholder="Search by player name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="!w-64 !mt-0" />
-                <Button onClick={() => setEditing({})}>Record Transfer</Button>
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                <Input placeholder="Search by player name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="!w-full sm:!w-64 !mt-0" />
+                <div className="flex gap-2">
+                    {selectedIds.size > 0 && (
+                        <Button onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-500">
+                            Delete Selected ({selectedIds.size})
+                        </Button>
+                    )}
+                    <Button onClick={() => setEditing({})}>Record Transfer</Button>
+                </div>
             </div>
+
+             {filtered.length > 0 && (
+                <div className="flex items-center gap-2 mb-2 px-3">
+                    <input 
+                        type="checkbox" 
+                        checked={selectedIds.size === filtered.length && filtered.length > 0}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 rounded border-gray-300 text-highlight focus:ring-highlight"
+                    />
+                    <span className="text-sm text-text-secondary cursor-pointer" onClick={handleSelectAll}>Select All</span>
+                </div>
+            )}
+
             <div className="space-y-2 max-h-96 overflow-y-auto">
                 {filtered.map(t => {
                     const player = players.find(p => p.id === t.playerId);
                     const fromTeam = teams.find(team => team.id === t.fromTeamId);
                     const toTeam = teams.find(team => team.id === t.toTeamId);
+                    const isSelected = selectedIds.has(t.id);
+
                     return (
-                        <div key={t.id} className="p-3 bg-accent rounded text-sm flex flex-col sm:flex-row justify-between gap-2">
-                            <div>
-                                <p className="font-bold text-white">{player?.name || 'Unknown Player'}</p>
-                                <p className="text-xs text-text-primary">
-                                    {new Date(t.transferDate).toLocaleDateString()}: <span className="text-text-secondary">{fromTeam?.name || 'Free Agent'}</span> &rarr; <span className="text-highlight">{toTeam?.name || 'Free Agent'}</span>
-                                </p>
-                                {t.notes && <p className="text-xs text-text-secondary italic mt-1">"{t.notes}"</p>}
-                                {t.isAutomated && <span className="inline-block mt-1 text-[10px] uppercase bg-gray-600 text-white px-1 rounded">Automated</span>}
+                        <div key={t.id} className={`p-3 rounded text-sm flex flex-col sm:flex-row justify-between gap-2 transition-colors ${isSelected ? 'bg-highlight/20 border border-highlight' : 'bg-accent'}`}>
+                            <div className="flex items-start gap-3">
+                                 <input 
+                                    type="checkbox" 
+                                    checked={isSelected}
+                                    onChange={() => handleToggleSelect(t.id)}
+                                    className="mt-1 w-4 h-4 rounded border-gray-300 text-highlight focus:ring-highlight flex-shrink-0"
+                                />
+                                <div>
+                                    <p className="font-bold text-white">{player?.name || 'Unknown Player'}</p>
+                                    <p className="text-xs text-text-primary">
+                                        {new Date(t.transferDate).toLocaleDateString()}: <span className="text-text-secondary">{fromTeam?.name || 'Free Agent'}</span> &rarr; <span className="text-highlight">{toTeam?.name || 'Free Agent'}</span>
+                                    </p>
+                                    {t.notes && <p className="text-xs text-text-secondary italic mt-1">"{t.notes}"</p>}
+                                    {t.isAutomated && <span className="inline-block mt-1 text-[10px] uppercase bg-gray-600 text-white px-1 rounded">Automated</span>}
+                                </div>
                             </div>
-                            <div className="flex gap-2 self-start">
+                            <div className="flex gap-2 self-start ml-7 sm:ml-0">
                                 <Button onClick={() => setEditing(t)} className="bg-blue-600 text-xs px-2 py-1">Edit</Button>
                                 <Button onClick={() => handleDelete(t.id)} className="bg-red-600 text-xs px-2 py-1">Del</Button>
                             </div>
