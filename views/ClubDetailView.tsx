@@ -1,8 +1,10 @@
+
 import React, { useMemo, useState } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Club, Team, Player } from '../types';
 import { AssignPlayerModal } from '../components/AssignPlayerModal';
+import { Button, Input, Select, Label, ImageUploadOrUrl, FormModal, ErrorMessage } from './AdminView';
 
 interface ClubDetailViewProps {
   club: Club;
@@ -78,6 +80,72 @@ const PlayerCard: React.FC<{ player: Player; isManaging: boolean; isSelected: bo
     );
 };
 
+const QuickAddPlayerModal: React.FC<{ clubId: number; teams: Team[]; onClose: () => void }> = ({ clubId, teams, onClose }) => {
+    const { addPlayer } = useSports();
+    const [formData, setFormData] = useState({
+        name: '',
+        role: 'Main Netty',
+        teamId: '' as string | number, // Use string for select, convert to number for save
+        photoUrl: ''
+    });
+    const [file, setFile] = useState<File | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        setError(null);
+        try {
+             await addPlayer({
+                name: formData.name,
+                role: formData.role as any,
+                teamId: formData.teamId ? Number(formData.teamId) : null,
+                clubId: clubId,
+                photoUrl: formData.photoUrl,
+                photoFile: file || undefined,
+                stats: { matches: 0, aces: 0, kills: 0, blocks: 0 }
+             });
+             onClose();
+        } catch (err: any) {
+            setError(err.message);
+            setSaving(false);
+        }
+    };
+
+    return (
+        <FormModal title="Quick Add Player" onClose={onClose}>
+             <form onSubmit={handleSave} className="space-y-4">
+                {error && <ErrorMessage message={error} />}
+                <div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
+                <div>
+                    <Label>Role</Label>
+                    <Select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                        {['Main Netty', 'Left Front', 'Right Front', 'Net Center', 'Back Center', 'Left Back', 'Right Back', 'Right Netty', 'Left Netty', 'Service Man'].map(r => <option key={r} value={r}>{r}</option>)}
+                    </Select>
+                </div>
+                <div>
+                    <Label>Team</Label>
+                    <Select value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>
+                        <option value="">Club Pool (Unassigned)</option>
+                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                </div>
+                 <ImageUploadOrUrl 
+                    label="Photo" 
+                    urlValue={formData.photoUrl || ''} 
+                    onUrlChange={(val) => setFormData({...formData, photoUrl: val})}
+                    onFileChange={setFile}
+                />
+                <div className="flex justify-end gap-2">
+                    <Button onClick={onClose} className="bg-gray-600">Cancel</Button>
+                    <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Add Player'}</Button>
+                </div>
+             </form>
+        </FormModal>
+    );
+}
+
 
 export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onSelectPlayer, onBack }) => {
   const { userProfile } = useAuth();
@@ -93,6 +161,9 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
   const [isManaging, setIsManaging] = useState(false);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Quick Add State
+  const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
   
   const isAdmin = userProfile?.role === 'admin';
 
@@ -212,7 +283,16 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
                 </div>
 
                 {isAdmin && (
-                    <div className="flex justify-end items-center mb-4">
+                    <div className="flex justify-end items-center mb-4 gap-2">
+                        <button
+                            onClick={() => setIsAddPlayerModalOpen(true)}
+                            className="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors duration-300 bg-green-600 hover:bg-green-500 flex items-center gap-2"
+                        >
+                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                           Add Player
+                        </button>
                         <button
                             onClick={() => {
                                 setIsManaging(!isManaging);
@@ -290,6 +370,14 @@ export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTe
             onAssignmentSuccess={handleAssignmentSuccess}
             clubId={club.id}
             selectedPlayerIds={Array.from(selectedPlayerIds)}
+          />
+      )}
+      
+      {isAddPlayerModalOpen && (
+          <QuickAddPlayerModal 
+            clubId={club.id} 
+            teams={clubTeams} 
+            onClose={() => setIsAddPlayerModalOpen(false)} 
           />
       )}
     </div>

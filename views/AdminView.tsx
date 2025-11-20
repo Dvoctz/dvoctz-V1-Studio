@@ -6,14 +6,14 @@ import { useAuth } from '../context/AuthContext';
 import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club, PlayerTransfer, Notice, NoticeLevel } from '../types';
 
 // Reusable UI Components
-const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+export const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <div className="bg-secondary p-6 rounded-lg shadow-lg mb-8">
         <h2 className="text-2xl font-bold mb-4 text-white">{title}</h2>
         {children}
     </div>
 );
 
-const Button: React.FC<{ onClick?: (e?: React.MouseEvent) => void; children: React.ReactNode; className?: string; disabled?: boolean; type?: 'button' | 'submit' }> = ({ onClick, children, className = 'bg-highlight hover:bg-teal-400', disabled = false, type = "button" }) => (
+export const Button: React.FC<{ onClick?: (e?: React.MouseEvent) => void; children: React.ReactNode; className?: string; disabled?: boolean; type?: 'button' | 'submit' }> = ({ onClick, children, className = 'bg-highlight hover:bg-teal-400', disabled = false, type = "button" }) => (
     <button
         type={type}
         onClick={onClick}
@@ -24,23 +24,23 @@ const Button: React.FC<{ onClick?: (e?: React.MouseEvent) => void; children: Rea
     </button>
 );
 
-const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
+export const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input {...props} className={`w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight ${className || ''}`} />
 );
 
-const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
+export const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     <select {...props} className="w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight disabled:bg-gray-800 disabled:cursor-not-allowed" />
 );
 
-const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+export const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
     <textarea {...props} className={`w-full bg-primary mt-1 p-2 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight ${props.className || ''}`} />
 );
 
-const Label: React.FC<{ children: React.ReactNode; htmlFor?: string; className?: string; }> = ({ children, htmlFor, className }) => (
+export const Label: React.FC<{ children: React.ReactNode; htmlFor?: string; className?: string; }> = ({ children, htmlFor, className }) => (
     <label htmlFor={htmlFor} className={`block text-sm font-medium text-text-secondary ${className || ''}`.trim()}>{children}</label>
 );
 
-const FormModal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => {
+export const FormModal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
             <div className="bg-secondary rounded-xl shadow-2xl w-full max-w-lg transform transition-all max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -60,13 +60,13 @@ const FormModal: React.FC<{ title: string; onClose: () => void; children: React.
     );
 };
 
-const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
+export const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
     <div className="bg-red-900/50 border border-red-700 text-red-300 p-3 rounded-md mb-4 text-sm">
         <strong>Error:</strong> {message}
     </div>
 );
 
-const ImageUploadOrUrl: React.FC<{ 
+export const ImageUploadOrUrl: React.FC<{ 
     label: string; 
     urlValue: string; 
     onUrlChange: (val: string) => void; 
