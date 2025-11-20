@@ -203,15 +203,36 @@ const TournamentForm: React.FC<{ tournament: any, onSave: any, onCancel: any, er
 
 const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
     const { sponsors, getSponsorsForTournament, updateSponsorsForTournament } = useSports();
-    const [selected, setSelected] = useState(new Set(getSponsorsForTournament(tournament.id).map(s => s.id)));
+    const [selected, setSelected] = useState(new Set<number>());
+    const [initialized, setInitialized] = useState(false);
+    const [saving, setSaving] = useState(false);
     
+    useEffect(() => {
+        if (initialized) return;
+        const currentSponsors = getSponsorsForTournament(tournament.id);
+        setSelected(new Set(currentSponsors.map(s => s.id)));
+        setInitialized(true);
+    }, [tournament.id, getSponsorsForTournament, initialized]);
+
     const toggle = (id: number) => { 
-        const s = new Set(selected); 
-        s.has(id) ? s.delete(id) : s.add(id); 
-        setSelected(s); 
+        setSelected(prev => {
+            const s = new Set(prev); 
+            s.has(id) ? s.delete(id) : s.add(id);
+            return s;
+        }); 
     };
     
-    const save = async () => { await updateSponsorsForTournament(tournament.id, Array.from(selected)); onClose(); };
+    const save = async () => { 
+        setSaving(true);
+        try {
+            await updateSponsorsForTournament(tournament.id, Array.from(selected)); 
+            onClose(); 
+        } catch(e: any) {
+            alert('Error saving sponsors: ' + e.message);
+        } finally {
+            setSaving(false);
+        }
+    };
     
     return (
         <FormModal title="Sponsors" onClose={onClose}>
@@ -232,7 +253,7 @@ const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () =>
                     </div>
                 ))}
             </div>
-            <div className="flex justify-end gap-2"><Button onClick={onClose} className="bg-gray-600">Cancel</Button><Button onClick={save}>Save</Button></div>
+            <div className="flex justify-end gap-2"><Button onClick={onClose} className="bg-gray-600">Cancel</Button><Button onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button></div>
         </FormModal>
     );
 };
@@ -241,25 +262,34 @@ const TournamentTeamsModal: React.FC<{ tournament: Tournament, onClose: () => vo
     const { teams, tournamentTeams, updateTournamentTeams } = useSports();
     const [selectedTeamIds, setSelectedTeamIds] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(false);
+    const [initialized, setInitialized] = useState(false);
 
     // Filter teams by Division
     const availableTeams = useMemo(() => {
         return teams.filter(t => t.division === tournament.division).sort((a, b) => a.name.localeCompare(b.name));
     }, [teams, tournament.division]);
 
-    // Load existing selection
+    // Load existing selection ONLY ONCE to prevent reset during editing
     useEffect(() => {
-        const currentParticipants = (tournamentTeams || [])
-            .filter(tt => tt.tournamentId === tournament.id)
-            .map(tt => tt.teamId);
-        setSelectedTeamIds(new Set(currentParticipants));
-    }, [tournament.id, tournamentTeams]);
+        if (initialized) return;
+
+        // If tournamentTeams is available (loaded from context), initialize the form
+        if (tournamentTeams) {
+            const currentParticipants = tournamentTeams
+                .filter(tt => tt.tournamentId === tournament.id)
+                .map(tt => tt.teamId);
+            setSelectedTeamIds(new Set(currentParticipants));
+            setInitialized(true);
+        }
+    }, [tournament.id, tournamentTeams, initialized]);
 
     const handleToggle = (teamId: number) => {
-        const newSet = new Set(selectedTeamIds);
-        if (newSet.has(teamId)) newSet.delete(teamId);
-        else newSet.add(teamId);
-        setSelectedTeamIds(newSet);
+        setSelectedTeamIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(teamId)) newSet.delete(teamId);
+            else newSet.add(teamId);
+            return newSet;
+        });
     };
 
     const handleSave = async () => {
@@ -281,7 +311,7 @@ const TournamentTeamsModal: React.FC<{ tournament: Tournament, onClose: () => vo
                 {availableTeams.length > 0 ? availableTeams.map(t => (
                     <div 
                         key={t.id} 
-                        className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" 
+                        className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer select-none" 
                         onClick={() => handleToggle(t.id)}
                     >
                          <input 
@@ -311,14 +341,15 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // Track initialization per team to avoid resets
+    const [lastLoadedTeamId, setLastLoadedTeamId] = useState<number | null>(null);
 
     const selectedTeam = useMemo(() => teams.find(t => t.id === Number(selectedTeamId)), [selectedTeamId, teams]);
     
     const availablePlayers = useMemo(() => {
         if (!selectedTeam) return [];
-        // Get players from the same club
-        const clubPlayers = getPlayersByClub(selectedTeam.clubId);
-        return clubPlayers; 
+        return getPlayersByClub(selectedTeam.clubId); 
     }, [selectedTeam, getPlayersByClub]);
 
     const filteredPlayers = useMemo(() => {
@@ -326,21 +357,25 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
         return availablePlayers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [availablePlayers, searchTerm]);
 
-    // Load existing roster when team changes
+    // Load existing roster when team changes, but ONLY when the selected team ID specifically changes
     useEffect(() => {
-        if (selectedTeamId) {
+        if (selectedTeamId && selectedTeamId !== lastLoadedTeamId) {
             const roster = getTournamentSquad(tournament.id, Number(selectedTeamId));
             setSelectedPlayerIds(new Set(roster.map(p => p.id)));
-        } else {
+            setLastLoadedTeamId(Number(selectedTeamId));
+        } else if (!selectedTeamId) {
             setSelectedPlayerIds(new Set());
+            setLastLoadedTeamId(null);
         }
-    }, [selectedTeamId, tournament.id, getTournamentSquad]);
+    }, [selectedTeamId, lastLoadedTeamId, tournament.id, getTournamentSquad]);
 
     const handleToggle = (playerId: number) => {
-        const newSet = new Set(selectedPlayerIds);
-        if (newSet.has(playerId)) newSet.delete(playerId);
-        else newSet.add(playerId);
-        setSelectedPlayerIds(newSet);
+        setSelectedPlayerIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(playerId)) newSet.delete(playerId);
+            else newSet.add(playerId);
+            return newSet;
+        });
     };
 
     const handleSave = async () => {
@@ -389,7 +424,7 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
                         {filteredPlayers.length > 0 ? filteredPlayers.map(p => (
                             <div 
                                 key={p.id} 
-                                className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" 
+                                className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer select-none" 
                                 onClick={() => handleToggle(p.id)}
                             >
                                 <input 
