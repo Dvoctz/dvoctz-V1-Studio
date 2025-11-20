@@ -366,9 +366,57 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const addPlayerTransfer = useCallback(async (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => {
-        const { data, error } = await supabase.from('player_transfers').insert({ player_id: transfer.playerId, from_team_id: transfer.fromTeamId, to_team_id: transfer.toTeamId, transfer_date: transfer.transferDate, notes: transfer.notes, is_automated: false }).select().single();
-        if (error) throw error;
-        setState(s => ({...s, playerTransfers: [...(s.playerTransfers || []), mapPlayerTransfer(data)]}));
+        // 1. Insert the transfer record first
+        const { data: transferData, error: transferError } = await supabase
+            .from('player_transfers')
+            .insert({ 
+                player_id: transfer.playerId, 
+                from_team_id: transfer.fromTeamId, 
+                to_team_id: transfer.toTeamId, 
+                transfer_date: transfer.transferDate, 
+                notes: transfer.notes, 
+                is_automated: false 
+            })
+            .select()
+            .single();
+        
+        if (transferError) throw transferError;
+
+        // 2. Find the new Club ID for the target team (if moving to a team)
+        let newClubId: number | null = null;
+        if (transfer.toTeamId) {
+            const { data: teamData, error: teamError } = await supabase
+                .from('teams')
+                .select('club_id')
+                .eq('id', transfer.toTeamId)
+                .single();
+            
+            if (teamError) throw teamError;
+            newClubId = teamData.club_id;
+        }
+        
+        // 3. Update the player's actual team_id and club_id
+        // This handles "removing from old club pool" by changing the club_id to the new one (or null if free agent)
+        const { data: playerData, error: playerError } = await supabase
+            .from('players')
+            .update({ 
+                team_id: transfer.toTeamId,
+                club_id: newClubId 
+            })
+            .eq('id', transfer.playerId)
+            .select()
+            .single();
+            
+        if (playerError) throw playerError;
+
+        // 4. Update local state
+        setState(s => ({
+            ...s, 
+            playerTransfers: [...(s.playerTransfers || []), mapPlayerTransfer(transferData)],
+            players: (s.players || []).map(p => 
+                p.id === transfer.playerId ? mapPlayer(playerData) : p
+            ).sort((a,b) => a.name.localeCompare(b.name))
+        }));
     }, [supabase]);
 
     const updatePlayerTransfer = useCallback(async (transfer: PlayerTransfer) => {
