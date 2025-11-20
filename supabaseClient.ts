@@ -49,3 +49,7 @@ export type DbTournamentRoster = {
     team_id: number;
     player_id: number;
 };
+export type DbTournamentTeam = {
+    tournament_id: number;
+    team_id: number;
+};

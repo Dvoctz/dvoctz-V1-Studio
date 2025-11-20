@@ -2,10 +2,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer, DbTournamentRoster } from '../supabaseClient';
-import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice, TournamentRoster } from '../types';
+import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer, DbTournamentRoster, DbTournamentTeam } from '../supabaseClient';
+import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice, TournamentRoster, TournamentTeam } from '../types';
 
-type EntityName = 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters';
+type EntityName = 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters' | 'tournamentTeams';
 
 interface SportsState {
     tournaments: Tournament[] | null;
@@ -19,6 +19,7 @@ interface SportsState {
     notices: Notice[] | null;
     rules: string | null;
     tournamentRosters: TournamentRoster[] | null;
+    tournamentTeams: TournamentTeam[] | null;
     loading: Set<EntityName>;
     error: Error | null;
 }
@@ -27,7 +28,7 @@ export type CsvTeam = Omit<Team, 'id' | 'clubId'> & { clubName: string };
 export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'clubId' | 'stats'> & { teamName?: string; clubName?: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
 
 
-interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters'> {
+interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters' | 'tournamentTeams'> {
     tournaments: Tournament[];
     clubs: Club[];
     teams: Team[];
@@ -39,6 +40,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     notices: Notice[];
     rules: string;
     tournamentRosters: TournamentRoster[];
+    tournamentTeams: TournamentTeam[];
     _internal_state: SportsState;
     fetchData: <T extends EntityName>(entityName: T) => Promise<SportsState[T]>;
     addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
@@ -73,6 +75,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     bulkUpdatePlayerTeam: (playerIds: number[], teamId: number | null) => Promise<void>;
     concludeLeaguePhase: (tournamentId: number) => Promise<void>;
     updateTournamentSquad: (tournamentId: number, teamId: number, playerIds: number[]) => Promise<void>;
+    updateTournamentTeams: (tournamentId: number, teamIds: number[]) => Promise<void>;
     getActiveNotice: () => Notice | null;
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
@@ -111,6 +114,7 @@ const mapFixture = (f: any): Fixture => {
 };
 const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({ id: pt.id, playerId: pt.player_id, fromTeamId: pt.from_team_id, toTeamId: pt.to_team_id, transferDate: pt.transfer_date, notes: pt.notes, isAutomated: pt.is_automated });
 const mapTournamentRoster = (tr: DbTournamentRoster): TournamentRoster => ({ id: tr.id, tournamentId: tr.tournament_id, teamId: tr.team_id, playerId: tr.player_id });
+const mapTournamentTeam = (tt: DbTournamentTeam): TournamentTeam => ({ tournamentId: tt.tournament_id, teamId: tt.team_id });
 
 const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
@@ -124,7 +128,7 @@ const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string
 export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { supabase } = useSupabase();
     const [state, setState] = useState<SportsState>({
-        tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null, tournamentRosters: null,
+        tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null, tournamentRosters: null, tournamentTeams: null,
         loading: new Set(),
         error: null,
     });
@@ -152,6 +156,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 case 'notices': ({ data, error } = await supabase.from('notices').select('*')); break;
                 case 'rules': ({ data, error } = await supabase.from('game_rules').select('content').limit(1).maybeSingle()); break;
                 case 'tournamentRosters': ({ data, error } = await supabase.from('tournament_rosters').select('*')); break;
+                case 'tournamentTeams': ({ data, error } = await supabase.from('tournament_teams').select('*')); break;
             }
 
             if (error) throw error;
@@ -180,8 +185,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                     notices: mapNotice, 
                     playerTransfers: mapPlayerTransfer, 
                     tournamentSponsors: (d: any) => d,
-                    tournamentRosters: mapTournamentRoster
-                }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors' | 'tournamentRosters'];
+                    tournamentRosters: mapTournamentRoster,
+                    tournamentTeams: mapTournamentTeam
+                }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors' | 'tournamentRosters' | 'tournamentTeams'];
                 processedData = (data || []).map(mapFn);
             }
             
@@ -237,6 +243,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const updateClub = useCallback(async (clubData: Club & { logoFile?: File }) => {
         let finalLogoUrl = clubData.logoUrl;
         if (clubData.logoFile) finalLogoUrl = await uploadAsset(supabase, clubData.logoFile);
+        const { id, name, logoUrl } = clubData;
         const { data, error } = await supabase.from('clubs').update({ name: clubData.name, logo_url: finalLogoUrl }).eq('id', clubData.id).select().single();
         if (error) throw error;
         setState(s => ({...s, clubs: (s.clubs || []).map(c => c.id === clubData.id ? mapClub(data) : c) }));
@@ -652,19 +659,46 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             });
         }
     }, [supabase, state.players]);
+    
+    // MANAGE TOURNAMENT TEAMS
+    const updateTournamentTeams = useCallback(async (tournamentId: number, teamIds: number[]) => {
+        const { error: deleteError } = await supabase.from('tournament_teams').delete().eq('tournament_id', tournamentId);
+        if (deleteError) throw deleteError;
+        if (teamIds.length > 0) {
+            const toInsert = teamIds.map(tid => ({ tournament_id: tournamentId, team_id: tid }));
+            const { error: insertError } = await supabase.from('tournament_teams').insert(toInsert);
+            if (insertError) throw insertError;
+        }
+        const { data, error } = await supabase.from('tournament_teams').select('*');
+        if (error) throw error;
+        setState(s => ({ ...s, tournamentTeams: (data || []).map(mapTournamentTeam) }));
+    }, [supabase]);
+
 
     const getStandingsForTournament = useCallback((tournamentId: number): TeamStanding[] => {
         const tournamentFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage);
         const teamIdsInTournament = new Set<number>();
+
+        // 1. Add Explicit Participating Teams
+        if (state.tournamentTeams) {
+             state.tournamentTeams
+                .filter(tt => tt.tournamentId === tournamentId)
+                .forEach(tt => teamIdsInTournament.add(tt.teamId));
+        }
+        
+        // 2. Add Implicit Teams from Fixtures (fallback)
         (state.teams || []).forEach(team => {
+            if (teamIdsInTournament.has(team.id)) return;
             const teamFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id) && !f.stage);
             if (teamFixtures.length > 0) teamIdsInTournament.add(team.id);
         });
+
         const standingsMap = new Map<number, TeamStanding>();
         teamIdsInTournament.forEach(id => {
             const team = (state.teams || []).find(t => t.id === id);
             if (team) standingsMap.set(id, { teamId: id, teamName: team.name, logoUrl: team.logoUrl, gamesPlayed: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 });
         });
+
         tournamentFixtures.forEach(fixture => {
             const team1Standing = standingsMap.get(fixture.team1Id);
             const team2Standing = standingsMap.get(fixture.team2Id);
@@ -688,7 +722,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             return a.teamName.localeCompare(b.teamName);
         });
         return standings;
-    }, [state.fixtures, state.teams]);
+    }, [state.fixtures, state.teams, state.tournamentTeams]);
 
      const concludeLeaguePhase = useCallback(async (tournamentId: number) => {
         const tournament = (state.tournaments || []).find(t => t.id === tournamentId);
@@ -790,6 +824,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         notices: state.notices || [],
         rules: state.rules || '',
         tournamentRosters: state.tournamentRosters || [],
+        tournamentTeams: state.tournamentTeams || [],
         fetchData,
         addTournament, updateTournament, deleteTournament,
         addClub, updateClub, deleteClub,
@@ -802,7 +837,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         updateRules,
         bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
         updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase,
-        updateTournamentSquad,
+        updateTournamentSquad, updateTournamentTeams,
         getActiveNotice, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
         getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament,
@@ -825,20 +860,18 @@ export const useSports = (): SportsContextType => {
 };
 
 export const useEntityData = <T extends EntityName>(entityName: T) => {
-    const { _internal_state, fetchData } = useSports();
-    const data = _internal_state[entityName];
-    const isLoading = _internal_state.loading.has(entityName);
-    const isLoaded = data !== null;
+    const context = useSports();
+    const isLoading = context._internal_state.loading.has(entityName);
+    const isLoaded = context._internal_state[entityName] !== null;
 
     useEffect(() => {
         if (!isLoaded && !isLoading) {
-            fetchData(entityName).catch(err => console.error(`Failed to load ${entityName}:`, err));
+            context.fetchData(entityName).catch(err => console.error(`Failed to load ${entityName}:`, err));
         }
-    }, [entityName, isLoaded, isLoading, fetchData]);
+    }, [entityName, isLoaded, isLoading, context]);
 
     return {
-        data: data as SportsState[T],
-        loading: isLoading || !isLoaded,
-        error: _internal_state.error
+        data: context[entityName] as unknown as (SportsState[T] extends null ? never : SportsState[T]), 
+        loading: isLoading
     };
 };

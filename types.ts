@@ -123,3 +123,8 @@ export interface TournamentRoster {
   teamId: number;
   playerId: number;
 }
+
+export interface TournamentTeam {
+  tournamentId: number;
+  teamId: number;
+}

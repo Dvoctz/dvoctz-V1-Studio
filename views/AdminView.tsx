@@ -126,6 +126,7 @@ const TournamentsAdmin = () => {
     const [editing, setEditing] = useState<Tournament | Partial<Tournament> | null>(null);
     const [managingSponsorsFor, setManagingSponsorsFor] = useState<Tournament | null>(null);
     const [managingSquadsFor, setManagingSquadsFor] = useState<Tournament | null>(null);
+    const [managingTeamsFor, setManagingTeamsFor] = useState<Tournament | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isConcluding, setIsConcluding] = useState<number | null>(null);
@@ -171,6 +172,7 @@ const TournamentsAdmin = () => {
                         <div><p className="font-bold text-white">{t.name}</p><p className="text-sm text-highlight">{t.division} - {t.phase}</p></div>
                         <div className="flex flex-wrap gap-2">
                             {t.phase === 'round-robin' && <Button onClick={() => handleConclude(t.id)} disabled={isConcluding === t.id} className="bg-green-600 hover:bg-green-500 text-xs">Conclude League</Button>}
+                            <Button onClick={() => setManagingTeamsFor(t)} className="bg-teal-600 hover:bg-teal-500 text-xs">Teams</Button>
                             <Button onClick={() => setManagingSquadsFor(t)} className="bg-indigo-600 hover:bg-indigo-500 text-xs">Squads</Button>
                             <Button onClick={() => setManagingSponsorsFor(t)} className="bg-purple-600 hover:bg-purple-500 text-xs">Sponsors</Button>
                             <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500 text-xs">Edit</Button>
@@ -182,6 +184,7 @@ const TournamentsAdmin = () => {
             {editing && <FormModal title={editing.id ? "Edit" : "Add"} onClose={() => setEditing(null)}><TournamentForm tournament={editing} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
             {managingSponsorsFor && <TournamentSponsorsModal tournament={managingSponsorsFor} onClose={() => setManagingSponsorsFor(null)} />}
             {managingSquadsFor && <TournamentSquadsModal tournament={managingSquadsFor} onClose={() => setManagingSquadsFor(null)} />}
+            {managingTeamsFor && <TournamentTeamsModal tournament={managingTeamsFor} onClose={() => setManagingTeamsFor(null)} />}
         </AdminSection>
     );
 };
@@ -215,6 +218,70 @@ const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () =>
     );
 };
 
+const TournamentTeamsModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
+    const { teams, tournamentTeams, updateTournamentTeams } = useSports();
+    const [selectedTeamIds, setSelectedTeamIds] = useState<Set<number>>(new Set());
+    const [loading, setLoading] = useState(false);
+
+    // Filter teams by Division
+    const availableTeams = useMemo(() => {
+        return teams.filter(t => t.division === tournament.division).sort((a, b) => a.name.localeCompare(b.name));
+    }, [teams, tournament.division]);
+
+    // Load existing selection
+    useEffect(() => {
+        const currentParticipants = (tournamentTeams || [])
+            .filter(tt => tt.tournamentId === tournament.id)
+            .map(tt => tt.teamId);
+        setSelectedTeamIds(new Set(currentParticipants));
+    }, [tournament.id, tournamentTeams]);
+
+    const handleToggle = (teamId: number) => {
+        const newSet = new Set(selectedTeamIds);
+        if (newSet.has(teamId)) newSet.delete(teamId);
+        else newSet.add(teamId);
+        setSelectedTeamIds(newSet);
+    };
+
+    const handleSave = async () => {
+        setLoading(true);
+        try {
+            await updateTournamentTeams(tournament.id, Array.from(selectedTeamIds));
+            onClose();
+        } catch (e: any) {
+            alert('Error saving participating teams: ' + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <FormModal title={`Participating Teams: ${tournament.name}`} onClose={onClose}>
+            <p className="text-sm text-highlight mb-4">Showing only {tournament.division} teams.</p>
+            <div className="space-y-2 max-h-96 overflow-y-auto mb-4 bg-primary p-2 rounded">
+                {availableTeams.length > 0 ? availableTeams.map(t => (
+                    <div key={t.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" onClick={() => handleToggle(t.id)}>
+                         <input 
+                            type="checkbox" 
+                            checked={selectedTeamIds.has(t.id)} 
+                            onChange={() => handleToggle(t.id)}
+                            className="rounded border-gray-300 text-highlight focus:ring-highlight h-4 w-4"
+                        />
+                        <span className={selectedTeamIds.has(t.id) ? "text-white font-medium" : "text-text-secondary"}>{t.name}</span>
+                    </div>
+                )) : (
+                    <p className="text-text-secondary text-center py-4">No teams found in {tournament.division}.</p>
+                )}
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button onClick={onClose} className="bg-gray-600">Cancel</Button>
+                <Button onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save Selection'}</Button>
+            </div>
+        </FormModal>
+    );
+};
+
+
 const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
     const { teams, getPlayersByClub, updateTournamentSquad, getTournamentSquad } = useSports();
     const [selectedTeamId, setSelectedTeamId] = useState<number | ''>('');
@@ -228,8 +295,6 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
         if (!selectedTeam) return [];
         // Get players from the same club
         const clubPlayers = getPlayersByClub(selectedTeam.clubId);
-        // Also include anyone currently assigned to this team globally (just in case data is messy)
-        // We'll filter out duplicates by ID automatically when rendering/using Set
         return clubPlayers; 
     }, [selectedTeam, getPlayersByClub]);
 
@@ -274,10 +339,14 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
                 <Label>Select Team</Label>
                 <Select value={selectedTeamId} onChange={e => setSelectedTeamId(Number(e.target.value) || '')}>
                     <option value="">-- Choose a Team --</option>
-                    {teams.sort((a,b) => a.name.localeCompare(b.name)).map(t => (
+                    {teams
+                        .filter(t => t.division === tournament.division)
+                        .sort((a,b) => a.name.localeCompare(b.name))
+                        .map(t => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                 </Select>
+                 <p className="text-xs text-highlight mt-1">Showing only {tournament.division} teams.</p>
             </div>
 
             {selectedTeam && (

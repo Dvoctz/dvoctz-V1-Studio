@@ -240,6 +240,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   const { loading: sponsorsLoading } = useEntityData('sponsors');
   const { loading: tsLoading } = useEntityData('tournamentSponsors');
   const { loading: trLoading } = useEntityData('tournamentRosters');
+  // Ensure tournament teams are loaded so standings/teams list is complete
+  useEntityData('tournamentTeams');
   
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
   const [selectedTeamForRoster, setSelectedTeamForRoster] = useState<Team | null>(null);
@@ -398,7 +400,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                         ))}
                     </div>
                 ) : (
-                    <p className="text-center text-text-secondary">Participating teams will appear here once fixtures are generated.</p>
+                    <p className="text-center text-text-secondary">Participating teams will appear here once fixtures are generated or teams are selected by admin.</p>
                 )
             )}
 
