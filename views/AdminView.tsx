@@ -204,13 +204,32 @@ const TournamentForm: React.FC<{ tournament: any, onSave: any, onCancel: any, er
 const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
     const { sponsors, getSponsorsForTournament, updateSponsorsForTournament } = useSports();
     const [selected, setSelected] = useState(new Set(getSponsorsForTournament(tournament.id).map(s => s.id)));
-    const toggle = (id: number) => { const s = new Set(selected); s.has(id) ? s.delete(id) : s.add(id); setSelected(s); };
+    
+    const toggle = (id: number) => { 
+        const s = new Set(selected); 
+        s.has(id) ? s.delete(id) : s.add(id); 
+        setSelected(s); 
+    };
+    
     const save = async () => { await updateSponsorsForTournament(tournament.id, Array.from(selected)); onClose(); };
+    
     return (
         <FormModal title="Sponsors" onClose={onClose}>
             <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
                 {sponsors.map(s => (
-                    <div key={s.id} className="flex items-center gap-2 p-2 bg-primary rounded"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} /><span>{s.name}</span></div>
+                    <div 
+                        key={s.id} 
+                        className="flex items-center gap-2 p-2 bg-primary rounded cursor-pointer hover:bg-accent" 
+                        onClick={() => toggle(s.id)}
+                    >
+                        <input 
+                            type="checkbox" 
+                            checked={selected.has(s.id)} 
+                            readOnly 
+                            className="pointer-events-none rounded border-gray-300 text-highlight focus:ring-highlight h-4 w-4" 
+                        />
+                        <span>{s.name}</span>
+                    </div>
                 ))}
             </div>
             <div className="flex justify-end gap-2"><Button onClick={onClose} className="bg-gray-600">Cancel</Button><Button onClick={save}>Save</Button></div>
@@ -260,12 +279,16 @@ const TournamentTeamsModal: React.FC<{ tournament: Tournament, onClose: () => vo
             <p className="text-sm text-highlight mb-4">Showing only {tournament.division} teams.</p>
             <div className="space-y-2 max-h-96 overflow-y-auto mb-4 bg-primary p-2 rounded">
                 {availableTeams.length > 0 ? availableTeams.map(t => (
-                    <div key={t.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" onClick={() => handleToggle(t.id)}>
+                    <div 
+                        key={t.id} 
+                        className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" 
+                        onClick={() => handleToggle(t.id)}
+                    >
                          <input 
                             type="checkbox" 
                             checked={selectedTeamIds.has(t.id)} 
-                            onChange={() => handleToggle(t.id)}
-                            className="rounded border-gray-300 text-highlight focus:ring-highlight h-4 w-4"
+                            readOnly
+                            className="pointer-events-none rounded border-gray-300 text-highlight focus:ring-highlight h-4 w-4"
                         />
                         <span className={selectedTeamIds.has(t.id) ? "text-white font-medium" : "text-text-secondary"}>{t.name}</span>
                     </div>
@@ -364,12 +387,16 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
                     </div>
                     <div className="bg-primary p-2 rounded max-h-60 overflow-y-auto space-y-1">
                         {filteredPlayers.length > 0 ? filteredPlayers.map(p => (
-                            <div key={p.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" onClick={() => handleToggle(p.id)}>
+                            <div 
+                                key={p.id} 
+                                className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" 
+                                onClick={() => handleToggle(p.id)}
+                            >
                                 <input 
                                     type="checkbox" 
                                     checked={selectedPlayerIds.has(p.id)} 
-                                    onChange={() => handleToggle(p.id)}
-                                    className="rounded border-gray-300 text-highlight focus:ring-highlight h-4 w-4"
+                                    readOnly
+                                    className="pointer-events-none rounded border-gray-300 text-highlight focus:ring-highlight h-4 w-4"
                                 />
                                 <span className={selectedPlayerIds.has(p.id) ? "text-white font-medium" : "text-text-secondary"}>{p.name} <span className="text-xs opacity-70">({p.role})</span></span>
                             </div>
