@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -5,6 +6,7 @@ import { HomeView } from './views/HomeView';
 import { TournamentsView } from './views/TournamentsView';
 import { ClubsView } from './views/ClubsView';
 import { PlayersView } from './views/PlayersView';
+import { TransfersView } from './views/TransfersView';
 import { TournamentDetailView } from './views/TournamentDetailView';
 import { ClubDetailView } from './views/ClubDetailView';
 import { TeamDetailView } from './views/TeamDetailView';
@@ -154,6 +156,8 @@ const AppContent: React.FC = () => {
         return <ClubsView onSelectClub={handleSelectClub} />;
       case 'players':
         return <PlayersView onSelectPlayer={handleSelectPlayer} />;
+      case 'transfers':
+        return <TransfersView />;
       case 'rules':
         return <RulesView />;
       case 'tournament-detail':
