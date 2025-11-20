@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Fixture, Player, Team, Tournament, Sponsor, Score, Club } from './types';
 
@@ -41,4 +42,10 @@ export type DbPlayerTransfer = {
     transfer_date: string;
     notes: string | null;
     is_automated: boolean;
+};
+export type DbTournamentRoster = {
+    id: number;
+    tournament_id: number;
+    team_id: number;
+    player_id: number;
 };

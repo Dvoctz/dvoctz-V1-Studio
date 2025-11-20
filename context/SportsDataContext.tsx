@@ -2,10 +2,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer } from '../supabaseClient';
-import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice } from '../types';
+import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer, DbTournamentRoster } from '../supabaseClient';
+import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice, TournamentRoster } from '../types';
 
-type EntityName = 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules';
+type EntityName = 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters';
 
 interface SportsState {
     tournaments: Tournament[] | null;
@@ -18,6 +18,7 @@ interface SportsState {
     playerTransfers: PlayerTransfer[] | null;
     notices: Notice[] | null;
     rules: string | null;
+    tournamentRosters: TournamentRoster[] | null;
     loading: Set<EntityName>;
     error: Error | null;
 }
@@ -26,7 +27,7 @@ export type CsvTeam = Omit<Team, 'id' | 'clubId'> & { clubName: string };
 export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'clubId' | 'stats'> & { teamName?: string; clubName?: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
 
 
-interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules'> {
+interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters'> {
     tournaments: Tournament[];
     clubs: Club[];
     teams: Team[];
@@ -37,6 +38,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     playerTransfers: PlayerTransfer[];
     notices: Notice[];
     rules: string;
+    tournamentRosters: TournamentRoster[];
     _internal_state: SportsState;
     fetchData: <T extends EntityName>(entityName: T) => Promise<SportsState[T]>;
     addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
@@ -70,6 +72,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     updateSponsorsForTournament: (tournamentId: number, sponsorIds: number[]) => Promise<void>;
     bulkUpdatePlayerTeam: (playerIds: number[], teamId: number | null) => Promise<void>;
     concludeLeaguePhase: (tournamentId: number) => Promise<void>;
+    updateTournamentSquad: (tournamentId: number, teamId: number, playerIds: number[]) => Promise<void>;
     getActiveNotice: () => Notice | null;
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
@@ -81,6 +84,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     getPlayersByClub: (clubId: number) => Player[];
     getTransfersByPlayerId: (playerId: number) => PlayerTransfer[];
     getStandingsForTournament: (tournamentId: number) => TeamStanding[];
+    getTournamentSquad: (tournamentId: number, teamId: number) => Player[];
 }
 
 const SportsDataContext = createContext<SportsContextType | undefined>(undefined);
@@ -106,6 +110,7 @@ const mapFixture = (f: any): Fixture => {
     return { id: f.id, tournamentId: f.tournament_id, team1Id: f.team1_id, team2Id: f.team2_id, ground: f.ground, dateTime: f.date_time, status: f.status, referee: actualReferee, score: f.score as Score | undefined, stage: stage };
 };
 const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({ id: pt.id, playerId: pt.player_id, fromTeamId: pt.from_team_id, toTeamId: pt.to_team_id, transferDate: pt.transfer_date, notes: pt.notes, isAutomated: pt.is_automated });
+const mapTournamentRoster = (tr: DbTournamentRoster): TournamentRoster => ({ id: tr.id, tournamentId: tr.tournament_id, teamId: tr.team_id, playerId: tr.player_id });
 
 const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
@@ -119,7 +124,7 @@ const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string
 export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { supabase } = useSupabase();
     const [state, setState] = useState<SportsState>({
-        tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null,
+        tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null, tournamentRosters: null,
         loading: new Set(),
         error: null,
     });
@@ -146,6 +151,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 case 'playerTransfers': ({ data, error } = await supabase.from('player_transfers').select('*')); break;
                 case 'notices': ({ data, error } = await supabase.from('notices').select('*')); break;
                 case 'rules': ({ data, error } = await supabase.from('game_rules').select('content').limit(1).maybeSingle()); break;
+                case 'tournamentRosters': ({ data, error } = await supabase.from('tournament_rosters').select('*')); break;
             }
 
             if (error) throw error;
@@ -166,7 +172,16 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             } else if (entityName === 'rules') {
                 processedData = data?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.';
             } else {
-                const mapFn = { clubs: mapClub, teams: mapTeam, players: mapPlayer, sponsors: mapSponsor, notices: mapNotice, playerTransfers: mapPlayerTransfer, tournamentSponsors: (d: any) => d }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors'];
+                const mapFn = { 
+                    clubs: mapClub, 
+                    teams: mapTeam, 
+                    players: mapPlayer, 
+                    sponsors: mapSponsor, 
+                    notices: mapNotice, 
+                    playerTransfers: mapPlayerTransfer, 
+                    tournamentSponsors: (d: any) => d,
+                    tournamentRosters: mapTournamentRoster
+                }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors' | 'tournamentRosters'];
                 processedData = (data || []).map(mapFn);
             }
             
@@ -699,6 +714,42 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         await fetchData('tournaments');
     }, [supabase, state.tournaments, getStandingsForTournament, fetchData]);
 
+    // TOURNAMENT ROSTER LOGIC
+    const updateTournamentSquad = useCallback(async (tournamentId: number, teamId: number, playerIds: number[]) => {
+        // 1. Remove existing roster entries for this team/tournament
+        const { error: deleteError } = await supabase
+            .from('tournament_rosters')
+            .delete()
+            .match({ tournament_id: tournamentId, team_id: teamId });
+        if (deleteError) throw deleteError;
+
+        // 2. Insert new entries
+        if (playerIds.length > 0) {
+            const toInsert = playerIds.map(pid => ({
+                tournament_id: tournamentId,
+                team_id: teamId,
+                player_id: pid
+            }));
+            const { error: insertError } = await supabase.from('tournament_rosters').insert(toInsert);
+            if (insertError) throw insertError;
+        }
+
+        // 3. Refresh local state
+        const { data, error } = await supabase.from('tournament_rosters').select('*');
+        if (error) throw error;
+        setState(s => ({ ...s, tournamentRosters: (data || []).map(mapTournamentRoster) }));
+
+    }, [supabase]);
+
+    const getTournamentSquad = useCallback((tournamentId: number, teamId: number): Player[] => {
+        if (!state.tournamentRosters) return [];
+        const rosterPlayerIds = state.tournamentRosters
+            .filter(tr => tr.tournamentId === tournamentId && tr.teamId === teamId)
+            .map(tr => tr.playerId);
+        return (state.players || []).filter(p => rosterPlayerIds.includes(p.id));
+    }, [state.tournamentRosters, state.players]);
+
+
     const getActiveNotice = useCallback((): Notice | null => {
         if (!state.notices) return null;
         const now = new Date();
@@ -738,6 +789,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         playerTransfers: state.playerTransfers || [],
         notices: state.notices || [],
         rules: state.rules || '',
+        tournamentRosters: state.tournamentRosters || [],
         fetchData,
         addTournament, updateTournament, deleteTournament,
         addClub, updateClub, deleteClub,
@@ -750,9 +802,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         updateRules,
         bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
         updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase,
+        updateTournamentSquad,
         getActiveNotice, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
-        getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament
+        getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament,
+        getTournamentSquad
     };
 
     return (

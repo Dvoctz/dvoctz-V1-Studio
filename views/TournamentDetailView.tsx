@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
-import type { Fixture, Tournament, Team, TeamStanding } from '../types';
+import type { Fixture, Tournament, Team, TeamStanding, Player } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
 import { KnockoutBracket } from '../components/KnockoutBracket';
 
@@ -22,8 +23,61 @@ const TeamLogo: React.FC<{ logoUrl: string | null; alt: string; className?: stri
     );
 };
 
+// New Modal Component for Tournament Roster
+const TournamentTeamRosterModal: React.FC<{ tournament: Tournament; team: Team; onClose: () => void }> = ({ tournament, team, onClose }) => {
+    const { getTournamentSquad } = useSports();
+    // Force load tournament rosters if not present, though generally handled by parent view or aggressive preload
+    const roster = useMemo(() => getTournamentSquad(tournament.id, team.id), [getTournamentSquad, tournament.id, team.id]);
 
-const FixtureItem: React.FC<{ fixture: Fixture, onScorecardClick: (fixture: Fixture) => void }> = ({ fixture, onScorecardClick }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
+             <div className="bg-secondary rounded-xl shadow-2xl w-full max-w-md transform transition-all max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="p-6 border-b border-accent flex justify-between items-center sticky top-0 bg-secondary z-10">
+                    <div>
+                         <h3 className="text-xl font-bold text-white">{team.name}</h3>
+                         <p className="text-sm text-highlight">Squad for {tournament.name}</p>
+                    </div>
+                    <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="p-4">
+                    {roster.length > 0 ? (
+                        <div className="space-y-2">
+                            {roster.map(p => (
+                                <div key={p.id} className="flex items-center gap-3 p-2 bg-primary rounded">
+                                     {p.photoUrl ? (
+                                        <img src={p.photoUrl} alt={p.name} className="w-10 h-10 rounded-full object-cover" />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-text-secondary">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <p className="font-bold text-white">{p.name}</p>
+                                        <p className="text-xs text-text-secondary">{p.role}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-text-secondary">
+                            <p>No specific roster recorded for this tournament.</p>
+                            <p className="text-xs mt-2">The team likely used their standard club roster.</p>
+                        </div>
+                    )}
+                </div>
+             </div>
+        </div>
+    );
+}
+
+
+const FixtureItem: React.FC<{ fixture: Fixture, onScorecardClick: (fixture: Fixture) => void, onTeamClick: (team: Team) => void }> = ({ fixture, onScorecardClick, onTeamClick }) => {
     const { getTeamById } = useSports();
     const team1 = getTeamById(fixture.team1Id);
     const team2 = getTeamById(fixture.team2Id);
@@ -42,9 +96,9 @@ const FixtureItem: React.FC<{ fixture: Fixture, onScorecardClick: (fixture: Fixt
     };
     
     const renderTeam = (team: Team) => (
-        <div className="flex items-center space-x-3 flex-1">
+        <div className="flex items-center space-x-3 flex-1 cursor-pointer group" onClick={() => onTeamClick(team)}>
             <TeamLogo logoUrl={team.logoUrl} alt={team.name} />
-            <span className="font-semibold text-base sm:text-lg text-text-primary">{team.name}</span>
+            <span className="font-semibold text-base sm:text-lg text-text-primary group-hover:text-highlight transition-colors">{team.name}</span>
         </div>
     );
 
@@ -83,7 +137,7 @@ const FixtureItem: React.FC<{ fixture: Fixture, onScorecardClick: (fixture: Fixt
     );
 };
 
-const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) => {
+const StandingsTable: React.FC<{ standings: TeamStanding[], onTeamClick: (teamId: number) => void }> = ({ standings, onTeamClick }) => {
     if (standings.length === 0) {
         return <p className="text-center text-text-secondary">No completed matches yet to generate standings.</p>;
     }
@@ -115,9 +169,9 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
                             <tr key={s.teamId} className="hover:bg-accent transition-colors">
                                 <td className={`${tableCellClasses} text-text-secondary font-semibold text-center`}>{index + 1}</td>
                                 <td className={`${tableCellClasses} text-text-primary font-medium`}>
-                                    <div className="flex items-center">
+                                    <div className="flex items-center cursor-pointer group" onClick={() => onTeamClick(s.teamId)}>
                                         <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-8 w-8 mr-3"/>
-                                        {s.teamName}
+                                        <span className="group-hover:text-highlight transition-colors">{s.teamName}</span>
                                     </div>
                                 </td>
                                 <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.gamesPlayed}</td>
@@ -139,10 +193,10 @@ const StandingsTable: React.FC<{ standings: TeamStanding[] }> = ({ standings }) 
                 {standings.map((s, index) => (
                     <div key={s.teamId} className="bg-accent p-4 rounded-lg shadow">
                         <div className="flex justify-between items-center mb-4">
-                            <div className="flex items-center">
+                            <div className="flex items-center cursor-pointer" onClick={() => onTeamClick(s.teamId)}>
                                 <span className="text-text-secondary font-semibold mr-3">{index + 1}</span>
                                 <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-8 w-8 mr-3"/>
-                                <span className="text-text-primary font-bold">{s.teamName}</span>
+                                <span className="text-text-primary font-bold hover:text-highlight">{s.teamName}</span>
                             </div>
                             <div className="text-right">
                                 <span className="text-white font-bold text-xl">{s.points}</span>
@@ -185,8 +239,10 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   const { loading: teamsLoading } = useEntityData('teams');
   const { loading: sponsorsLoading } = useEntityData('sponsors');
   const { loading: tsLoading } = useEntityData('tournamentSponsors');
+  const { loading: trLoading } = useEntityData('tournamentRosters');
   
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
+  const [selectedTeamForRoster, setSelectedTeamForRoster] = useState<Team | null>(null);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
 
@@ -218,6 +274,11 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   const handleNextSponsor = () => {
     setCurrentSponsorIndex((prevIndex) => (prevIndex + 1) % sponsors.length);
   };
+  
+  const handleTeamClick = (team: Team | number) => {
+      const t = typeof team === 'number' ? getTeamById(team) : team;
+      if (t) setSelectedTeamForRoster(t);
+  }
 
   const team1 = selectedFixture ? getTeamById(selectedFixture.team1Id) : null;
   const team2 = selectedFixture ? getTeamById(selectedFixture.team2Id) : null;
@@ -314,13 +375,13 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
       <div className="space-y-6">
             {activeTab === 'fixtures' ? (
                 fixtures.length > 0 ? (
-                fixtures.map(f => <FixtureItem key={f.id} fixture={f} onScorecardClick={setSelectedFixture} />)
+                fixtures.map(f => <FixtureItem key={f.id} fixture={f} onScorecardClick={setSelectedFixture} onTeamClick={handleTeamClick} />)
                 ) : (
                 <p className="text-center text-text-secondary">No round-robin fixtures scheduled for this tournament yet.</p>
                 )
             ) : activeTab === 'standings' ? (
                 <>
-                    <StandingsTable standings={standings} />
+                    <StandingsTable standings={standings} onTeamClick={handleTeamClick} />
                         {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
                         <p className="text-center text-yellow-400 p-4 bg-secondary rounded-lg mt-4">The league phase is complete. The top teams have advanced to the knockout stage.</p>
                     )}
@@ -332,6 +393,14 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
 
       {selectedFixture && team1 && team2 && (
           <ScoreSheetModal fixture={selectedFixture} team1={team1} team2={team2} onClose={() => setSelectedFixture(null)} />
+      )}
+
+      {selectedTeamForRoster && (
+          <TournamentTeamRosterModal 
+            tournament={tournament} 
+            team={selectedTeamForRoster} 
+            onClose={() => setSelectedTeamForRoster(null)} 
+          />
       )}
     </div>
   );

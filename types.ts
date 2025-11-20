@@ -116,3 +116,10 @@ export interface Notice {
   expiresAt: string;
   createdAt: string;
 }
+
+export interface TournamentRoster {
+  id: number;
+  tournamentId: number;
+  teamId: number;
+  playerId: number;
+}

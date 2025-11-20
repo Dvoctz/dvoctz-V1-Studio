@@ -125,6 +125,7 @@ const TournamentsAdmin = () => {
     const { tournaments, addTournament, updateTournament, deleteTournament, concludeLeaguePhase, fixtures } = useSports();
     const [editing, setEditing] = useState<Tournament | Partial<Tournament> | null>(null);
     const [managingSponsorsFor, setManagingSponsorsFor] = useState<Tournament | null>(null);
+    const [managingSquadsFor, setManagingSquadsFor] = useState<Tournament | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isConcluding, setIsConcluding] = useState<number | null>(null);
@@ -170,6 +171,7 @@ const TournamentsAdmin = () => {
                         <div><p className="font-bold text-white">{t.name}</p><p className="text-sm text-highlight">{t.division} - {t.phase}</p></div>
                         <div className="flex flex-wrap gap-2">
                             {t.phase === 'round-robin' && <Button onClick={() => handleConclude(t.id)} disabled={isConcluding === t.id} className="bg-green-600 hover:bg-green-500 text-xs">Conclude League</Button>}
+                            <Button onClick={() => setManagingSquadsFor(t)} className="bg-indigo-600 hover:bg-indigo-500 text-xs">Squads</Button>
                             <Button onClick={() => setManagingSponsorsFor(t)} className="bg-purple-600 hover:bg-purple-500 text-xs">Sponsors</Button>
                             <Button onClick={() => setEditing(t)} className="bg-blue-600 hover:bg-blue-500 text-xs">Edit</Button>
                             <Button onClick={() => handleDelete(t.id)} className="bg-red-600 hover:bg-red-500 text-xs">Delete</Button>
@@ -179,6 +181,7 @@ const TournamentsAdmin = () => {
             </div>
             {editing && <FormModal title={editing.id ? "Edit" : "Add"} onClose={() => setEditing(null)}><TournamentForm tournament={editing} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
             {managingSponsorsFor && <TournamentSponsorsModal tournament={managingSponsorsFor} onClose={() => setManagingSponsorsFor(null)} />}
+            {managingSquadsFor && <TournamentSquadsModal tournament={managingSquadsFor} onClose={() => setManagingSquadsFor(null)} />}
         </AdminSection>
     );
 };
@@ -208,6 +211,100 @@ const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () =>
                 ))}
             </div>
             <div className="flex justify-end gap-2"><Button onClick={onClose} className="bg-gray-600">Cancel</Button><Button onClick={save}>Save</Button></div>
+        </FormModal>
+    );
+};
+
+const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
+    const { teams, getPlayersByClub, updateTournamentSquad, getTournamentSquad } = useSports();
+    const [selectedTeamId, setSelectedTeamId] = useState<number | ''>('');
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
+    const [loading, setLoading] = useState(false);
+
+    const selectedTeam = useMemo(() => teams.find(t => t.id === Number(selectedTeamId)), [selectedTeamId, teams]);
+    
+    const availablePlayers = useMemo(() => {
+        if (!selectedTeam) return [];
+        // Get players from the same club
+        const clubPlayers = getPlayersByClub(selectedTeam.clubId);
+        // Also include anyone currently assigned to this team globally (just in case data is messy)
+        // We'll filter out duplicates by ID automatically when rendering/using Set
+        return clubPlayers; 
+    }, [selectedTeam, getPlayersByClub]);
+
+    // Load existing roster when team changes
+    useEffect(() => {
+        if (selectedTeamId) {
+            const roster = getTournamentSquad(tournament.id, Number(selectedTeamId));
+            setSelectedPlayerIds(new Set(roster.map(p => p.id)));
+        } else {
+            setSelectedPlayerIds(new Set());
+        }
+    }, [selectedTeamId, tournament.id, getTournamentSquad]);
+
+    const handleToggle = (playerId: number) => {
+        const newSet = new Set(selectedPlayerIds);
+        if (newSet.has(playerId)) newSet.delete(playerId);
+        else newSet.add(playerId);
+        setSelectedPlayerIds(newSet);
+    };
+
+    const handleSave = async () => {
+        if (!selectedTeamId) return;
+        setLoading(true);
+        try {
+            await updateTournamentSquad(tournament.id, Number(selectedTeamId), Array.from(selectedPlayerIds));
+            alert('Squad updated successfully!');
+        } catch (e: any) {
+            alert('Error updating squad: ' + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <FormModal title={`Manage Squad: ${tournament.name}`} onClose={onClose}>
+            <div className="mb-4">
+                <Label>Select Team</Label>
+                <Select value={selectedTeamId} onChange={e => setSelectedTeamId(Number(e.target.value) || '')}>
+                    <option value="">-- Choose a Team --</option>
+                    {teams.sort((a,b) => a.name.localeCompare(b.name)).map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                </Select>
+            </div>
+
+            {selectedTeam && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h4 className="font-bold text-white">Available Players ({availablePlayers.length})</h4>
+                        <span className="text-sm text-highlight">{selectedPlayerIds.size} selected</span>
+                    </div>
+                    <div className="bg-primary p-2 rounded max-h-60 overflow-y-auto space-y-1">
+                        {availablePlayers.length > 0 ? availablePlayers.map(p => (
+                            <div key={p.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" onClick={() => handleToggle(p.id)}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={selectedPlayerIds.has(p.id)} 
+                                    onChange={() => handleToggle(p.id)}
+                                    className="rounded border-gray-300 text-highlight focus:ring-highlight h-4 w-4"
+                                />
+                                <span className={selectedPlayerIds.has(p.id) ? "text-white font-medium" : "text-text-secondary"}>{p.name} <span className="text-xs opacity-70">({p.role})</span></span>
+                            </div>
+                        )) : (
+                            <p className="text-text-secondary text-sm p-2">No players found in this club.</p>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t border-accent">
+                        <Button onClick={onClose} className="bg-gray-600">Close</Button>
+                        <Button onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save Squad'}</Button>
+                    </div>
+                </div>
+            )}
+            
+            {!selectedTeam && (
+                <p className="text-text-secondary text-center py-4">Please select a team to manage its roster for this tournament.</p>
+            )}
         </FormModal>
     );
 };
