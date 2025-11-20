@@ -490,9 +490,9 @@ const PlayerForm: React.FC<{ player: any, teams: Team[], clubs: Club[], onSave: 
             
             {/* Step 1: Select Club */}
             <div>
-                <Label>Club (Required)</Label>
-                <Select value={formData.clubId ?? ''} onChange={handleClubChange} required>
-                    <option value="" disabled>Select a Club</option>
+                <Label>Club</Label>
+                <Select value={formData.clubId ?? ''} onChange={handleClubChange}>
+                    <option value="">No Club (Free Agent)</option>
                     {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
             </div>
@@ -504,7 +504,7 @@ const PlayerForm: React.FC<{ player: any, teams: Team[], clubs: Club[], onSave: 
                     <option value="">Unassigned (Club Pool)</option>
                     {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </Select>
-                {!formData.clubId && <p className="text-xs text-text-secondary mt-1">Please select a club first.</p>}
+                {!formData.clubId && <p className="text-xs text-highlight mt-1">Player will be registered as a Free Agent (No Club).</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
