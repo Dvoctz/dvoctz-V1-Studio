@@ -46,6 +46,7 @@ const AppContent: React.FC = () => {
   useEntityData('players');
   useEntityData('tournamentSponsors');
   useEntityData('notices');
+  useEntityData('playerTransfers');
 
   useEffect(() => {
     if (authLoading) return;

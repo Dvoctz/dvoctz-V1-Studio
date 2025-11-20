@@ -559,7 +559,7 @@ const TransfersAdmin = () => {
     };
 
     const filtered = useMemo(() => {
-        let list = playerTransfers || [];
+        let list = playerTransfers ? [...playerTransfers] : [];
         if (searchTerm) {
             list = list.filter(t => {
                 const p = players.find(player => player.id === t.playerId);
