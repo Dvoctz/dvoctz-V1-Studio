@@ -220,6 +220,7 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
     const [selectedTeamId, setSelectedTeamId] = useState<number | ''>('');
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const selectedTeam = useMemo(() => teams.find(t => t.id === Number(selectedTeamId)), [selectedTeamId, teams]);
     
@@ -231,6 +232,11 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
         // We'll filter out duplicates by ID automatically when rendering/using Set
         return clubPlayers; 
     }, [selectedTeam, getPlayersByClub]);
+
+    const filteredPlayers = useMemo(() => {
+        if (!searchTerm) return availablePlayers;
+        return availablePlayers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [availablePlayers, searchTerm]);
 
     // Load existing roster when team changes
     useEffect(() => {
@@ -276,12 +282,19 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
 
             {selectedTeam && (
                 <div className="space-y-4">
+                    <div>
+                        <Input 
+                            placeholder="Search players..." 
+                            value={searchTerm} 
+                            onChange={e => setSearchTerm(e.target.value)} 
+                        />
+                    </div>
                     <div className="flex justify-between items-center">
                         <h4 className="font-bold text-white">Available Players ({availablePlayers.length})</h4>
                         <span className="text-sm text-highlight">{selectedPlayerIds.size} selected</span>
                     </div>
                     <div className="bg-primary p-2 rounded max-h-60 overflow-y-auto space-y-1">
-                        {availablePlayers.length > 0 ? availablePlayers.map(p => (
+                        {filteredPlayers.length > 0 ? filteredPlayers.map(p => (
                             <div key={p.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer" onClick={() => handleToggle(p.id)}>
                                 <input 
                                     type="checkbox" 
@@ -292,7 +305,7 @@ const TournamentSquadsModal: React.FC<{ tournament: Tournament, onClose: () => v
                                 <span className={selectedPlayerIds.has(p.id) ? "text-white font-medium" : "text-text-secondary"}>{p.name} <span className="text-xs opacity-70">({p.role})</span></span>
                             </div>
                         )) : (
-                            <p className="text-text-secondary text-sm p-2">No players found in this club.</p>
+                            <p className="text-text-secondary text-sm p-2">No players found matching "{searchTerm}".</p>
                         )}
                     </div>
                     <div className="flex justify-end gap-2 pt-2 border-t border-accent">
