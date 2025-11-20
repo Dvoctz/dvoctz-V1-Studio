@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Player } from '../types';
@@ -19,8 +20,16 @@ const PlayerCardSkeleton: React.FC = () => (
 );
 
 const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ player, onSelect }) => {
-    const { getTeamById } = useSports();
+    const { getTeamById, getClubById } = useSports();
     const team = getTeamById(player.teamId);
+    const club = getClubById(player.clubId);
+
+    let affiliationText = 'Free Agent';
+    if (team) {
+        affiliationText = team.name;
+    } else if (club) {
+        affiliationText = `${club.name} (Unassigned)`;
+    }
 
     return (
         <div onClick={onSelect} className="bg-secondary rounded-lg shadow-lg overflow-hidden text-center group cursor-pointer">
@@ -39,7 +48,7 @@ const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ playe
                 </div>
             </div>
              <div className="p-4">
-                <p className="text-sm text-text-secondary">Team: <span className="font-semibold text-text-primary">{team?.name || 'Free Agent'}</span></p>
+                <p className="text-sm text-text-secondary">Team: <span className={`font-semibold ${team ? 'text-text-primary' : club ? 'text-yellow-400' : 'text-text-secondary'}`}>{affiliationText}</span></p>
                  <div className="grid grid-cols-4 gap-2 mt-3 text-xs text-text-secondary">
                     <div>
                         <span className="font-bold text-white block">{player.stats?.matches ?? 0}</span>
@@ -66,13 +75,16 @@ const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ playe
 export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> = ({ onSelectPlayer }) => {
   const { data: players, loading: playersLoading } = useEntityData('players');
   const { loading: teamsLoading } = useEntityData('teams');
+  const { loading: clubsLoading } = useEntityData('clubs');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'freeAgents'>('all');
 
   const filteredPlayers = useMemo(() => {
       let playerList = players || [];
       if (activeTab === 'freeAgents') {
-          playerList = playerList.filter(p => p.teamId === null);
+          // Only players WITHOUT a club are free agents.
+          // Players with a club but no team are in the "Club Pool", not Free Agents.
+          playerList = playerList.filter(p => p.clubId === null);
       }
       return playerList.filter(player => {
         return player.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -88,7 +100,7 @@ export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> 
     </button>
   );
 
-  const isLoading = playersLoading || teamsLoading;
+  const isLoading = playersLoading || teamsLoading || clubsLoading;
 
   return (
     <div>
@@ -130,7 +142,7 @@ export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> 
         <div className="text-center py-10">
           <p className="text-text-secondary text-lg">
             {activeTab === 'freeAgents' 
-              ? 'There are currently no free agents.' 
+              ? 'There are currently no true free agents (players without a club).' 
               : 'No players found matching your search.'
             }
           </p>

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useSports } from '../context/SportsDataContext';
 import type { Player, PlayerTransfer } from '../types';
@@ -44,9 +45,17 @@ const TransferHistory: React.FC<{ transfers: PlayerTransfer[] }> = ({ transfers 
 
 
 export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBack }) => {
-  const { getTeamById, getTransfersByPlayerId } = useSports();
+  const { getTeamById, getClubById, getTransfersByPlayerId } = useSports();
   const team = getTeamById(player.teamId);
+  const club = getClubById(player.clubId);
   const transfers = getTransfersByPlayerId(player.id);
+
+  let currentAffiliation = 'Free Agent';
+  if (team) {
+      currentAffiliation = team.name;
+  } else if (club) {
+      currentAffiliation = `Unassigned - ${club.name}`;
+  }
 
   return (
     <div>
@@ -68,7 +77,7 @@ export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBa
         <div className="text-center md:text-left">
             <h1 className="text-4xl font-extrabold text-white">{player.name}</h1>
             <p className="text-xl text-highlight font-semibold mt-1">{player.role}</p>
-            <p className="text-text-secondary mt-2">Current Team: <span className="font-semibold text-text-primary">{team?.name || 'Free Agent'}</span></p>
+            <p className="text-text-secondary mt-2">Current Status: <span className={`font-semibold ${team ? 'text-text-primary' : club ? 'text-yellow-400' : 'text-text-secondary'}`}>{currentAffiliation}</span></p>
         </div>
         <div className="w-full md:w-auto md:ml-auto grid grid-cols-2 sm:grid-cols-4 md:grid-cols-2 gap-4 text-center bg-primary p-4 rounded-lg">
              <div><span className="font-bold text-xl text-white block">{player.stats?.matches ?? 0}</span><span className="text-xs text-text-secondary">Matches</span></div>
