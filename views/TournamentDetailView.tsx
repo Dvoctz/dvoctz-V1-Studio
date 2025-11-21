@@ -23,19 +23,43 @@ const TeamLogo: React.FC<{ logoUrl: string | null; alt: string; className?: stri
     );
 };
 
-// New Modal Component for Tournament Roster
-const TournamentTeamRosterModal: React.FC<{ tournament: Tournament; team: Team; onClose: () => void }> = ({ tournament, team, onClose }) => {
-    const { getTournamentSquad } = useSports();
-    // Force load tournament rosters if not present, though generally handled by parent view or aggressive preload
+// Enhanced Modal Component for Team Details (Squad + Fixtures)
+const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team; onClose: () => void }> = ({ tournament, team, onClose }) => {
+    const { getTournamentSquad, getFixturesByTournament, getTeamById } = useSports();
+    const [activeTab, setActiveTab] = useState<'squad' | 'fixtures'>('squad');
+
+    // Force load tournament rosters if not present
     const roster = useMemo(() => getTournamentSquad(tournament.id, team.id), [getTournamentSquad, tournament.id, team.id]);
+
+    // Filter and sort fixtures for this team in this tournament
+    const teamFixtures = useMemo(() => {
+        const allFixtures = getFixturesByTournament(tournament.id);
+        return allFixtures
+            .filter(f => f.team1Id === team.id || f.team2Id === team.id)
+            .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+    }, [getFixturesByTournament, tournament.id, team.id]);
+
+    const getResultBadge = (fixture: Fixture) => {
+        if (fixture.status !== 'completed' || !fixture.score) return null;
+        
+        const isTeam1 = fixture.team1Id === team.id;
+        const myScore = isTeam1 ? fixture.score.team1Score : fixture.score.team2Score;
+        const oppScore = isTeam1 ? fixture.score.team2Score : fixture.score.team1Score;
+
+        if (myScore > oppScore) return <span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Win</span>;
+        if (myScore < oppScore) return <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Loss</span>;
+        return <span className="bg-gray-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Draw</span>;
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
-             <div className="bg-secondary rounded-xl shadow-2xl w-full max-w-md transform transition-all max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="p-6 border-b border-accent flex justify-between items-center sticky top-0 bg-secondary z-10">
+             <div className="bg-secondary rounded-xl shadow-2xl w-full max-w-md transform transition-all max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                
+                {/* Modal Header */}
+                <div className="p-6 border-b border-accent flex justify-between items-center flex-shrink-0 bg-secondary rounded-t-xl">
                     <div>
                          <h3 className="text-xl font-bold text-white">{team.name}</h3>
-                         <p className="text-sm text-highlight">Squad for {tournament.name}</p>
+                         <p className="text-sm text-highlight">{tournament.name}</p>
                     </div>
                     <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -43,31 +67,106 @@ const TournamentTeamRosterModal: React.FC<{ tournament: Tournament; team: Team; 
                         </svg>
                     </button>
                 </div>
-                <div className="p-4">
-                    {roster.length > 0 ? (
+
+                {/* Tabs */}
+                <div className="flex border-b border-accent flex-shrink-0">
+                    <button 
+                        className={`flex-1 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'squad' ? 'text-highlight border-highlight' : 'text-text-secondary border-transparent hover:text-white'}`}
+                        onClick={() => setActiveTab('squad')}
+                    >
+                        Squad
+                    </button>
+                    <button 
+                        className={`flex-1 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'fixtures' ? 'text-highlight border-highlight' : 'text-text-secondary border-transparent hover:text-white'}`}
+                        onClick={() => setActiveTab('fixtures')}
+                    >
+                        Fixtures
+                    </button>
+                </div>
+
+                {/* Scrollable Content Area */}
+                <div className="p-4 overflow-y-auto flex-grow">
+                    {activeTab === 'squad' ? (
                         <div className="space-y-2">
-                            {roster.map(p => (
-                                <div key={p.id} className="flex items-center gap-3 p-2 bg-primary rounded">
-                                     {p.photoUrl ? (
-                                        <img src={p.photoUrl} alt={p.name} className="w-10 h-10 rounded-full object-cover" />
-                                    ) : (
-                                        <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-text-secondary">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                            </svg>
+                            {roster.length > 0 ? (
+                                roster.map(p => (
+                                    <div key={p.id} className="flex items-center gap-3 p-2 bg-primary rounded hover:bg-accent transition-colors">
+                                         {p.photoUrl ? (
+                                            <img src={p.photoUrl} alt={p.name} className="w-10 h-10 rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-text-secondary">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-bold text-white">{p.name}</p>
+                                            <p className="text-xs text-text-secondary">{p.role}</p>
                                         </div>
-                                    )}
-                                    <div>
-                                        <p className="font-bold text-white">{p.name}</p>
-                                        <p className="text-xs text-text-secondary">{p.role}</p>
                                     </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-8 text-text-secondary">
+                                    <p>No specific roster recorded for this tournament.</p>
+                                    <p className="text-xs mt-2">The team likely used their standard club roster.</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     ) : (
-                        <div className="text-center py-8 text-text-secondary">
-                            <p>No specific roster recorded for this tournament.</p>
-                            <p className="text-xs mt-2">The team likely used their standard club roster.</p>
+                        // FIXTURES TAB
+                        <div className="space-y-3">
+                            {teamFixtures.length > 0 ? (
+                                teamFixtures.map(f => {
+                                    const isTeam1 = f.team1Id === team.id;
+                                    const opponentId = isTeam1 ? f.team2Id : f.team1Id;
+                                    const opponent = getTeamById(opponentId);
+                                    const dateObj = new Date(f.dateTime);
+                                    
+                                    return (
+                                        <div key={f.id} className="bg-primary p-3 rounded flex items-center justify-between border border-transparent hover:border-accent transition-colors">
+                                            <div className="flex flex-col gap-1 overflow-hidden">
+                                                <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wide flex items-center gap-1">
+                                                    {f.stage ? f.stage.replace('-', ' ') : 'Group Stage'} 
+                                                    <span className="w-1 h-1 rounded-full bg-text-secondary"></span>
+                                                    {dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-text-secondary text-xs font-medium">vs</span>
+                                                    {opponent?.logoUrl && <img src={opponent.logoUrl} className="w-5 h-5 rounded-full object-cover" alt="" />}
+                                                    <span className="font-semibold text-white text-sm truncate">{opponent?.name || 'Unknown Team'}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end pl-2">
+                                                 {f.status === 'completed' && f.score ? (
+                                                     <div className="flex flex-col items-end gap-1">
+                                                         <div className="flex items-center gap-2">
+                                                             {getResultBadge(f)}
+                                                             <span className="text-white font-bold text-lg leading-none">
+                                                                 {f.score.team1Score}-{f.score.team2Score}
+                                                             </span>
+                                                         </div>
+                                                     </div>
+                                                 ) : (
+                                                     <div className="flex flex-col items-end">
+                                                         <span className="text-highlight text-sm font-bold">
+                                                             {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                                                         </span>
+                                                         {f.status === 'live' && (
+                                                            <span className="text-[10px] bg-red-500 text-white px-1 rounded animate-pulse font-bold">LIVE</span>
+                                                         )}
+                                                     </div>
+                                                 )}
+                                                 <span className="text-[10px] text-text-secondary mt-0.5 truncate max-w-[100px]">{f.ground}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center py-8 text-text-secondary">
+                                    <p>No fixtures scheduled for this team in this tournament yet.</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -244,7 +343,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   useEntityData('tournamentTeams');
   
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
-  const [selectedTeamForRoster, setSelectedTeamForRoster] = useState<Team | null>(null);
+  const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<Team | null>(null);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout' | 'teams'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
 
@@ -279,7 +378,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   
   const handleTeamClick = (team: Team | number) => {
       const t = typeof team === 'number' ? getTeamById(team) : team;
-      if (t) setSelectedTeamForRoster(t);
+      if (t) setSelectedTeamForDetails(t);
   }
 
   const team1 = selectedFixture ? getTeamById(selectedFixture.team1Id) : null;
@@ -422,11 +521,11 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
           <ScoreSheetModal fixture={selectedFixture} team1={team1} team2={team2} onClose={() => setSelectedFixture(null)} />
       )}
 
-      {selectedTeamForRoster && (
-          <TournamentTeamRosterModal 
+      {selectedTeamForDetails && (
+          <TournamentTeamDetailsModal 
             tournament={tournament} 
-            team={selectedTeamForRoster} 
-            onClose={() => setSelectedTeamForRoster(null)} 
+            team={selectedTeamForDetails} 
+            onClose={() => setSelectedTeamForDetails(null)} 
           />
       )}
     </div>
