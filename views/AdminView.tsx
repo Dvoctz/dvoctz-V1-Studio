@@ -1254,6 +1254,9 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
         const val = e.target.value;
         setRefereeSelection(val);
         if (val === '__manual__') {
+             // Keep existing if switching to manual, or blank if empty
+             setFormData(prev => ({ ...prev, referee: prev.referee || '' })); 
+        } else if (val === '') {
              setFormData(prev => ({ ...prev, referee: '' }));
         } else {
             setFormData(prev => ({ ...prev, referee: val }));

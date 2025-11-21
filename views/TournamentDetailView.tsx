@@ -23,10 +23,10 @@ const TeamLogo: React.FC<{ logoUrl: string | null; alt: string; className?: stri
     );
 };
 
-// Enhanced Modal Component for Team Details (Squad + Fixtures)
+// Enhanced Modal Component for Team Details (Squad + Fixtures + Officiating)
 const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team; onClose: () => void }> = ({ tournament, team, onClose }) => {
     const { getTournamentSquad, getFixturesByTournament, getTeamById } = useSports();
-    const [activeTab, setActiveTab] = useState<'squad' | 'fixtures'>('squad');
+    const [activeTab, setActiveTab] = useState<'squad' | 'fixtures' | 'officiating'>('squad');
 
     // Force load tournament rosters if not present
     const roster = useMemo(() => getTournamentSquad(tournament.id, team.id), [getTournamentSquad, tournament.id, team.id]);
@@ -38,6 +38,14 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
             .filter(f => f.team1Id === team.id || f.team2Id === team.id)
             .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     }, [getFixturesByTournament, tournament.id, team.id]);
+
+    // Filter fixtures where this team is the referee
+    const officiatingFixtures = useMemo(() => {
+        const allFixtures = getFixturesByTournament(tournament.id);
+        return allFixtures
+            .filter(f => f.referee === team.name)
+            .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+    }, [getFixturesByTournament, tournament.id, team.name]);
 
     const getResultBadge = (fixture: Fixture) => {
         if (fixture.status !== 'completed' || !fixture.score) return null;
@@ -82,11 +90,17 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                     >
                         Fixtures
                     </button>
+                    <button 
+                        className={`flex-1 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'officiating' ? 'text-highlight border-highlight' : 'text-text-secondary border-transparent hover:text-white'}`}
+                        onClick={() => setActiveTab('officiating')}
+                    >
+                        Officiating
+                    </button>
                 </div>
 
                 {/* Scrollable Content Area */}
                 <div className="p-4 overflow-y-auto flex-grow">
-                    {activeTab === 'squad' ? (
+                    {activeTab === 'squad' && (
                         <div className="space-y-2">
                             {roster.length > 0 ? (
                                 roster.map(p => (
@@ -113,8 +127,9 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                                 </div>
                             )}
                         </div>
-                    ) : (
-                        // FIXTURES TAB
+                    )}
+
+                    {activeTab === 'fixtures' && (
                         <div className="space-y-3">
                             {teamFixtures.length > 0 ? (
                                 teamFixtures.map(f => {
@@ -165,6 +180,45 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                             ) : (
                                 <div className="text-center py-8 text-text-secondary">
                                     <p>No fixtures scheduled for this team in this tournament yet.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'officiating' && (
+                        <div className="space-y-3">
+                            {officiatingFixtures.length > 0 ? (
+                                officiatingFixtures.map(f => {
+                                    const team1 = getTeamById(f.team1Id);
+                                    const team2 = getTeamById(f.team2Id);
+                                    const dateObj = new Date(f.dateTime);
+                                    
+                                    return (
+                                        <div key={f.id} className="bg-primary p-3 rounded border-l-2 border-highlight">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-[10px] text-text-secondary font-bold uppercase tracking-wide">
+                                                    {dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} • {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                </span>
+                                                <span className="text-[10px] text-text-secondary">{f.ground}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    {team1?.logoUrl ? <img src={team1.logoUrl} className="w-5 h-5 rounded-full object-cover" alt="" /> : <div className="w-5 h-5 rounded-full bg-accent"></div>}
+                                                    <span className="font-semibold text-white text-sm">{team1?.name || 'TBD'}</span>
+                                                </div>
+                                                <span className="text-text-secondary text-xs mx-1">vs</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-semibold text-white text-sm">{team2?.name || 'TBD'}</span>
+                                                    {team2?.logoUrl ? <img src={team2.logoUrl} className="w-5 h-5 rounded-full object-cover" alt="" /> : <div className="w-5 h-5 rounded-full bg-accent"></div>}
+                                                </div>
+                                            </div>
+                                            {f.stage && <p className="text-center text-[10px] text-text-secondary mt-2 uppercase tracking-wider">{f.stage.replace('-', ' ')}</p>}
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center py-8 text-text-secondary">
+                                    <p>No officiating duties assigned to this team yet.</p>
                                 </div>
                             )}
                         </div>
@@ -324,13 +378,36 @@ const StandingsTable: React.FC<{ standings: TeamStanding[], onTeamClick: (teamId
     );
 };
 
+const RefereeFixtureCard: React.FC<{ fixture: Fixture }> = ({ fixture }) => {
+    const { getTeamById } = useSports();
+    const team1 = getTeamById(fixture.team1Id);
+    const team2 = getTeamById(fixture.team2Id);
+    const dateObj = new Date(fixture.dateTime);
+
+    return (
+        <div className="bg-secondary p-4 rounded-lg shadow flex flex-col sm:flex-row items-center justify-between gap-4 border-l-4 border-highlight hover:bg-accent transition-colors">
+            <div className="text-center sm:text-left">
+                 <div className="text-xs text-text-secondary font-bold uppercase tracking-wide mb-1">
+                    {dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} • {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                 </div>
+                 <div className="font-bold text-white text-lg">
+                    {team1 ? team1.name : 'TBD'} <span className="text-text-secondary mx-1">vs</span> {team2 ? team2.name : 'TBD'}
+                 </div>
+                 <div className="text-xs text-text-secondary mt-1">{fixture.ground} {fixture.stage ? `• ${fixture.stage.replace('-', ' ')}` : ''}</div>
+            </div>
+            <div className="flex flex-col items-center sm:items-end bg-primary/50 p-2 rounded min-w-[150px]">
+                <span className="text-[10px] text-text-secondary uppercase font-semibold">Officiating</span>
+                <span className="font-bold text-highlight text-center truncate max-w-[180px]">{fixture.referee}</span>
+            </div>
+        </div>
+    )
+};
+
 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament: initialTournament, onBack }) => {
   const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, tournaments } = useSports();
   
   // FIX: Get the absolute latest version of the tournament from context.
-  // The 'initialTournament' prop passed from the parent might be stale (e.g., it doesn't know the phase changed).
-  // This ensures that when data is loaded in the background, the view updates to reflect the new phase (e.g., knockout).
   const tournament = useMemo(() => tournaments.find(t => t.id === initialTournament.id) || initialTournament, [tournaments, initialTournament]);
 
   // Ensure dependencies for this view are loaded
@@ -344,10 +421,34 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
   const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<Team | null>(null);
-  const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout' | 'teams'>('fixtures');
+  const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
+  const [refereeFilter, setRefereeFilter] = useState('');
 
+  // Round Robin Fixtures
   const fixtures = useMemo(() => getFixturesByTournament(tournament.id).filter(f => !f.stage), [getFixturesByTournament, tournament.id]);
+  
+  // ALL Fixtures (for Referees tab)
+  const allFixtures = useMemo(() => getFixturesByTournament(tournament.id), [getFixturesByTournament, tournament.id]);
+
+  // Unique Referees list
+  const uniqueReferees = useMemo(() => {
+      const refs = new Set<string>();
+      allFixtures.forEach(f => {
+          if (f.referee) refs.add(f.referee);
+      });
+      return Array.from(refs).sort();
+  }, [allFixtures]);
+
+  // Filtered Referee Fixtures
+  const refereeFixtures = useMemo(() => {
+      let list = allFixtures.filter(f => f.referee); 
+      if (refereeFilter) {
+          list = list.filter(f => f.referee === refereeFilter);
+      }
+      return list;
+  }, [allFixtures, refereeFilter]);
+
   const standings = useMemo(() => getStandingsForTournament(tournament.id), [getStandingsForTournament, tournament.id]);
   const sponsors = useMemo(() => getSponsorsForTournament(tournament.id), [getSponsorsForTournament, tournament.id]);
 
@@ -362,9 +463,11 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   
   useEffect(() => {
       if (tournament.phase === 'knockout' || tournament.phase === 'completed') {
-          setActiveTab('knockout');
-      } else {
-          setActiveTab('fixtures');
+          // If opening directly into knockout phase, prefer knockout tab unless coming back
+          // Keeping logic simple: default to fixtures if phase matches
+          if (activeTab === 'fixtures') {
+              setActiveTab('knockout');
+          }
       }
   }, [tournament.phase]);
 
@@ -386,10 +489,10 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   
   const isDataLoading = fixturesLoading || teamsLoading || sponsorsLoading || tsLoading;
 
-  const TabButton: React.FC<{ tab: 'fixtures' | 'standings' | 'knockout' | 'teams'; children: React.ReactNode }> = ({ tab, children }) => (
+  const TabButton: React.FC<{ tab: 'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees'; children: React.ReactNode }> = ({ tab, children }) => (
     <button
       onClick={() => setActiveTab(tab)}
-      className={`px-6 py-3 text-lg font-semibold transition-colors duration-300 focus:outline-none ${activeTab === tab ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+      className={`px-4 sm:px-6 py-3 text-sm sm:text-lg font-semibold transition-colors duration-300 focus:outline-none whitespace-nowrap ${activeTab === tab ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
     >
       {children}
     </button>
@@ -465,8 +568,9 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
           </div>
       )}
       
-      <div className="flex flex-wrap border-b border-accent mb-6 justify-center gap-2">
+      <div className="flex flex-wrap border-b border-accent mb-6 justify-center overflow-x-auto">
             <TabButton tab="fixtures">Fixtures</TabButton>
+            <TabButton tab="referees">Referees</TabButton>
             <TabButton tab="teams">Teams</TabButton>
             <TabButton tab="standings">Standings</TabButton>
             {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
@@ -481,6 +585,43 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                 ) : (
                 <p className="text-center text-text-secondary">No round-robin fixtures scheduled for this tournament yet.</p>
                 )
+            )}
+
+            {activeTab === 'referees' && (
+                <div className="space-y-4">
+                    <div className="bg-secondary p-4 rounded-lg shadow-lg mb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-xl font-bold text-white">Officiating Schedule</h3>
+                                <p className="text-sm text-text-secondary">View fixture assignments for referees and officiating teams.</p>
+                            </div>
+                            <select 
+                                className="bg-primary text-white p-2 rounded border border-accent focus:border-highlight focus:outline-none w-full sm:w-auto"
+                                value={refereeFilter}
+                                onChange={(e) => setRefereeFilter(e.target.value)}
+                            >
+                                <option value="">All Officials</option>
+                                {uniqueReferees.map(ref => (
+                                    <option key={ref} value={ref}>{ref}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {refereeFixtures.length > 0 ? (
+                        refereeFixtures.map(f => <RefereeFixtureCard key={f.id} fixture={f} />)
+                    ) : (
+                        <div className="text-center py-12 bg-secondary rounded-lg">
+                            <div className="flex justify-center mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-text-secondary opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                </svg>
+                            </div>
+                            <p className="text-text-secondary font-medium">No officiating assignments found.</p>
+                            {refereeFilter && <p className="text-sm text-text-secondary mt-2">Try clearing the filter to see all fixtures.</p>}
+                        </div>
+                    )}
+                </div>
             )}
 
             {activeTab === 'teams' && (
