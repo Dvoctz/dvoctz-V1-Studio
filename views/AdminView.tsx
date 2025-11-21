@@ -1208,54 +1208,62 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
     const [formData, setFormData] = useState({
         tournamentId: tournaments[0]?.id, team1Id: teams[0]?.id, team2Id: teams[1]?.id,
         ground: 'Main Court', 
-        // Initialize with converted local time or current local time
         status: 'upcoming', referee: '', score: { team1Score: 0, team2Score: 0, sets: [], resultMessage: '' },
         ...fixture,
-        // Override dateTime from fixture spread if it exists, to ensure we use the transformed local string
         dateTime: fixture?.dateTime ? toLocalInputString(fixture.dateTime) : getNowLocalString()
+    });
+
+    // New State for Referee Dropdown Logic
+    const [refereeSelection, setRefereeSelection] = useState<string>(() => {
+        const currentRef = fixture?.referee;
+        if (!currentRef) return '';
+        const isKnownTeam = teams.some(t => t.name === currentRef);
+        return isKnownTeam ? currentRef : '__manual__';
     });
 
     const selectedTournament = useMemo(() => tournaments.find(t => t.id === Number(formData.tournamentId)), [tournaments, formData.tournamentId]);
 
     const availableTeams = useMemo(() => {
         if (!selectedTournament) return teams;
-        // Filter teams matching the tournament's division
         return teams.filter(t => t.division === selectedTournament.division).sort((a, b) => a.name.localeCompare(b.name));
     }, [teams, selectedTournament]);
 
-    // Handler for changing tournament to auto-update teams if they don't match division
     const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newId = Number(e.target.value);
         const newTourney = tournaments.find(t => t.id === newId);
-        let update = { tournamentId: newId };
+        let update: any = { tournamentId: newId };
         
         if (newTourney) {
             const relevantTeams = teams.filter(t => t.division === newTourney.division).sort((a, b) => a.name.localeCompare(b.name));
-            // If current selection isn't in the new list, default to first available
             const t1Exists = relevantTeams.find(t => t.id === formData.team1Id);
             const t2Exists = relevantTeams.find(t => t.id === formData.team2Id);
             
             if (!t1Exists && relevantTeams.length > 0) {
-                 // @ts-ignore
                 update.team1Id = relevantTeams[0].id;
             }
              if (!t2Exists && relevantTeams.length > 1) {
-                 // @ts-ignore
                 update.team2Id = relevantTeams[1].id;
             } else if (!t2Exists && relevantTeams.length > 0) {
-                 // @ts-ignore
                 update.team2Id = relevantTeams[0].id;
             }
         }
         setFormData({ ...formData, ...update });
     };
     
+    const handleRefereeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        setRefereeSelection(val);
+        if (val === '__manual__') {
+             setFormData(prev => ({ ...prev, referee: '' }));
+        } else {
+            setFormData(prev => ({ ...prev, referee: val }));
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Convert Local Time Input back to UTC ISO String for database storage
         const localDate = new Date(formData.dateTime);
         const utcDate = localDate.toISOString();
-        
         onSave({ ...formData, dateTime: utcDate });
     };
 
@@ -1302,8 +1310,27 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
                 <div><Label>Ground</Label><Input value={formData.ground} onChange={e => setFormData({...formData, ground: e.target.value})} /></div>
             </div>
             <div><Label>Status</Label><Select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="completed">Completed</option></Select></div>
-            <div><Label>Referee</Label><Input value={formData.referee || ''} onChange={e => setFormData({...formData, referee: e.target.value})} /></div>
             
+            {/* UPDATED REFEREE SECTION */}
+            <div>
+                <Label>Referee / Officiating Team</Label>
+                <Select value={refereeSelection} onChange={handleRefereeChange}>
+                    <option value="">-- Select Officiating Team --</option>
+                    {teams.sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                    ))}
+                    <option value="__manual__">Other / Manual Entry</option>
+                </Select>
+                {refereeSelection === '__manual__' && (
+                    <Input 
+                        placeholder="Enter Referee Name" 
+                        value={formData.referee || ''} 
+                        onChange={e => setFormData({...formData, referee: e.target.value})}
+                        className="mt-2" 
+                    />
+                )}
+            </div>
+
             {formData.status === 'completed' && (
                 <div className="border-t border-accent pt-4">
                     <h4 className="font-bold text-white mb-2">Score Details</h4>
