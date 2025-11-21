@@ -494,7 +494,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                             >
                                 <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="w-20 h-20 mb-3 shadow-lg" />
                                 <h3 className="font-bold text-white group-hover:text-highlight transition-colors">{s.teamName}</h3>
-                                <span className="text-xs text-text-secondary mt-1 bg-primary px-2 py-1 rounded-full">View Squad</span>
+                                <span className="text-xs text-text-secondary mt-1 bg-primary px-2 py-1 rounded-full">More Details</span>
                             </div>
                         ))}
                     </div>
