@@ -1070,11 +1070,30 @@ const FixturesAdmin = () => {
 };
 
 const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tournament[], onSave: any, onCancel: any, error: any }> = ({ fixture, teams, tournaments, onSave, onCancel, error }) => {
+    
+    // Helper: Convert UTC ISO string to Local Date Time String (YYYY-MM-DDTHH:mm) for input[type="datetime-local"]
+    const toLocalInputString = (dateStr: string) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+        return localDate.toISOString().slice(0, 16);
+    };
+
+    // Helper: Get current local time string for default value
+    const getNowLocalString = () => {
+        const now = new Date();
+        const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+        return localDate.toISOString().slice(0, 16);
+    };
+
     const [formData, setFormData] = useState({
         tournamentId: tournaments[0]?.id, team1Id: teams[0]?.id, team2Id: teams[1]?.id,
-        ground: 'Main Court', dateTime: new Date().toISOString().slice(0,16),
+        ground: 'Main Court', 
+        // Initialize with converted local time or current local time
         status: 'upcoming', referee: '', score: { team1Score: 0, team2Score: 0, sets: [], resultMessage: '' },
-        ...fixture
+        ...fixture,
+        // Override dateTime from fixture spread if it exists, to ensure we use the transformed local string
+        dateTime: fixture?.dateTime ? toLocalInputString(fixture.dateTime) : getNowLocalString()
     });
 
     const selectedTournament = useMemo(() => tournaments.find(t => t.id === Number(formData.tournamentId)), [tournaments, formData.tournamentId]);
@@ -1111,6 +1130,15 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
         }
         setFormData({ ...formData, ...update });
     };
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        // Convert Local Time Input back to UTC ISO String for database storage
+        const localDate = new Date(formData.dateTime);
+        const utcDate = localDate.toISOString();
+        
+        onSave({ ...formData, dateTime: utcDate });
+    };
 
     const updateSet = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
         const newSets = [...(formData.score?.sets || [])];
@@ -1126,7 +1154,7 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
     };
 
     return (
-        <form onSubmit={e => { e.preventDefault(); onSave(formData); }} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
             {error && <ErrorMessage message={error} />}
             <div>
                 <Label>Tournament</Label>
