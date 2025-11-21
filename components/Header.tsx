@@ -62,10 +62,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
     <header className="bg-secondary shadow-lg sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-4 cursor-pointer" onClick={() => handleNavClick('home')}>
-             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-highlight">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-            </svg>
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => handleNavClick('home')}>
+             <img src="/logo.png" alt="DVOC Tanzania" className="h-12 w-auto object-contain" />
             <span className="text-xl font-bold text-text-primary">DVOC Tanzania</span>
           </div>
           
