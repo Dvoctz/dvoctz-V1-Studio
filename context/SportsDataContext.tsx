@@ -59,6 +59,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     addFixture: (fixture: Omit<Fixture, 'id' | 'score'>) => Promise<void>;
     updateFixture: (fixture: Fixture) => Promise<void>;
     deleteFixture: (id: number) => Promise<void>;
+    bulkAddFixtures: (fixtures: Omit<Fixture, 'id' | 'score'>[]) => Promise<void>;
     addSponsor: (sponsor: Omit<Sponsor, 'id'> & { logoFile?: File }) => Promise<void>;
     updateSponsor: (sponsor: Sponsor & { logoFile?: File }) => Promise<void>;
     deleteSponsor: (id: number) => Promise<void>;
@@ -355,6 +356,37 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { error } = await supabase.from('fixtures').delete().eq('id', id);
         if (error) throw error;
         setState(s => ({...s, fixtures: (s.fixtures || []).filter(f => f.id !== id) }));
+    }, [supabase]);
+
+    const bulkAddFixtures = useCallback(async (fixturesData: Omit<Fixture, 'id' | 'score'>[]) => {
+        const fixturesToInsert = fixturesData.map(f => {
+            const { stage, referee, ...rest } = f;
+            let dbReferee = referee;
+            if (stage) {
+                const prefix = stage === 'quarter-final' ? 'KO_QF' : stage === 'semi-final' ? 'KO_SF' : 'KO_FINAL';
+                dbReferee = referee ? `${prefix}: ${referee}` : prefix;
+            }
+            return {
+                tournament_id: rest.tournamentId,
+                team1_id: rest.team1Id,
+                team2_id: rest.team2Id,
+                ground: rest.ground,
+                date_time: rest.dateTime,
+                status: rest.status,
+                referee: dbReferee
+            };
+        });
+
+        const { data, error } = await supabase.from('fixtures').insert(fixturesToInsert).select();
+        if (error) throw error;
+        
+        // Map back to app format
+        const newFixtures = (data || []).map(mapFixture);
+        
+        setState(s => ({
+            ...s, 
+            fixtures: [...(s.fixtures || []), ...newFixtures].sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+        }));
     }, [supabase]);
 
     const addSponsor = useCallback(async (sponsorData: Omit<Sponsor, 'id'> & { logoFile?: File }) => {
@@ -830,7 +862,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         addClub, updateClub, deleteClub,
         addTeam, updateTeam, deleteTeam,
         addPlayer, updatePlayer, deletePlayer, deleteAllPlayers,
-        addFixture, updateFixture, deleteFixture,
+        addFixture, updateFixture, deleteFixture, bulkAddFixtures,
         addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter,
         addPlayerTransfer, updatePlayerTransfer, deletePlayerTransfer,
         addNotice, deleteNotice,

@@ -1019,7 +1019,7 @@ const TransferForm: React.FC<{ transfer: any, players: Player[], teams: Team[], 
 
 // --- FIXTURES ---
 const FixturesAdmin = () => {
-    const { fixtures, tournaments, teams, addFixture, updateFixture, deleteFixture } = useSports();
+    const { fixtures, tournaments, teams, addFixture, updateFixture, deleteFixture, bulkAddFixtures } = useSports();
     const [editing, setEditing] = useState<Fixture | Partial<Fixture> | null>(null);
     const [filterTournament, setFilterTournament] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
@@ -1036,6 +1036,119 @@ const FixturesAdmin = () => {
         return list.sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
     }, [fixtures, filterTournament]);
 
+    const handleExport = () => {
+        // Export currently filtered view
+        const exportData = filtered.map(f => {
+            const t = tournaments.find(tr => tr.id === f.tournamentId);
+            const t1 = teams.find(tm => tm.id === f.team1Id);
+            const t2 = teams.find(tm => tm.id === f.team2Id);
+            
+            // Split ISO string into separate Date (YYYY-MM-DD) and Time (HH:mm) for easier CSV editing
+            // Convert to Local Time first for user convenience
+            const localDateObj = new Date(f.dateTime);
+            const localDateStr = localDateObj.toLocaleDateString('en-CA'); // YYYY-MM-DD
+            const localTimeStr = localDateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
+
+            return {
+                Tournament: t?.name || '',
+                Division: t?.division || '',
+                Team1: t1?.name || '',
+                Team2: t2?.name || '',
+                Date: localDateStr,
+                Time: localTimeStr,
+                Ground: f.ground,
+                Stage: f.stage || '',
+                Referee: f.referee || ''
+            };
+        });
+        
+        const csv = Papa.unparse(exportData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'fixtures_export.csv';
+        link.click();
+    };
+
+    const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                try {
+                    const rawData = results.data as any[];
+                    if (rawData.length === 0) throw new Error("CSV file is empty.");
+
+                    const newFixtures: Omit<Fixture, 'id' | 'score'>[] = [];
+                    const normalize = (s: string) => s ? s.trim().toLowerCase() : '';
+                    
+                    // Create maps for fast lookup
+                    const tournamentMap = new Map(tournaments.map(t => [normalize(t.name), t.id]));
+                    const teamMap = new Map(teams.map(t => [normalize(t.name), t.id]));
+
+                    let rowCount = 0;
+                    for (const r of rawData) {
+                        rowCount++;
+                        const tourName = r.Tournament || r.tournament;
+                        const t1Name = r.Team1 || r.team1;
+                        const t2Name = r.Team2 || r.team2;
+                        const dateStr = r.Date || r.date;
+                        const timeStr = r.Time || r.time;
+                        const ground = r.Ground || r.ground || 'TBD';
+                        
+                        if (!tourName || !t1Name || !t2Name || !dateStr) {
+                             console.warn(`Skipping row ${rowCount}: Missing required fields (Tournament, Team1, Team2, Date)`);
+                             continue;
+                        }
+                        
+                        const tournamentId = tournamentMap.get(normalize(tourName));
+                        const team1Id = teamMap.get(normalize(t1Name));
+                        const team2Id = teamMap.get(normalize(t2Name));
+                        
+                        if (!tournamentId) throw new Error(`Row ${rowCount}: Tournament "${tourName}" not found.`);
+                        if (!team1Id) throw new Error(`Row ${rowCount}: Team "${t1Name}" not found.`);
+                        if (!team2Id) throw new Error(`Row ${rowCount}: Team "${t2Name}" not found.`);
+
+                        // Combine Date and Time into ISO String
+                        // Assumption: Date is YYYY-MM-DD, Time is HH:mm
+                        // We treat input as Local Time and convert to UTC
+                        const timeComponent = timeStr ? timeStr : '00:00';
+                        const combinedStr = `${dateStr}T${timeComponent}`;
+                        const dateObj = new Date(combinedStr);
+                        
+                        if (isNaN(dateObj.getTime())) throw new Error(`Row ${rowCount}: Invalid Date/Time format. Use YYYY-MM-DD and HH:mm.`);
+
+                        newFixtures.push({
+                            tournamentId,
+                            team1Id,
+                            team2Id,
+                            ground,
+                            dateTime: dateObj.toISOString(), // Convert to UTC for DB
+                            status: 'upcoming',
+                            stage: r.Stage || r.stage || undefined,
+                            referee: r.Referee || r.referee || undefined
+                        });
+                    }
+                    
+                    if (newFixtures.length > 0) {
+                        await bulkAddFixtures(newFixtures);
+                        alert(`Successfully imported ${newFixtures.length} fixtures.`);
+                    } else {
+                        alert("No valid fixtures found to import.");
+                    }
+
+                } catch (err: any) {
+                    alert(`Import Failed: ${err.message}`);
+                }
+                // Reset input
+                e.target.value = '';
+            }
+        });
+    };
+
     return (
         <AdminSection title="Manage Fixtures">
             <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
@@ -1043,7 +1156,13 @@ const FixturesAdmin = () => {
                     <option value="">All Tournaments</option>
                     {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </Select>
-                <Button onClick={() => setEditing({})}>Add Fixture</Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleExport} className="bg-green-600 hover:bg-green-500">Export CSV</Button>
+                    <label className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md text-sm font-medium cursor-pointer">
+                        Bulk Upload CSV <input type="file" className="hidden" accept=".csv" onChange={handleBulkUpload} />
+                    </label>
+                    <Button onClick={() => setEditing({})}>Add Fixture</Button>
+                </div>
             </div>
             <div className="space-y-2 max-h-96 overflow-y-auto">
                 {filtered.map(f => {
