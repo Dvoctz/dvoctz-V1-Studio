@@ -51,6 +51,7 @@ export interface Fixture {
   score?: Score;
   referee?: string;
   stage?: 'quarter-final' | 'semi-final' | 'final';
+  manOfTheMatchId?: number | null;
 }
 
 export interface Tournament {

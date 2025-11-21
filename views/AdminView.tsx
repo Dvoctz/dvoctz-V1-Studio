@@ -1189,6 +1189,7 @@ const FixturesAdmin = () => {
 };
 
 const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tournament[], onSave: any, onCancel: any, error: any }> = ({ fixture, teams, tournaments, onSave, onCancel, error }) => {
+    const { players } = useSports();
     
     // Helper: Convert UTC ISO string to Local Date Time String (YYYY-MM-DDTHH:mm) for input[type="datetime-local"]
     const toLocalInputString = (dateStr: string) => {
@@ -1209,6 +1210,7 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
         tournamentId: tournaments[0]?.id, team1Id: teams[0]?.id, team2Id: teams[1]?.id,
         ground: 'Main Court', 
         status: 'upcoming', referee: '', score: { team1Score: 0, team2Score: 0, sets: [], resultMessage: '' },
+        manOfTheMatchId: null as number | null,
         ...fixture,
         dateTime: fixture?.dateTime ? toLocalInputString(fixture.dateTime) : getNowLocalString()
     });
@@ -1227,6 +1229,14 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
         if (!selectedTournament) return teams;
         return teams.filter(t => t.division === selectedTournament.division).sort((a, b) => a.name.localeCompare(b.name));
     }, [teams, selectedTournament]);
+    
+    // Eligible Players for MOTM: Filter players from Team 1 or Team 2
+    const eligiblePlayers = useMemo(() => {
+        if (!formData.team1Id || !formData.team2Id) return [];
+        return players
+            .filter(p => p.teamId === formData.team1Id || p.teamId === formData.team2Id)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [players, formData.team1Id, formData.team2Id]);
 
     const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newId = Number(e.target.value);
@@ -1271,9 +1281,10 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
     };
 
     const updateSet = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
-        const newSets = [...(formData.score?.sets || [])];
+        const newSets: { team1Points: number; team2Points: number }[] = [...(formData.score?.sets || [])];
         if (!newSets[index]) newSets[index] = { team1Points: 0, team2Points: 0 };
-        newSets[index] = { ...newSets[index], [field]: Number(value) };
+        const currentSet = newSets[index];
+        newSets[index] = { ...currentSet, [field]: Number(value) };
         setFormData({ ...formData, score: { ...formData.score, sets: newSets } });
     };
     const addSet = () => setFormData({ ...formData, score: { ...formData.score, sets: [...(formData.score?.sets || []), { team1Points: 0, team2Points: 0 }] } });
@@ -1354,6 +1365,21 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
                             </div>
                         ))}
                         <Button onClick={addSet} className="bg-accent text-xs mt-2">Add Set</Button>
+                    </div>
+
+                    <div className="mt-4 border-t border-accent pt-4">
+                        <Label>Man of the Match</Label>
+                        <Select 
+                            value={formData.manOfTheMatchId ?? ''} 
+                            onChange={e => setFormData({...formData, manOfTheMatchId: e.target.value ? Number(e.target.value) : null})}
+                        >
+                            <option value="">-- Select Player --</option>
+                            {eligiblePlayers.map(p => {
+                                const teamName = teams.find(t => t.id === p.teamId)?.shortName || '';
+                                return <option key={p.id} value={p.id}>{p.name} ({teamName})</option>;
+                            })}
+                        </Select>
+                        {eligiblePlayers.length === 0 && <p className="text-xs text-yellow-400 mt-1">No players found in Team 1 or Team 2 rosters.</p>}
                     </div>
                 </div>
             )}

@@ -32,7 +32,7 @@ export type DbTournament = Omit<Tournament, 'id'> & { id: number };
 export type DbClub = Omit<Club, 'id'> & { id: number };
 export type DbTeam = Omit<Team, 'id'> & { id: number };
 export type DbPlayer = Omit<Player, 'id'> & { id: number };
-export type DbFixture = Omit<Fixture, 'id' | 'score'> & { id: number; score: Score | null };
+export type DbFixture = Omit<Fixture, 'id' | 'score'> & { id: number; score: Score | null; man_of_the_match_id?: number | null };
 export type DbSponsor = Omit<Sponsor, 'id'> & { id: number };
 export type DbPlayerTransfer = {
     id: number;
