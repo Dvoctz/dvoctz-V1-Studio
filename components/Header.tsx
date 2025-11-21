@@ -63,7 +63,12 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => handleNavClick('home')}>
-             <img src="/logo.png" alt="DVOC Tanzania" className="h-12 w-auto object-contain" />
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 12h20" />
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10" />
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10" />
+             </svg>
             <span className="text-xl font-bold text-text-primary">DVOC Tanzania</span>
           </div>
           
