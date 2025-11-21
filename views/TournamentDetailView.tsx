@@ -25,13 +25,13 @@ const TeamLogo: React.FC<{ logoUrl: string | null; alt: string; className?: stri
 
 // Enhanced Modal Component for Team Details (Squad + Fixtures + Officiating)
 const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team; onClose: () => void }> = ({ tournament, team, onClose }) => {
-    const { getTournamentSquad, getFixturesByTournament, getTeamById } = useSports();
+    const { getTournamentSquad, getFixturesByTournament, getTeamById, fixtures, tournaments } = useSports();
     const [activeTab, setActiveTab] = useState<'squad' | 'fixtures' | 'officiating'>('squad');
 
     // Force load tournament rosters if not present
     const roster = useMemo(() => getTournamentSquad(tournament.id, team.id), [getTournamentSquad, tournament.id, team.id]);
 
-    // Filter and sort fixtures for this team in this tournament
+    // Filter and sort fixtures for this team in this tournament (Standard Fixtures Tab - Scoped to Tournament)
     const teamFixtures = useMemo(() => {
         const allFixtures = getFixturesByTournament(tournament.id);
         return allFixtures
@@ -39,13 +39,13 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
             .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     }, [getFixturesByTournament, tournament.id, team.id]);
 
-    // Filter fixtures where this team is the referee
+    // Filter fixtures where this team is the referee (Officiating Tab - GLOBAL SCOPE)
+    // We look at ALL fixtures in the app to catch if they are officiating in other divisions/tournaments
     const officiatingFixtures = useMemo(() => {
-        const allFixtures = getFixturesByTournament(tournament.id);
-        return allFixtures
+        return (fixtures || [])
             .filter(f => f.referee === team.name)
             .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-    }, [getFixturesByTournament, tournament.id, team.name]);
+    }, [fixtures, team.name]);
 
     const getResultBadge = (fixture: Fixture) => {
         if (fixture.status !== 'completed' || !fixture.score) return null;
@@ -192,6 +192,8 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                                     const team1 = getTeamById(f.team1Id);
                                     const team2 = getTeamById(f.team2Id);
                                     const dateObj = new Date(f.dateTime);
+                                    // Identify the tournament for this fixture
+                                    const fTournament = tournaments.find(t => t.id === f.tournamentId);
                                     
                                     return (
                                         <div key={f.id} className="bg-primary p-3 rounded border-l-2 border-highlight">
@@ -201,6 +203,14 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                                                 </span>
                                                 <span className="text-[10px] text-text-secondary">{f.ground}</span>
                                             </div>
+                                            
+                                            {/* Tournament Label Context */}
+                                            <div className="mb-2">
+                                                 <span className="text-[10px] bg-accent text-highlight px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider">
+                                                    {fTournament ? fTournament.name : 'Unknown Tournament'}
+                                                 </span>
+                                            </div>
+
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     {team1?.logoUrl ? <img src={team1.logoUrl} className="w-5 h-5 rounded-full object-cover" alt="" /> : <div className="w-5 h-5 rounded-full bg-accent"></div>}
