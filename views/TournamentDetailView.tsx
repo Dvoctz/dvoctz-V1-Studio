@@ -389,23 +389,29 @@ const StandingsTable: React.FC<{ standings: TeamStanding[], onTeamClick: (teamId
 };
 
 const RefereeFixtureCard: React.FC<{ fixture: Fixture }> = ({ fixture }) => {
-    const { getTeamById } = useSports();
+    const { getTeamById, tournaments } = useSports();
     const team1 = getTeamById(fixture.team1Id);
     const team2 = getTeamById(fixture.team2Id);
     const dateObj = new Date(fixture.dateTime);
+    const fixtureTournament = tournaments.find(t => t.id === fixture.tournamentId);
 
     return (
         <div className="bg-secondary p-4 rounded-lg shadow flex flex-col sm:flex-row items-center justify-between gap-4 border-l-4 border-highlight hover:bg-accent transition-colors">
-            <div className="text-center sm:text-left">
-                 <div className="text-xs text-text-secondary font-bold uppercase tracking-wide mb-1">
-                    {dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} • {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            <div className="text-center sm:text-left w-full">
+                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+                    <div className="text-xs text-text-secondary font-bold uppercase tracking-wide">
+                        {dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} • {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                    <span className="text-[10px] bg-primary text-highlight px-2 py-1 rounded font-semibold uppercase tracking-wider self-center sm:self-auto">
+                       {fixtureTournament ? fixtureTournament.name : 'Unknown Tournament'}
+                    </span>
                  </div>
                  <div className="font-bold text-white text-lg">
                     {team1 ? team1.name : 'TBD'} <span className="text-text-secondary mx-1">vs</span> {team2 ? team2.name : 'TBD'}
                  </div>
                  <div className="text-xs text-text-secondary mt-1">{fixture.ground} {fixture.stage ? `• ${fixture.stage.replace('-', ' ')}` : ''}</div>
             </div>
-            <div className="flex flex-col items-center sm:items-end bg-primary/50 p-2 rounded min-w-[150px]">
+            <div className="flex flex-col items-center sm:items-end bg-primary/50 p-2 rounded min-w-[150px] flex-shrink-0">
                 <span className="text-[10px] text-text-secondary uppercase font-semibold">Officiating</span>
                 <span className="font-bold text-highlight text-center truncate max-w-[180px]">{fixture.referee}</span>
             </div>
@@ -415,7 +421,7 @@ const RefereeFixtureCard: React.FC<{ fixture: Fixture }> = ({ fixture }) => {
 
 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament: initialTournament, onBack }) => {
-  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, tournaments } = useSports();
+  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, tournaments, fixtures: globalFixtures, teams } = useSports();
   
   // FIX: Get the absolute latest version of the tournament from context.
   const tournament = useMemo(() => tournaments.find(t => t.id === initialTournament.id) || initialTournament, [tournaments, initialTournament]);
@@ -438,26 +444,45 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   // Round Robin Fixtures
   const fixtures = useMemo(() => getFixturesByTournament(tournament.id).filter(f => !f.stage), [getFixturesByTournament, tournament.id]);
   
-  // ALL Fixtures (for Referees tab)
-  const allFixtures = useMemo(() => getFixturesByTournament(tournament.id), [getFixturesByTournament, tournament.id]);
+  // Teams participating in this tournament's division (by name, for filtering referee duties)
+  const divisionTeamNames = useMemo(() => {
+      return new Set(teams.filter(t => t.division === tournament.division).map(t => t.name));
+  }, [teams, tournament.division]);
 
-  // Unique Referees list
+  // Duty Roster Logic:
+  // 1. Matches in this tournament (whether assigned to a ref from this div or not)
+  // 2. Matches ANYWHERE else officiated by teams from this tournament division
+  const dutyRosterFixtures = useMemo(() => {
+      return (globalFixtures || [])
+        .filter(f => {
+            // Condition 1: Game belongs to this tournament
+            if (f.tournamentId === tournament.id) return true;
+            
+            // Condition 2: Referee is a team from this tournament's division (officiating elsewhere)
+            if (f.referee && divisionTeamNames.has(f.referee)) return true;
+            
+            return false;
+        })
+        .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+  }, [globalFixtures, tournament.id, divisionTeamNames]);
+
+  // Unique Referees list (for filter dropdown) derived from the duty roster
   const uniqueReferees = useMemo(() => {
       const refs = new Set<string>();
-      allFixtures.forEach(f => {
+      dutyRosterFixtures.forEach(f => {
           if (f.referee) refs.add(f.referee);
       });
       return Array.from(refs).sort();
-  }, [allFixtures]);
+  }, [dutyRosterFixtures]);
 
   // Filtered Referee Fixtures
   const refereeFixtures = useMemo(() => {
-      let list = allFixtures.filter(f => f.referee); 
+      let list = dutyRosterFixtures.filter(f => f.referee); 
       if (refereeFilter) {
           list = list.filter(f => f.referee === refereeFilter);
       }
       return list;
-  }, [allFixtures, refereeFilter]);
+  }, [dutyRosterFixtures, refereeFilter]);
 
   const standings = useMemo(() => getStandingsForTournament(tournament.id), [getStandingsForTournament, tournament.id]);
   const sponsors = useMemo(() => getSponsorsForTournament(tournament.id), [getSponsorsForTournament, tournament.id]);
