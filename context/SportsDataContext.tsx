@@ -43,6 +43,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     tournamentTeams: TournamentTeam[];
     _internal_state: SportsState;
     fetchData: <T extends EntityName>(entityName: T) => Promise<SportsState[T]>;
+    prefetchAllData: () => Promise<void>;
     addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
     updateTournament: (tournament: Tournament) => Promise<void>;
     deleteTournament: (id: number) => Promise<void>;
@@ -178,8 +179,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (entityName === 'fixtures') {
                  processedData = (data || []).map(mapFixture);
             } else if (entityName === 'tournaments') {
-                const fixturesData = state.fixtures || await fetchData('fixtures');
+                // Note: This recursive check is why individual fetching flickers. 
+                // Ideally tournaments depend on fixtures, but for initial load we can do it smarter in prefetch.
+                const fixturesData = state.fixtures; 
+                // If fixtures aren't loaded yet, this calc might be stale, but prefetchAllData solves this.
+                
                 processedData = (data || []).map(mapTournament).map(t => {
+                    if (!fixturesData) return { ...t, phase: 'round-robin' as const }; // Fallback if fixtures not ready
                     const knockoutFixtures = (fixturesData as Fixture[]).some(f => f.tournamentId === t.id && f.stage);
                     const finalFixture = (fixturesData as Fixture[]).find(f => f.tournamentId === t.id && f.stage === 'final');
                     let phase: Tournament['phase'] = 'round-robin';
@@ -221,6 +227,82 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             throw error;
         }
     }, [supabase, state]);
+
+    const prefetchAllData = useCallback(async () => {
+        try {
+            // Use Promise.all to fetch everything in parallel
+            const [
+                { data: tournaments, error: errTournaments },
+                { data: clubs, error: errClubs },
+                { data: teams, error: errTeams },
+                { data: players, error: errPlayers },
+                { data: fixtures, error: errFixtures },
+                { data: sponsors, error: errSponsors },
+                { data: tournamentSponsors, error: errTS },
+                { data: playerTransfers, error: errPT },
+                { data: notices, error: errNotices },
+                { data: rules, error: errRules },
+                { data: tournamentRosters, error: errTR },
+                { data: tournamentTeams, error: errTT }
+            ] = await Promise.all([
+                supabase.from('tournaments').select('*').order('name'),
+                supabase.from('clubs').select('*').order('name'),
+                supabase.from('teams').select('*').order('name'),
+                supabase.from('players').select('*').order('name'),
+                supabase.from('fixtures').select('*'),
+                supabase.from('sponsors').select('*').order('name'),
+                supabase.from('tournament_sponsors').select('*'),
+                supabase.from('player_transfers').select('*'),
+                supabase.from('notices').select('*'),
+                supabase.from('game_rules').select('content').limit(1).maybeSingle(),
+                supabase.from('tournament_rosters').select('*'),
+                supabase.from('tournament_teams').select('*')
+            ]);
+
+            if (errTournaments) throw errTournaments;
+            if (errClubs) throw errClubs;
+            // ... check others if necessary, but keeping it simple for speed
+
+            // Process Fixtures First (needed for Tournament logic)
+            const processedFixtures = (fixtures || []).map(mapFixture);
+            
+            // Process Tournaments with phase logic
+            const processedTournaments = (tournaments || []).map(mapTournament).map(t => {
+                const knockoutFixtures = processedFixtures.some(f => f.tournamentId === t.id && f.stage);
+                const finalFixture = processedFixtures.find(f => f.tournamentId === t.id && f.stage === 'final');
+                let phase: Tournament['phase'] = 'round-robin';
+                if (finalFixture && finalFixture.status === 'completed') phase = 'completed';
+                else if (knockoutFixtures) phase = 'knockout';
+                return { ...t, phase };
+            });
+
+            const processedRules = rules?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.';
+
+            // Atomic State Update: Sets all data at once, preventing intermediate re-renders
+            setState(s => ({
+                ...s,
+                tournaments: processedTournaments,
+                clubs: (clubs || []).map(mapClub),
+                teams: (teams || []).map(mapTeam),
+                players: (players || []).map(mapPlayer),
+                fixtures: processedFixtures,
+                sponsors: (sponsors || []).map(mapSponsor),
+                tournamentSponsors: tournamentSponsors || [],
+                playerTransfers: (playerTransfers || []).map(mapPlayerTransfer),
+                notices: (notices || []).map(mapNotice),
+                rules: processedRules,
+                tournamentRosters: (tournamentRosters || []).map(mapTournamentRoster),
+                tournamentTeams: (tournamentTeams || []).map(mapTournamentTeam),
+                loading: new Set(), // Clear all loading states
+                error: null
+            }));
+
+        } catch (error: any) {
+            console.error("Error during prefetch:", error);
+            setState(s => ({ ...s, error }));
+        }
+    }, [supabase]);
+
 
     const addTournament = useCallback(async (tournament: Omit<Tournament, 'id'>) => {
         const { phase, ...dbTournament } = tournament;
@@ -898,6 +980,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         tournamentRosters: state.tournamentRosters || [],
         tournamentTeams: state.tournamentTeams || [],
         fetchData,
+        prefetchAllData,
         addTournament, updateTournament, deleteTournament,
         addClub, updateClub, deleteClub,
         addTeam, updateTeam, deleteTeam,

@@ -15,7 +15,7 @@ import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
 import { RulesView } from './views/RulesView';
 import type { View, Tournament, Team, Club, Player } from './types';
-import { SportsDataProvider, useEntityData } from './context/SportsDataContext';
+import { SportsDataProvider, useSports } from './context/SportsDataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { initializeSupabase } from './supabaseClient';
 import { SupabaseProvider } from './context/SupabaseContext';
@@ -23,7 +23,6 @@ import { Analytics } from '@vercel/analytics/react';
 import { AddToHomeScreenPrompt } from './components/AddToHomeScreenPrompt';
 
 // Initialize the Supabase client once, outside of the component render cycle.
-// This is the critical fix to prevent re-creating the client on every render.
 const supabaseClient = initializeSupabase();
 
 const AppContent: React.FC = () => {
@@ -33,24 +32,22 @@ const AppContent: React.FC = () => {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const { currentUser, userProfile, loading: authLoading } = useAuth();
+  const { prefetchAllData } = useSports();
+  
   const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
   const [viewBeforeLogin, setViewBeforeLogin] = useState<View | null>(null);
+  const [isAppReady, setIsAppReady] = useState(false);
 
-  // AGGRESSIVE PRELOAD: Fetch all core data entities immediately upon app launch.
-  // This solves the issue where data appears "empty" until a user visits a specific tab.
-  // By loading everything upfront, we ensure the "Past Fixtures" and "Sponsors" are ready
-  // whenever the user navigates to them.
-  useEntityData('teams');
-  useEntityData('clubs');
-  useEntityData('sponsors');
-  useEntityData('tournaments');
-  useEntityData('fixtures');
-  useEntityData('players');
-  useEntityData('tournamentSponsors');
-  useEntityData('notices');
-  useEntityData('playerTransfers');
-  useEntityData('tournamentRosters');
-  useEntityData('tournamentTeams');
+  // SINGLE DATA FETCH: Instead of firing 11 separate requests that cause flickering,
+  // we fire one consolidated request that loads everything in parallel and updates the UI once.
+  useEffect(() => {
+      const loadData = async () => {
+          await prefetchAllData();
+          setIsAppReady(true);
+      };
+      loadData();
+  }, [prefetchAllData]);
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -178,6 +175,17 @@ const AppContent: React.FC = () => {
         return <HomeView onNavigate={handleNavigate} onSelectTournament={handleSelectTournament} />;
     }
   };
+
+  // LOADING SCREEN
+  if (!isAppReady) {
+      return (
+          <div className="min-h-screen bg-primary flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-highlight mb-4"></div>
+              <h1 className="text-2xl font-bold text-white">DVOC Tanzania</h1>
+              <p className="text-text-secondary mt-2">Loading application data...</p>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-primary">
