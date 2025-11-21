@@ -1077,6 +1077,41 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
         ...fixture
     });
 
+    const selectedTournament = useMemo(() => tournaments.find(t => t.id === Number(formData.tournamentId)), [tournaments, formData.tournamentId]);
+
+    const availableTeams = useMemo(() => {
+        if (!selectedTournament) return teams;
+        // Filter teams matching the tournament's division
+        return teams.filter(t => t.division === selectedTournament.division).sort((a, b) => a.name.localeCompare(b.name));
+    }, [teams, selectedTournament]);
+
+    // Handler for changing tournament to auto-update teams if they don't match division
+    const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newId = Number(e.target.value);
+        const newTourney = tournaments.find(t => t.id === newId);
+        let update = { tournamentId: newId };
+        
+        if (newTourney) {
+            const relevantTeams = teams.filter(t => t.division === newTourney.division).sort((a, b) => a.name.localeCompare(b.name));
+            // If current selection isn't in the new list, default to first available
+            const t1Exists = relevantTeams.find(t => t.id === formData.team1Id);
+            const t2Exists = relevantTeams.find(t => t.id === formData.team2Id);
+            
+            if (!t1Exists && relevantTeams.length > 0) {
+                 // @ts-ignore
+                update.team1Id = relevantTeams[0].id;
+            }
+             if (!t2Exists && relevantTeams.length > 1) {
+                 // @ts-ignore
+                update.team2Id = relevantTeams[1].id;
+            } else if (!t2Exists && relevantTeams.length > 0) {
+                 // @ts-ignore
+                update.team2Id = relevantTeams[0].id;
+            }
+        }
+        setFormData({ ...formData, ...update });
+    };
+
     const updateSet = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
         const newSets = [...(formData.score?.sets || [])];
         if (!newSets[index]) newSets[index] = { team1Points: 0, team2Points: 0 };
@@ -1093,11 +1128,28 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
     return (
         <form onSubmit={e => { e.preventDefault(); onSave(formData); }} className="space-y-4">
             {error && <ErrorMessage message={error} />}
-            <div><Label>Tournament</Label><Select value={formData.tournamentId} onChange={e => setFormData({...formData, tournamentId: Number(e.target.value)})}>{tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
-            <div className="grid grid-cols-2 gap-2">
-                <div><Label>Team 1</Label><Select value={formData.team1Id} onChange={e => setFormData({...formData, team1Id: Number(e.target.value)})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
-                <div><Label>Team 2</Label><Select value={formData.team2Id} onChange={e => setFormData({...formData, team2Id: Number(e.target.value)})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div>
+            <div>
+                <Label>Tournament</Label>
+                <Select value={formData.tournamentId} onChange={handleTournamentChange}>
+                    {tournaments.map(t => <option key={t.id} value={t.id}>{t.name} ({t.division})</option>)}
+                </Select>
             </div>
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <Label>Team 1</Label>
+                    <Select value={formData.team1Id} onChange={e => setFormData({...formData, team1Id: Number(e.target.value)})}>
+                        {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                </div>
+                <div>
+                    <Label>Team 2</Label>
+                    <Select value={formData.team2Id} onChange={e => setFormData({...formData, team2Id: Number(e.target.value)})}>
+                         {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                </div>
+            </div>
+            {availableTeams.length === 0 && <p className="text-xs text-red-400">No teams found for this division. Please add teams to {selectedTournament?.division} first.</p>}
+
             <div className="grid grid-cols-2 gap-2">
                 <div><Label>Date & Time</Label><Input type="datetime-local" value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} /></div>
                 <div><Label>Ground</Label><Input value={formData.ground} onChange={e => setFormData({...formData, ground: e.target.value})} /></div>
