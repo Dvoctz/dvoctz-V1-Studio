@@ -7,38 +7,14 @@ interface ShareFixtureCardProps {
   fixtures: Fixture[];
   getTeam: (id: number) => Team | undefined;
   getTournament: (id: number) => Tournament | undefined;
-  preloadedLogos?: Record<number, string | null>;
 }
 
 // Fixed dimensions for optimal sharing (like WhatsApp Status)
 // We scale this down in the preview using CSS transforms
-export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps>(({ date, fixtures, getTeam, getTournament, preloadedLogos }, ref) => {
+export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps>(({ date, fixtures, getTeam, getTournament }, ref) => {
     
     // Sort fixtures by time
     const sortedFixtures = [...fixtures].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-
-    const renderTeamLogo = (teamId: number, teamName?: string) => {
-        const logoSrc = preloadedLogos ? preloadedLogos[teamId] : getTeam(teamId)?.logoUrl;
-
-        if (logoSrc) {
-            return (
-                <img 
-                    src={logoSrc} 
-                    className="w-16 h-16 rounded-full object-cover border-2 border-accent bg-primary" 
-                    alt={teamName || 'Team Logo'}
-                    // No crossOrigin needed for Base64, but keeping it safe if URL is passed
-                    crossOrigin={logoSrc.startsWith('data:') ? undefined : "anonymous"}
-                    style={{ objectFit: 'cover' }} 
-                />
-            );
-        }
-
-        return (
-            <div className="w-16 h-16 bg-accent rounded-full border-2 border-gray-600 flex items-center justify-center">
-                <span className="text-xs text-text-secondary font-bold">{(teamName || 'TBD').substring(0, 3).toUpperCase()}</span>
-            </div>
-        );
-    };
 
     return (
         <div 
@@ -89,7 +65,7 @@ export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps
             </div>
 
             {/* Fixtures List */}
-            <div className="flex-grow space-y-5 z-10">
+            <div className="flex-grow space-y-6 z-10">
                 {sortedFixtures.map((f, i) => {
                     const t1 = getTeam(f.team1Id);
                     const t2 = getTeam(f.team2Id);
@@ -97,38 +73,48 @@ export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps
                     const time = new Date(f.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: true}); // 12-hour format looks better on posters
                     
                     return (
-                        <div key={i} className="bg-secondary/90 rounded-xl p-4 flex flex-col gap-3 border-l-8 border-highlight shadow-lg">
+                        <div key={i} className="bg-secondary/90 rounded-xl p-5 flex flex-col gap-4 border-l-8 border-highlight shadow-lg">
                             <div className="flex justify-between items-center text-text-secondary border-b border-accent pb-2 mb-1">
-                                <span className="font-black text-xl text-white">{time}</span>
-                                <span className="uppercase tracking-wider text-xs font-bold bg-primary px-2 py-1 rounded text-highlight">
+                                <span className="font-black text-2xl text-white">{time}</span>
+                                <span className="uppercase tracking-wider text-xs font-bold bg-primary px-3 py-1 rounded text-highlight">
                                     {tourney?.division || 'Friendly'}
                                 </span>
                             </div>
                             
-                            <div className="flex justify-between items-center px-2">
+                            <div className="flex items-center justify-between gap-4 px-2 py-2">
                                 {/* Team 1 */}
-                                <div className="flex flex-col items-center w-32">
-                                     {renderTeamLogo(f.team1Id, t1?.name)}
-                                     <span className="text-sm text-center mt-2 font-bold leading-tight line-clamp-2 w-full">{t1?.name || 'TBD'}</span>
+                                <div className="flex-1 text-right flex flex-col justify-center">
+                                    <span className="text-2xl font-black text-white leading-tight uppercase drop-shadow-sm">
+                                        {t1?.name || 'TBD'}
+                                    </span>
                                 </div>
 
-                                <div className="flex flex-col items-center">
-                                    <span className="text-3xl font-black text-highlight italic pr-1">VS</span>
+                                <div className="flex-shrink-0 px-2">
+                                    <span className="text-2xl font-black text-highlight italic">VS</span>
                                 </div>
 
                                 {/* Team 2 */}
-                                <div className="flex flex-col items-center w-32">
-                                     {renderTeamLogo(f.team2Id, t2?.name)}
-                                     <span className="text-sm text-center mt-2 font-bold leading-tight line-clamp-2 w-full">{t2?.name || 'TBD'}</span>
+                                <div className="flex-1 text-left flex flex-col justify-center">
+                                    <span className="text-2xl font-black text-white leading-tight uppercase drop-shadow-sm">
+                                        {t2?.name || 'TBD'}
+                                    </span>
                                 </div>
                             </div>
                             
-                            <div className="flex items-center justify-center text-sm text-text-secondary mt-1 bg-black/20 py-1 rounded">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                <span className="font-medium truncate max-w-[300px]">{f.ground}</span>
+                            <div className="space-y-1">
+                                <div className="flex items-center justify-center text-sm text-text-secondary bg-black/20 py-1.5 rounded">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span className="font-medium truncate max-w-[300px] uppercase tracking-wide">{f.ground}</span>
+                                </div>
+                                
+                                {f.referee && (
+                                    <div className="flex items-center justify-center text-xs text-highlight font-bold bg-black/10 py-1 rounded uppercase tracking-widest">
+                                        Officiating: {f.referee}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
@@ -144,8 +130,8 @@ export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps
 
             {/* Footer */}
             <div className="mt-auto pt-6 text-center z-10">
-                <div className="inline-block bg-highlight text-primary font-bold px-6 py-2 rounded-full text-lg shadow-lg mb-2">
-                    Follow Live @ dvoctz.app
+                <div className="inline-block bg-highlight text-primary font-bold px-8 py-3 rounded-full text-xl shadow-lg mb-2">
+                    dvoctz.app
                 </div>
                 <p className="text-xs text-text-secondary uppercase tracking-widest mt-2">Dar Es Salaam Volleyball Oversee Committee</p>
             </div>
