@@ -64,7 +64,10 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     const dayFixtures = useMemo(() => {
-        return (fixtures || []).filter(f => f.dateTime.startsWith(selectedDate));
+        return (fixtures || [])
+            .filter(f => f.dateTime.startsWith(selectedDate))
+            // Sort by time (ascending) BEFORE chunking so that Page 1 has the earliest games, Page 2 the next, etc.
+            .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     }, [fixtures, selectedDate]);
     
     const getTournament = (id: number) => tournaments.find(t => t.id === id);
