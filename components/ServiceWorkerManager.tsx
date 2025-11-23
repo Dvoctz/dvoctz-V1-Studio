@@ -1,9 +1,17 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 
 export const ServiceWorkerManager: React.FC = () => {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+
+  // Function to manually trigger an update check
+  const checkForUpdate = useCallback(() => {
+      if (registration) {
+          console.log('Checking for Service Worker update...');
+          registration.update().catch(err => console.error('Failed to check for update:', err));
+      }
+  }, [registration]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -42,10 +50,37 @@ export const ServiceWorkerManager: React.FC = () => {
     }
   }, []);
 
+  // iOS/Mobile: Check for updates when the app becomes visible (resumes from background)
+  useEffect(() => {
+      if (!registration) return;
+
+      const handleVisibilityChange = () => {
+          if (document.visibilityState === 'visible') {
+              checkForUpdate();
+          }
+      };
+
+      // Check on resume
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Also check periodically (every 60 minutes) in case the app stays open
+      const intervalId = setInterval(() => {
+          checkForUpdate();
+      }, 60 * 60 * 1000);
+
+      return () => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          clearInterval(intervalId);
+      };
+  }, [registration, checkForUpdate]);
+
   const updateApp = () => {
     if (registration && registration.waiting) {
         // Send message to SW to skip waiting and activate immediately
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+        // Fallback reload if state mismatch
+        window.location.reload();
     }
   };
 
