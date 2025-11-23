@@ -7,14 +7,38 @@ interface ShareFixtureCardProps {
   fixtures: Fixture[];
   getTeam: (id: number) => Team | undefined;
   getTournament: (id: number) => Tournament | undefined;
+  preloadedLogos?: Record<number, string | null>;
 }
 
 // Fixed dimensions for optimal sharing (like WhatsApp Status)
 // We scale this down in the preview using CSS transforms
-export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps>(({ date, fixtures, getTeam, getTournament }, ref) => {
+export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps>(({ date, fixtures, getTeam, getTournament, preloadedLogos }, ref) => {
     
     // Sort fixtures by time
     const sortedFixtures = [...fixtures].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+
+    const renderTeamLogo = (teamId: number, teamName?: string) => {
+        const logoSrc = preloadedLogos ? preloadedLogos[teamId] : getTeam(teamId)?.logoUrl;
+
+        if (logoSrc) {
+            return (
+                <img 
+                    src={logoSrc} 
+                    className="w-16 h-16 rounded-full object-cover border-2 border-accent bg-primary" 
+                    alt={teamName || 'Team Logo'}
+                    // No crossOrigin needed for Base64, but keeping it safe if URL is passed
+                    crossOrigin={logoSrc.startsWith('data:') ? undefined : "anonymous"}
+                    style={{ objectFit: 'cover' }} 
+                />
+            );
+        }
+
+        return (
+            <div className="w-16 h-16 bg-accent rounded-full border-2 border-gray-600 flex items-center justify-center">
+                <span className="text-xs text-text-secondary font-bold">{(teamName || 'TBD').substring(0, 3).toUpperCase()}</span>
+            </div>
+        );
+    };
 
     return (
         <div 
@@ -84,13 +108,7 @@ export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps
                             <div className="flex justify-between items-center px-2">
                                 {/* Team 1 */}
                                 <div className="flex flex-col items-center w-32">
-                                     {t1?.logoUrl ? (
-                                         <img src={t1.logoUrl} className="w-16 h-16 rounded-full object-cover border-2 border-accent bg-primary" crossOrigin="anonymous" alt="t1" />
-                                     ) : (
-                                         <div className="w-16 h-16 bg-accent rounded-full border-2 border-gray-600 flex items-center justify-center">
-                                             <span className="text-xs text-text-secondary">N/A</span>
-                                         </div>
-                                     )}
+                                     {renderTeamLogo(f.team1Id, t1?.name)}
                                      <span className="text-sm text-center mt-2 font-bold leading-tight line-clamp-2 w-full">{t1?.name || 'TBD'}</span>
                                 </div>
 
@@ -100,13 +118,7 @@ export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps
 
                                 {/* Team 2 */}
                                 <div className="flex flex-col items-center w-32">
-                                     {t2?.logoUrl ? (
-                                         <img src={t2.logoUrl} className="w-16 h-16 rounded-full object-cover border-2 border-accent bg-primary" crossOrigin="anonymous" alt="t2" />
-                                     ) : (
-                                         <div className="w-16 h-16 bg-accent rounded-full border-2 border-gray-600 flex items-center justify-center">
-                                            <span className="text-xs text-text-secondary">N/A</span>
-                                         </div>
-                                     )}
+                                     {renderTeamLogo(f.team2Id, t2?.name)}
                                      <span className="text-sm text-center mt-2 font-bold leading-tight line-clamp-2 w-full">{t2?.name || 'TBD'}</span>
                                 </div>
                             </div>

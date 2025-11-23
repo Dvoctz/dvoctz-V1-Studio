@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import { NoticeBanner } from '../components/NoticeBanner';
 import type { Fixture, Team, Tournament, View, Notice } from '../types';
@@ -59,6 +59,8 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { fixtures, getTeamById, tournaments } = useSports();
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [preloadedLogos, setPreloadedLogos] = useState<Record<number, string | null>>({});
+    const [isPreloading, setIsPreloading] = useState(true);
     const cardRef = useRef<HTMLDivElement>(null);
 
     const dayFixtures = useMemo(() => {
@@ -67,22 +69,83 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     
     const getTournament = (id: number) => tournaments.find(t => t.id === id);
 
+    // Preload images as Base64. This solves the "tainted canvas" issue by loading the data 
+    // into the app memory first. If Supabase blocks CORS, we catch it here and show a fallback,
+    // rather than crashing the generation process.
+    useEffect(() => {
+        let isMounted = true;
+        const loadImages = async () => {
+            setIsPreloading(true);
+            const teamIds = new Set<number>();
+            dayFixtures.forEach(f => {
+                if (f.team1Id) teamIds.add(f.team1Id);
+                if (f.team2Id) teamIds.add(f.team2Id);
+            });
+
+            const newLogoMap: Record<number, string | null> = {};
+            
+            await Promise.all(Array.from(teamIds).map(async (tid) => {
+                const team = getTeamById(tid);
+                if (!team?.logoUrl) {
+                    newLogoMap[tid] = null;
+                    return;
+                }
+                
+                try {
+                    // Try to fetch the image data
+                    const response = await fetch(team.logoUrl, { mode: 'cors' });
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const blob = await response.blob();
+                    
+                    // Convert to Base64
+                    await new Promise<void>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            if (isMounted) newLogoMap[tid] = reader.result as string;
+                            resolve();
+                        };
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (error) {
+                    console.warn(`Failed to preload image for team ${team.name} (likely CORS). Using placeholder.`, error);
+                    // On error, set to null so the card renders a text circle
+                    if (isMounted) newLogoMap[tid] = null; 
+                }
+            }));
+            
+            if (isMounted) {
+                setPreloadedLogos(newLogoMap);
+                setIsPreloading(false);
+            }
+        };
+
+        if (dayFixtures.length > 0) {
+            loadImages();
+        } else {
+            setIsPreloading(false);
+        }
+
+        return () => { isMounted = false; };
+    }, [dayFixtures, getTeamById]);
+
+
     const handleShare = async () => {
         if (!cardRef.current) return;
         setIsGenerating(true);
         
         try {
-            // Slight delay to ensure render is complete
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Delay to ensure render is complete
+            await new Promise(resolve => setTimeout(resolve, 500));
             
+            // Standard Capture
             const dataUrl = await htmlToImage.toPng(cardRef.current, {
-                cacheBust: true,
+                cacheBust: false, // We already preloaded data URLs, so no network fetch needed here
                 quality: 0.95,
-                pixelRatio: 2, // High resolution
+                pixelRatio: 2,
                 backgroundColor: '#1a202c',
-                skipFonts: true, // IMPORTANT: Prevents timeouts fetching external fonts
-                width: 540, // Enforce original width (ignoring CSS scale)
-                height: Math.max(960, cardRef.current.scrollHeight) // Enforce minimum height
+                skipFonts: true,
+                width: 540,
+                height: Math.max(960, cardRef.current.scrollHeight)
             });
 
             // Convert to blob
@@ -143,16 +206,24 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
                     {/* Preview Area */}
                     <div className="flex justify-center overflow-hidden">
-                         {/* We scale the card down visually to fit, but render full size for capture */}
-                        <div className="origin-top transform scale-[0.45] sm:scale-[0.6]" style={{ height: dayFixtures.length > 3 ? '600px' : '600px', width: '540px', marginBottom: '-300px' }}> {/* Negative margin to compensate for scale */}
-                             <ShareFixtureCard 
-                                ref={cardRef}
-                                date={selectedDate}
-                                fixtures={dayFixtures}
-                                getTeam={getTeamById}
-                                getTournament={getTournament}
-                             />
-                        </div>
+                        {isPreloading ? (
+                            <div className="flex flex-col items-center justify-center py-20">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-highlight mb-4"></div>
+                                <p className="text-text-secondary">Preparing card assets...</p>
+                            </div>
+                        ) : (
+                            /* We scale the card down visually to fit, but render full size for capture */
+                            <div className="origin-top transform scale-[0.45] sm:scale-[0.6]" style={{ height: dayFixtures.length > 3 ? '600px' : '600px', width: '540px', marginBottom: '-300px' }}> {/* Negative margin to compensate for scale */}
+                                <ShareFixtureCard 
+                                    ref={cardRef}
+                                    date={selectedDate}
+                                    fixtures={dayFixtures}
+                                    getTeam={getTeamById}
+                                    getTournament={getTournament}
+                                    preloadedLogos={preloadedLogos}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -161,7 +232,7 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <button onClick={onClose} className="px-4 py-2 rounded text-text-secondary hover:text-white font-medium">Close</button>
                     <button 
                         onClick={handleShare} 
-                        disabled={isGenerating}
+                        disabled={isGenerating || isPreloading}
                         className="px-6 py-2 bg-highlight hover:bg-teal-400 text-white rounded font-bold shadow-lg flex items-center gap-2 transition-colors disabled:opacity-50"
                     >
                         {isGenerating ? (
