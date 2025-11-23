@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Fixture, Tournament, Team, TeamStanding, Player } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
 import { KnockoutBracket } from '../components/KnockoutBracket';
+import { ShareTeamCard } from '../components/ShareTeamCard';
+import * as htmlToImage from 'html-to-image';
 
 interface TournamentDetailViewProps {
   tournament: Tournament;
@@ -27,6 +29,8 @@ const TeamLogo: React.FC<{ logoUrl: string | null; alt: string; className?: stri
 const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team; onClose: () => void }> = ({ tournament, team, onClose }) => {
     const { getTournamentSquad, getFixturesByTournament, getTeamById, fixtures, tournaments } = useSports();
     const [activeTab, setActiveTab] = useState<'squad' | 'fixtures' | 'officiating'>('squad');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const cardRef = useRef<HTMLDivElement>(null);
 
     // Force load tournament rosters if not present
     const roster = useMemo(() => getTournamentSquad(tournament.id, team.id), [getTournamentSquad, tournament.id, team.id]);
@@ -39,6 +43,12 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
             .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     }, [getFixturesByTournament, tournament.id, team.id]);
 
+    // Filter upcoming fixtures for the share card (Future dates only)
+    const upcomingFixtures = useMemo(() => {
+        const now = new Date().toISOString();
+        return teamFixtures.filter(f => f.dateTime > now);
+    }, [teamFixtures]);
+
     // Filter fixtures where this team is the referee (Officiating Tab - GLOBAL SCOPE)
     // We look at ALL fixtures in the app to catch if they are officiating in other divisions/tournaments
     const officiatingFixtures = useMemo(() => {
@@ -46,6 +56,55 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
             .filter(f => f.referee === team.name)
             .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     }, [fixtures, team.name]);
+    
+    // Filter upcoming officiating for share card
+    const upcomingOfficiating = useMemo(() => {
+        const now = new Date().toISOString();
+        return officiatingFixtures.filter(f => f.dateTime > now);
+    }, [officiatingFixtures]);
+
+
+    const handleShare = async () => {
+        if (!cardRef.current) return;
+        setIsGenerating(true);
+        
+        try {
+            // Small delay to ensure any rendering is settled
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const dataUrl = await htmlToImage.toPng(cardRef.current, {
+                quality: 0.95,
+                pixelRatio: 2,
+                backgroundColor: '#1a202c',
+                skipFonts: true, // Use system fonts for speed/compatibility
+                width: 540,
+                height: 960 // Fixed poster size
+            });
+
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+            const file = new File([blob], `${team.shortName}-summary.png`, { type: 'image/png' });
+
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `${team.name} - Team Summary`,
+                    text: `Check out the upcoming schedule for ${team.name}!`,
+                });
+            } else {
+                const link = document.createElement('a');
+                link.download = `${team.shortName}-summary.png`;
+                link.href = dataUrl;
+                link.click();
+            }
+        } catch (err) {
+            console.error('Failed to generate team card', err);
+            alert('Could not generate image. Please try again.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
 
     const getResultBadge = (fixture: Fixture) => {
         if (fixture.status !== 'completed' || !fixture.score) return null;
@@ -69,11 +128,40 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                          <h3 className="text-xl font-bold text-white">{team.name}</h3>
                          <p className="text-sm text-highlight">{tournament.name}</p>
                     </div>
-                    <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleShare}
+                            disabled={isGenerating}
+                            className="bg-highlight hover:bg-teal-400 text-white p-2 rounded-full transition-colors disabled:opacity-50"
+                            title="Share Team Card"
+                        >
+                             {isGenerating ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                             ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                             )}
+                        </button>
+                        <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Hidden Share Card Render */}
+                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
+                    <ShareTeamCard 
+                        ref={cardRef}
+                        team={team}
+                        tournament={tournament}
+                        roster={roster}
+                        upcomingFixtures={upcomingFixtures}
+                        officiatingFixtures={upcomingOfficiating}
+                        getTeam={getTeamById}
+                    />
                 </div>
 
                 {/* Tabs */}
