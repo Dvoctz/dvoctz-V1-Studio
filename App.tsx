@@ -21,6 +21,7 @@ import { initializeSupabase } from './supabaseClient';
 import { SupabaseProvider } from './context/SupabaseContext';
 import { Analytics } from '@vercel/analytics/react';
 import { AddToHomeScreenPrompt } from './components/AddToHomeScreenPrompt';
+import { ServiceWorkerManager } from './components/ServiceWorkerManager';
 
 // Initialize the Supabase client once, outside of the component render cycle.
 const supabaseClient = initializeSupabase();
@@ -195,6 +196,7 @@ const AppContent: React.FC = () => {
       </main>
       <Footer />
       {showIosInstallPrompt && <AddToHomeScreenPrompt onClose={handleIosInstallPromptClose} />}
+      <ServiceWorkerManager />
     </div>
   );
 };

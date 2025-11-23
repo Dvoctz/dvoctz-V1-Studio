@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'dvoc-tanzania-cache-v5'; // Increment version to force update & clear old caches
+const CACHE_NAME = 'dvoc-tanzania-cache-v6'; // Increment version to force update & clear old caches
 const APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -97,4 +97,11 @@ self.addEventListener('fetch', event => {
       });
     })
   );
+});
+
+// Listener for SKIP_WAITING message to allow the app to update immediately
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
