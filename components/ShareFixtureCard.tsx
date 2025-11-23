@@ -7,11 +7,13 @@ interface ShareFixtureCardProps {
   fixtures: Fixture[];
   getTeam: (id: number) => Team | undefined;
   getTournament: (id: number) => Tournament | undefined;
+  page?: number;
+  totalPages?: number;
 }
 
 // Fixed dimensions for optimal sharing (like WhatsApp Status)
 // We scale this down in the preview using CSS transforms
-export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps>(({ date, fixtures, getTeam, getTournament }, ref) => {
+export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps>(({ date, fixtures, getTeam, getTournament, page, totalPages }, ref) => {
     
     // Sort fixtures by time
     const sortedFixtures = [...fixtures].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
@@ -130,6 +132,11 @@ export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps
 
             {/* Footer */}
             <div className="mt-auto pt-6 text-center z-10">
+                {totalPages && totalPages > 1 && (
+                    <div className="mb-2 inline-block bg-black/40 px-3 py-1 rounded text-xs font-bold text-white uppercase tracking-widest border border-white/20">
+                        Page {page} of {totalPages}
+                    </div>
+                )}
                 <div className="inline-block bg-highlight text-primary font-bold px-8 py-3 rounded-full text-xl shadow-lg mb-2">
                     dvoctz.app
                 </div>

@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import { NoticeBanner } from '../components/NoticeBanner';
 import type { Fixture, Team, Tournament, View, Notice } from '../types';
@@ -59,49 +59,79 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { fixtures, getTeamById, tournaments } = useSports();
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [isGenerating, setIsGenerating] = useState(false);
-    const cardRef = useRef<HTMLDivElement>(null);
+    
+    // We maintain an array of refs for multiple pages
+    const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     const dayFixtures = useMemo(() => {
         return (fixtures || []).filter(f => f.dateTime.startsWith(selectedDate));
     }, [fixtures, selectedDate]);
     
     const getTournament = (id: number) => tournaments.find(t => t.id === id);
+    
+    // Split fixtures into chunks to prevent super tall images
+    const FIXTURES_PER_PAGE = 4;
+    const fixtureChunks = useMemo(() => {
+        if (!dayFixtures.length) return [];
+        const chunks = [];
+        for (let i = 0; i < dayFixtures.length; i += FIXTURES_PER_PAGE) {
+            chunks.push(dayFixtures.slice(i, i + FIXTURES_PER_PAGE));
+        }
+        return chunks;
+    }, [dayFixtures]);
+
+    // Clean up refs if chunks decrease
+    useEffect(() => {
+        cardRefs.current = cardRefs.current.slice(0, fixtureChunks.length);
+    }, [fixtureChunks]);
 
     const handleShare = async () => {
-        if (!cardRef.current) return;
+        if (fixtureChunks.length === 0) return;
         setIsGenerating(true);
         
         try {
             // Delay to ensure render is complete
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Standard Capture - simplified without image fetching needs
-            const dataUrl = await htmlToImage.toPng(cardRef.current, {
-                quality: 0.95,
-                pixelRatio: 2,
-                backgroundColor: '#1a202c',
-                skipFonts: true, // Use system fonts for faster generation
-                width: 540,
-                height: Math.max(960, cardRef.current.scrollHeight)
-            });
+            const files: File[] = [];
 
-            // Convert to blob
-            const response = await fetch(dataUrl);
-            const blob = await response.blob();
-            const file = new File([blob], `dvoc-schedule-${selectedDate}.png`, { type: 'image/png' });
+            // Generate an image for each chunk/page
+            for (let i = 0; i < fixtureChunks.length; i++) {
+                const cardElement = cardRefs.current[i];
+                if (!cardElement) continue;
 
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: 'DVOC Daily Schedule',
-                    text: `Check out the matches for ${selectedDate}!`,
+                const dataUrl = await htmlToImage.toPng(cardElement, {
+                    quality: 0.95,
+                    pixelRatio: 2,
+                    backgroundColor: '#1a202c',
+                    skipFonts: true, // Use system fonts for faster generation
+                    width: 540,
+                    // Ensure full content is captured, but enforce a reasonable minimum for consistency
+                    height: Math.max(960, cardElement.scrollHeight)
                 });
-            } else {
-                // Fallback for desktop: download
-                const link = document.createElement('a');
-                link.download = `dvoc-schedule-${selectedDate}.png`;
-                link.href = dataUrl;
-                link.click();
+
+                const response = await fetch(dataUrl);
+                const blob = await response.blob();
+                const file = new File([blob], `dvoc-schedule-${selectedDate}-part${i+1}.png`, { type: 'image/png' });
+                files.push(file);
+            }
+
+            if (files.length > 0) {
+                if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
+                    await navigator.share({
+                        files: files,
+                        title: 'DVOC Daily Schedule',
+                        text: `Check out the matches for ${selectedDate}!`,
+                    });
+                } else {
+                    // Fallback for desktop: download each file
+                    files.forEach(file => {
+                        const link = document.createElement('a');
+                        link.download = file.name;
+                        link.href = URL.createObjectURL(file);
+                        link.click();
+                    });
+                }
             }
         } catch (err) {
             console.error('Failed to generate image', err);
@@ -141,18 +171,27 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         />
                     </div>
 
-                    {/* Preview Area */}
-                    <div className="flex justify-center overflow-hidden">
-                        {/* We scale the card down visually to fit, but render full size for capture */}
-                        <div className="origin-top transform scale-[0.45] sm:scale-[0.6]" style={{ height: dayFixtures.length > 3 ? '600px' : '600px', width: '540px', marginBottom: '-300px' }}> {/* Negative margin to compensate for scale */}
-                            <ShareFixtureCard 
-                                ref={cardRef}
-                                date={selectedDate}
-                                fixtures={dayFixtures}
-                                getTeam={getTeamById}
-                                getTournament={getTournament}
-                            />
-                        </div>
+                    {/* Preview Area - Stacked vertically if multiple pages */}
+                    <div className="flex flex-col items-center gap-8 pb-10">
+                        {fixtureChunks.length > 0 ? (
+                            fixtureChunks.map((chunk, index) => (
+                                <div key={index} className="origin-top transform scale-[0.5] sm:scale-[0.6] flex-shrink-0" style={{ width: '540px', height: '960px', marginBottom: '-300px' /* Comprensate for scale */ }}> 
+                                    <ShareFixtureCard 
+                                        ref={el => { cardRefs.current[index] = el; }}
+                                        date={selectedDate}
+                                        fixtures={chunk}
+                                        getTeam={getTeamById}
+                                        getTournament={getTournament}
+                                        page={index + 1}
+                                        totalPages={fixtureChunks.length}
+                                    />
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-10 text-text-secondary">No fixtures found for this date.</div>
+                        )}
+                        {/* Spacer to push content up so the last card isn't cut off by negative margin logic visual glitch */}
+                        <div style={{ height: '300px' }}></div>
                     </div>
                 </div>
 
@@ -161,7 +200,7 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <button onClick={onClose} className="px-4 py-2 rounded text-text-secondary hover:text-white font-medium">Close</button>
                     <button 
                         onClick={handleShare} 
-                        disabled={isGenerating}
+                        disabled={isGenerating || fixtureChunks.length === 0}
                         className="px-6 py-2 bg-highlight hover:bg-teal-400 text-white rounded font-bold shadow-lg flex items-center gap-2 transition-colors disabled:opacity-50"
                     >
                         {isGenerating ? (
@@ -171,7 +210,7 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                 </svg>
-                                Share Image
+                                Share {fixtureChunks.length > 1 ? `(${fixtureChunks.length} Pages)` : 'Image'}
                             </>
                         )}
                     </button>
