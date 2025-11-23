@@ -77,8 +77,12 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             
             const dataUrl = await htmlToImage.toPng(cardRef.current, {
                 cacheBust: true,
+                quality: 0.95,
                 pixelRatio: 2, // High resolution
-                backgroundColor: '#1a202c'
+                backgroundColor: '#1a202c',
+                skipFonts: true, // IMPORTANT: Prevents timeouts fetching external fonts
+                width: 540, // Enforce original width (ignoring CSS scale)
+                height: Math.max(960, cardRef.current.scrollHeight) // Enforce minimum height
             });
 
             // Convert to blob
@@ -138,7 +142,7 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     </div>
 
                     {/* Preview Area */}
-                    <div className="flex justify-center">
+                    <div className="flex justify-center overflow-hidden">
                          {/* We scale the card down visually to fit, but render full size for capture */}
                         <div className="origin-top transform scale-[0.45] sm:scale-[0.6]" style={{ height: dayFixtures.length > 3 ? '600px' : '600px', width: '540px', marginBottom: '-300px' }}> {/* Negative margin to compensate for scale */}
                              <ShareFixtureCard 

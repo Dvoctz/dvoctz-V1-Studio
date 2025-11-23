@@ -17,7 +17,17 @@ export const ShareFixtureCard = forwardRef<HTMLDivElement, ShareFixtureCardProps
     const sortedFixtures = [...fixtures].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     return (
-        <div ref={ref} className="bg-primary text-white font-sans relative overflow-hidden flex flex-col" style={{ width: '540px', minHeight: '960px', padding: '32px' }}>
+        <div 
+            ref={ref} 
+            className="bg-primary text-white relative overflow-hidden flex flex-col" 
+            style={{ 
+                width: '540px', 
+                minHeight: '960px', 
+                padding: '32px',
+                // Explicit font family fallback to ensure it renders even if we skip webfont fetching
+                fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+            }}
+        >
             {/* Background Texture/Pattern */}
             <div className="absolute inset-0 opacity-5 pointer-events-none">
                  <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
