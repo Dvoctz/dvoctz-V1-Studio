@@ -78,7 +78,9 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                 backgroundColor: '#1a202c',
                 skipFonts: true, // Use system fonts for speed/compatibility
                 width: 540,
-                height: 960 // Fixed poster size
+                // DYNAMIC HEIGHT FIX:
+                // We use scrollHeight to capture the full length of the content if it exceeds 960px.
+                height: Math.max(960, cardRef.current.scrollHeight) 
             });
 
             const response = await fetch(dataUrl);
