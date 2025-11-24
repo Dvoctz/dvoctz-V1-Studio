@@ -62,30 +62,6 @@ const MiniStandingsTable: React.FC<{ title: string; standings: TeamStanding[]; o
     </div>
 );
 
-const FixtureCard: React.FC<{ fixture: Fixture; team1?: Team; team2?: Team; }> = ({ fixture, team1, team2 }) => {
-    if (!team1 || !team2) return null;
-    
-    return (
-        <div className="bg-secondary rounded-lg p-4 text-center hover:bg-accent transition-colors duration-300 flex flex-col justify-between h-full">
-            <div>
-                <p className="text-sm text-text-secondary mb-2">{new Date(fixture.dateTime).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                <div className="flex items-start justify-between space-x-2">
-                    <div className="flex flex-col items-center w-2/5 text-center">
-                        <img src={team1.logoUrl} alt={team1.name} className="w-12 h-12 rounded-full mb-2 object-cover" />
-                        <span className="font-semibold text-sm text-text-primary break-words line-clamp-2">{team1.name}</span>
-                    </div>
-                    <span className="text-xl font-bold text-text-secondary pt-4">VS</span>
-                     <div className="flex flex-col items-center w-2/5 text-center">
-                        <img src={team2.logoUrl} alt={team2.name} className="w-12 h-12 rounded-full mb-2 object-cover" />
-                        <span className="font-semibold text-sm text-text-primary break-words line-clamp-2">{team2.name}</span>
-                    </div>
-                </div>
-            </div>
-            <p className="text-xs text-text-secondary mt-3">{fixture.ground}</p>
-        </div>
-    );
-};
-
 // Daily Schedule & Share Modal
 const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { fixtures, getTeamById, tournaments } = useSports();
