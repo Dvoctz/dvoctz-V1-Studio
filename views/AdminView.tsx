@@ -4,6 +4,7 @@ import Papa from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club, PlayerTransfer, Notice, NoticeLevel } from '../types';
+import { LiveScorerView } from './LiveScorerView';
 
 // Reusable UI Components
 export const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -1018,7 +1019,7 @@ const TransferForm: React.FC<{ transfer: any, players: Player[], teams: Team[], 
 };
 
 // --- FIXTURES ---
-const FixturesAdmin = () => {
+const FixturesAdmin: React.FC<{onEnterLiveMode?: () => void, isManager?: boolean}> = ({onEnterLiveMode, isManager}) => {
     const { fixtures, tournaments, teams, addFixture, updateFixture, deleteFixture, bulkAddFixtures } = useSports();
     const [editing, setEditing] = useState<Fixture | Partial<Fixture> | null>(null);
     const [filterTournament, setFilterTournament] = useState<string>('');
@@ -1151,6 +1152,24 @@ const FixturesAdmin = () => {
 
     return (
         <AdminSection title="Manage Fixtures">
+            {isManager && onEnterLiveMode && (
+                <div className="mb-6 bg-secondary/50 p-4 rounded-lg border border-highlight flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h3 className="font-bold text-lg text-white">📱 Live Scorer Mode</h3>
+                        <p className="text-sm text-text-secondary">Switch to a simplified interface optimized for courtside scoring.</p>
+                    </div>
+                    <button 
+                        onClick={onEnterLiveMode}
+                        className="bg-highlight hover:bg-teal-400 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition-transform hover:scale-105 flex items-center gap-2"
+                    >
+                        <span>Enter Live Mode</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
             <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <Select value={filterTournament} onChange={e => setFilterTournament(e.target.value)} className="!w-64 !mt-0">
                     <option value="">All Tournaments</option>
@@ -1499,8 +1518,17 @@ const NoticeForm: React.FC<{ notice: any, onSave: any, onCancel: any, error: any
 
 // --- MAIN ADMIN VIEW ---
 export const AdminView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'transfers' | 'fixtures' | 'sponsors' | 'notices'>('tournaments');
     const { userProfile } = useAuth();
+    // Default to 'fixtures' if the user is a fixture_manager
+    const [activeTab, setActiveTab] = useState<'tournaments' | 'clubs' | 'teams' | 'players' | 'transfers' | 'fixtures' | 'sponsors' | 'notices'>(
+        userProfile?.role === 'fixture_manager' ? 'fixtures' : 'tournaments'
+    );
+    const [isLiveMode, setIsLiveMode] = useState(false);
+
+    // If currently in Live Mode, show the LiveScorerView instead of the Dashboard
+    if (isLiveMode) {
+        return <LiveScorerView onExit={() => setIsLiveMode(false)} />;
+    }
 
     const tabs = [
         { id: 'tournaments', label: 'Tournaments' },
@@ -1512,12 +1540,18 @@ export const AdminView: React.FC = () => {
         { id: 'sponsors', label: 'Sponsors' },
         { id: 'notices', label: 'Notices' },
     ];
+    
+    // Dynamic Title based on Role
+    let dashboardTitle = 'Admin Dashboard';
+    if (userProfile?.role === 'fixture_manager') dashboardTitle = 'Fixture Manager Panel';
+    if (userProfile?.role === 'team_manager') dashboardTitle = 'Team Manager Panel';
+    if (userProfile?.role === 'content_editor') dashboardTitle = 'Content Editor Panel';
 
     return (
         <div className="space-y-6">
             <div className="bg-secondary p-4 rounded-lg shadow-lg text-center">
-                <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-                <p className="text-text-secondary">Welcome back, {userProfile?.fullName || 'Admin'}</p>
+                <h1 className="text-3xl font-bold text-white">{dashboardTitle}</h1>
+                <p className="text-text-secondary">Welcome back, {userProfile?.fullName || 'User'}</p>
             </div>
 
             <div className="flex flex-wrap justify-center gap-2 border-b border-accent pb-4">
@@ -1538,7 +1572,7 @@ export const AdminView: React.FC = () => {
                 {activeTab === 'teams' && <TeamsAdmin />}
                 {activeTab === 'players' && <PlayersAdmin />}
                 {activeTab === 'transfers' && <TransfersAdmin />}
-                {activeTab === 'fixtures' && <FixturesAdmin />}
+                {activeTab === 'fixtures' && <FixturesAdmin isManager={userProfile?.role === 'fixture_manager' || userProfile?.role === 'admin'} onEnterLiveMode={() => setIsLiveMode(true)} />}
                 {activeTab === 'sponsors' && <SponsorsAdmin />}
                 {activeTab === 'notices' && <NoticesAdmin />}
             </div>

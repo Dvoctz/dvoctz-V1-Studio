@@ -55,6 +55,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
 
   const getAdminLinkText = () => {
     if (userProfile?.role === 'admin') return 'Admin Panel';
+    if (userProfile?.role === 'fixture_manager') return 'Fixture Manager';
+    if (userProfile?.role === 'team_manager') return 'Team Manager';
+    if (userProfile?.role === 'content_editor') return 'Editor Panel';
     return 'Admin Login';
   }
 
