@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import { NoticeBanner } from '../components/NoticeBanner';
-import type { Fixture, Team, Tournament, View, Notice } from '../types';
+import type { Fixture, Team, Tournament, View, Notice, TeamStanding } from '../types';
 import { ShareFixtureCard } from '../components/ShareFixtureCard';
 import * as htmlToImage from 'html-to-image';
 
@@ -11,45 +11,77 @@ interface HomeViewProps {
   onSelectTournament: (tournament: Tournament) => void;
 }
 
-const FixtureCardSkeleton: React.FC = () => (
-    <div className="bg-secondary rounded-lg p-4 animate-pulse">
-        <div className="h-4 bg-accent rounded w-3/4 mx-auto mb-4"></div>
-        <div className="flex items-start justify-between space-x-2">
-            <div className="flex flex-col items-center w-2/5">
-                <div className="w-16 h-16 rounded-full bg-accent mb-2"></div>
-                <div className="h-5 bg-accent rounded w-full"></div>
-            </div>
-            <div className="pt-8 w-1/5 flex justify-center"><div className="h-6 w-8 bg-accent rounded"></div></div>
-            <div className="flex flex-col items-center w-2/5">
-                <div className="w-16 h-16 rounded-full bg-accent mb-2"></div>
-                <div className="h-5 bg-accent rounded w-full"></div>
-            </div>
+const MiniStandingsTable: React.FC<{ title: string; standings: TeamStanding[]; onViewFull: () => void }> = ({ title, standings, onViewFull }) => (
+    <div className="bg-secondary rounded-lg shadow-lg overflow-hidden flex flex-col h-full border border-accent">
+        <div className="p-4 border-b border-accent flex justify-between items-center bg-secondary">
+            <h3 className="text-xl font-bold text-white">{title}</h3>
+            <span className="text-[10px] font-bold bg-highlight text-primary px-2 py-1 rounded uppercase tracking-wider">Top 5</span>
         </div>
-        <div className="h-3 bg-accent rounded w-1/2 mx-auto mt-5"></div>
+        <div className="flex-grow overflow-x-auto">
+            <table className="min-w-full text-sm">
+                <thead className="bg-primary/50 text-text-secondary">
+                    <tr>
+                        <th className="px-3 py-2 text-center w-8">#</th>
+                        <th className="px-3 py-2 text-left">Team</th>
+                        <th className="px-3 py-2 text-center w-8">P</th>
+                        <th className="px-3 py-2 text-center w-8 font-bold text-white">Pts</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-accent">
+                    {standings.length > 0 ? standings.slice(0, 5).map((s, i) => (
+                        <tr key={s.teamId} className="hover:bg-primary/50 transition-colors">
+                            <td className="px-3 py-2 text-center text-text-secondary font-medium">{i + 1}</td>
+                            <td className="px-3 py-2 flex items-center gap-2 text-white font-medium">
+                                {s.logoUrl ? (
+                                    <img src={s.logoUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                ) : (
+                                    <div className="w-6 h-6 rounded-full bg-accent flex-shrink-0" />
+                                )}
+                                <span className="truncate max-w-[140px]">{s.teamName}</span>
+                            </td>
+                            <td className="px-3 py-2 text-center text-text-secondary">{s.gamesPlayed}</td>
+                            <td className="px-3 py-2 text-center font-bold text-highlight">{s.points}</td>
+                        </tr>
+                    )) : (
+                        <tr><td colSpan={4} className="px-4 py-8 text-center text-text-secondary">No standings available yet.</td></tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+        <div className="p-3 border-t border-accent bg-secondary text-center mt-auto">
+            <button 
+                onClick={onViewFull} 
+                className="text-sm font-semibold text-highlight hover:text-white transition-colors flex items-center justify-center gap-1 mx-auto"
+            >
+                View Full Table
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+            </button>
+        </div>
     </div>
 );
-
 
 const FixtureCard: React.FC<{ fixture: Fixture; team1?: Team; team2?: Team; }> = ({ fixture, team1, team2 }) => {
     if (!team1 || !team2) return null;
     
     return (
-        <div className="bg-secondary rounded-lg p-4 text-center hover:bg-accent transition-colors duration-300 flex flex-col justify-between">
+        <div className="bg-secondary rounded-lg p-4 text-center hover:bg-accent transition-colors duration-300 flex flex-col justify-between h-full">
             <div>
-                <p className="text-sm text-text-secondary mb-2">{new Date(fixture.dateTime).toLocaleString()}</p>
+                <p className="text-sm text-text-secondary mb-2">{new Date(fixture.dateTime).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 <div className="flex items-start justify-between space-x-2">
                     <div className="flex flex-col items-center w-2/5 text-center">
-                        <img src={team1.logoUrl} alt={team1.name} className="w-16 h-16 rounded-full mb-2 object-cover" />
-                        <span className="font-semibold text-base text-text-primary break-words min-h-[48px]">{team1.name}</span>
+                        <img src={team1.logoUrl} alt={team1.name} className="w-12 h-12 rounded-full mb-2 object-cover" />
+                        <span className="font-semibold text-sm text-text-primary break-words line-clamp-2">{team1.name}</span>
                     </div>
-                    <span className="text-2xl font-bold text-text-secondary pt-8">VS</span>
+                    <span className="text-xl font-bold text-text-secondary pt-4">VS</span>
                      <div className="flex flex-col items-center w-2/5 text-center">
-                        <img src={team2.logoUrl} alt={team2.name} className="w-16 h-16 rounded-full mb-2 object-cover" />
-                        <span className="font-semibold text-base text-text-primary break-words min-h-[48px]">{team2.name}</span>
+                        <img src={team2.logoUrl} alt={team2.name} className="w-12 h-12 rounded-full mb-2 object-cover" />
+                        <span className="font-semibold text-sm text-text-primary break-words line-clamp-2">{team2.name}</span>
                     </div>
                 </div>
             </div>
-            <p className="text-xs text-text-secondary mt-4">{fixture.ground}</p>
+            <p className="text-xs text-text-secondary mt-3">{fixture.ground}</p>
         </div>
     );
 };
@@ -224,18 +256,37 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
-    const { getTeamById, getActiveNotice } = useSports();
-    const { data: fixtures, loading: fixturesLoading } = useEntityData('fixtures');
-    // Ensure teams are loaded so cards render correctly
-    const { loading: teamsLoading } = useEntityData('teams');
+    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament } = useSports();
+    // Ensure data is loaded
+    useEntityData('fixtures');
+    useEntityData('teams');
     const { loading: noticesLoading } = useEntityData('notices');
+    const { loading: tournamentsLoading } = useEntityData('tournaments');
     
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
-    const upcomingFixtures = useMemo(() => (fixtures || []).filter(f => f.status === 'upcoming').slice(0, 3), [fixtures]);
     const activeNotice = getActiveNotice();
 
-    const isDataLoading = fixturesLoading || teamsLoading;
+    // Get active tournaments (heuristic: highest ID usually means newest/current)
+    const activeDiv1Tournament = useMemo(() => {
+        const list = getTournamentsByDivision('Division 1');
+        return list.length > 0 ? list.sort((a,b) => b.id - a.id)[0] : null;
+    }, [getTournamentsByDivision]);
+
+    const activeDiv2Tournament = useMemo(() => {
+        const list = getTournamentsByDivision('Division 2');
+        return list.length > 0 ? list.sort((a,b) => b.id - a.id)[0] : null;
+    }, [getTournamentsByDivision]);
+
+    // Calculate Standings
+    const div1Standings = useMemo(() => 
+        activeDiv1Tournament ? getStandingsForTournament(activeDiv1Tournament.id) : [], 
+    [activeDiv1Tournament, getStandingsForTournament]);
+
+    const div2Standings = useMemo(() => 
+        activeDiv2Tournament ? getStandingsForTournament(activeDiv2Tournament.id) : [], 
+    [activeDiv2Tournament, getStandingsForTournament]);
+
 
     return (
         <div className="space-y-12">
@@ -246,7 +297,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
                     <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Welcome to DVOC Tanzania</h1>
                     <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-6">Your one-stop destination for all Tanzania Traditional Volleyball tournaments, fixtures, teams, and player stats.</p>
                     
-                    {/* New Share Button */}
                     <button 
                         onClick={() => setIsScheduleModalOpen(true)}
                         className="inline-flex items-center px-6 py-3 bg-highlight hover:bg-teal-400 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg gap-2"
@@ -273,21 +323,29 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
                 </div>
             </div>
 
-             <div>
-                <h2 className="text-3xl font-bold text-center mb-6">Upcoming Matches</h2>
-                <div className="grid md:grid-cols-3 gap-6">
-                    {isDataLoading ? (
-                        <>
-                            <FixtureCardSkeleton />
-                            <FixtureCardSkeleton />
-                            <FixtureCardSkeleton />
-                        </>
-                    ) : (
-                        upcomingFixtures.map(fixture => (
-                            <FixtureCard key={fixture.id} fixture={fixture} team1={getTeamById(fixture.team1Id)} team2={getTeamById(fixture.team2Id)} />
-                        ))
-                    )}
-                </div>
+             <div className="space-y-6">
+                <h2 className="text-3xl font-bold text-center mb-6">League Standings</h2>
+                {tournamentsLoading ? (
+                    <div className="flex justify-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-highlight"></div>
+                    </div>
+                ) : (
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {/* Division 1 Table */}
+                        <MiniStandingsTable 
+                            title={activeDiv1Tournament ? activeDiv1Tournament.name : "Division 1"} 
+                            standings={div1Standings}
+                            onViewFull={() => activeDiv1Tournament && onSelectTournament(activeDiv1Tournament)}
+                        />
+                        
+                        {/* Division 2 Table */}
+                        <MiniStandingsTable 
+                            title={activeDiv2Tournament ? activeDiv2Tournament.name : "Division 2"} 
+                            standings={div2Standings}
+                            onViewFull={() => activeDiv2Tournament && onSelectTournament(activeDiv2Tournament)}
+                        />
+                    </div>
+                )}
             </div>
             
             {isScheduleModalOpen && <DailyScheduleModal onClose={() => setIsScheduleModalOpen(false)} />}
