@@ -152,6 +152,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             return state[entityName] as SportsState[T];
         }
 
+        // Prevent duplicate requests for the same entity if already loading
+        if (state.loading.has(entityName)) {
+            return state[entityName] as SportsState[T];
+        }
+
         setState(s => ({ ...s, loading: new Set(s.loading).add(entityName) }));
 
         try {
@@ -179,13 +184,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (entityName === 'fixtures') {
                  processedData = (data || []).map(mapFixture);
             } else if (entityName === 'tournaments') {
-                // Note: This recursive check is why individual fetching flickers. 
-                // Ideally tournaments depend on fixtures, but for initial load we can do it smarter in prefetch.
                 const fixturesData = state.fixtures; 
-                // If fixtures aren't loaded yet, this calc might be stale, but prefetchAllData solves this.
-                
                 processedData = (data || []).map(mapTournament).map(t => {
-                    if (!fixturesData) return { ...t, phase: 'round-robin' as const }; // Fallback if fixtures not ready
+                    if (!fixturesData) return { ...t, phase: 'round-robin' as const };
                     const knockoutFixtures = (fixturesData as Fixture[]).some(f => f.tournamentId === t.id && f.stage);
                     const finalFixture = (fixturesData as Fixture[]).find(f => f.tournamentId === t.id && f.stage === 'final');
                     let phase: Tournament['phase'] = 'round-robin';
@@ -230,13 +231,27 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
     const prefetchAllData = useCallback(async () => {
         try {
-            // Use Promise.all to fetch everything in parallel
+            // Batch 1: Core Data (Split to avoid connection limits)
             const [
                 { data: tournaments, error: errTournaments },
-                { data: clubs, error: errClubs },
+                { data: fixtures, error: errFixtures },
                 { data: teams, error: errTeams },
                 { data: players, error: errPlayers },
-                { data: fixtures, error: errFixtures },
+            ] = await Promise.all([
+                supabase.from('tournaments').select('*').order('name'),
+                supabase.from('fixtures').select('*'),
+                supabase.from('teams').select('*').order('name'),
+                supabase.from('players').select('*').order('name'),
+            ]);
+
+            if (errTournaments) throw errTournaments;
+            if (errFixtures) throw errFixtures;
+            if (errTeams) throw errTeams;
+            if (errPlayers) throw errPlayers;
+
+            // Batch 2: Secondary Data
+            const [
+                { data: clubs, error: errClubs },
                 { data: sponsors, error: errSponsors },
                 { data: tournamentSponsors, error: errTS },
                 { data: playerTransfers, error: errPT },
@@ -245,11 +260,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 { data: tournamentRosters, error: errTR },
                 { data: tournamentTeams, error: errTT }
             ] = await Promise.all([
-                supabase.from('tournaments').select('*').order('name'),
                 supabase.from('clubs').select('*').order('name'),
-                supabase.from('teams').select('*').order('name'),
-                supabase.from('players').select('*').order('name'),
-                supabase.from('fixtures').select('*'),
                 supabase.from('sponsors').select('*').order('name'),
                 supabase.from('tournament_sponsors').select('*'),
                 supabase.from('player_transfers').select('*'),
@@ -258,12 +269,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 supabase.from('tournament_rosters').select('*'),
                 supabase.from('tournament_teams').select('*')
             ]);
+            
+            // Note: We don't throw on secondary data errors to allow app to partially load
+            if (errClubs) console.error("Error fetching clubs:", errClubs);
 
-            if (errTournaments) throw errTournaments;
-            if (errClubs) throw errClubs;
-            // ... check others if necessary, but keeping it simple for speed
-
-            // Process Fixtures First (needed for Tournament logic)
+            // Process Fixtures First
             const processedFixtures = (fixtures || []).map(mapFixture);
             
             // Process Tournaments with phase logic
@@ -278,14 +288,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
             const processedRules = rules?.content || 'The official game rules have not been set yet. An admin can add them from the Rules page.';
 
-            // Atomic State Update: Sets all data at once, preventing intermediate re-renders
             setState(s => ({
                 ...s,
                 tournaments: processedTournaments,
-                clubs: (clubs || []).map(mapClub),
+                fixtures: processedFixtures,
                 teams: (teams || []).map(mapTeam),
                 players: (players || []).map(mapPlayer),
-                fixtures: processedFixtures,
+                clubs: (clubs || []).map(mapClub),
                 sponsors: (sponsors || []).map(mapSponsor),
                 tournamentSponsors: tournamentSponsors || [],
                 playerTransfers: (playerTransfers || []).map(mapPlayerTransfer),
@@ -293,7 +302,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 rules: processedRules,
                 tournamentRosters: (tournamentRosters || []).map(mapTournamentRoster),
                 tournamentTeams: (tournamentTeams || []).map(mapTournamentTeam),
-                loading: new Set(), // Clear all loading states
+                loading: new Set(),
                 error: null
             }));
 
@@ -378,7 +387,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         let finalPhotoUrl = playerData.photoUrl;
         if (playerData.photoFile) finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
         const { name, teamId, clubId, role, stats } = playerData;
-        // If clubId is not explicit but teamId is present, try to infer it from team (safety check, though logic should be robust)
         const { data, error } = await supabase.from('players').insert({ name, team_id: teamId, club_id: clubId, role, stats, photo_url: finalPhotoUrl }).select().single();
         if (error) throw error;
         setState(s => ({...s, players: [...(s.players || []), mapPlayer(data)].sort((a,b) => a.name.localeCompare(b.name)) }));
@@ -494,7 +502,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { data, error } = await supabase.from('fixtures').insert(fixturesToInsert).select();
         if (error) throw error;
         
-        // Map back to app format
         const newFixtures = (data || []).map(mapFixture);
         
         setState(s => ({
@@ -534,7 +541,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const addPlayerTransfer = useCallback(async (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => {
-        // 1. Insert the transfer record first
         const { data: transferData, error: transferError } = await supabase
             .from('player_transfers')
             .insert({ 
@@ -550,7 +556,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         
         if (transferError) throw transferError;
 
-        // 2. Find the new Club ID for the target team (if moving to a team)
         let newClubId: number | null = null;
         if (transfer.toTeamId) {
             const { data: teamData, error: teamError } = await supabase
@@ -563,8 +568,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             newClubId = teamData.club_id;
         }
         
-        // 3. Update the player's actual team_id and club_id
-        // This handles "removing from old club pool" by changing the club_id to the new one (or null if free agent)
         const { data: playerData, error: playerError } = await supabase
             .from('players')
             .update({ 
@@ -577,7 +580,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             
         if (playerError) throw playerError;
 
-        // 4. Update local state
         setState(s => ({
             ...s, 
             playerTransfers: [...(s.playerTransfers || []), mapPlayerTransfer(transferData)],
@@ -625,17 +627,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
     
     const bulkAddOrUpdateTeams = useCallback(async (teamsData: CsvTeam[]) => {
-        // Fetch current data to be sure
         const currentClubs = await fetchData('clubs');
         
         const clubNameMap = new Map<string, number>();
         (currentClubs || []).forEach(club => {
-             // Use trim and lowercase for robust matching
              clubNameMap.set(club.name.trim().toLowerCase(), club.id);
         });
         
         const teamsToUpsert = teamsData.map(t => {
-            // Clean the input
             const cleanClubName = t.clubName.trim().toLowerCase();
             const clubId = clubNameMap.get(cleanClubName);
             
@@ -651,23 +650,20 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const bulkAddOrUpdatePlayers = useCallback(async (playersData: CsvPlayer[]) => {
         const normalize = (s: string) => s ? s.trim().toLowerCase() : '';
 
-        // 1. Identify unique Clubs and Teams from CSV
         const uniqueCsvClubs = new Set<string>();
-        const uniqueCsvTeams = new Map<string, string>(); // TeamName -> ClubName
+        const uniqueCsvTeams = new Map<string, string>(); 
 
         playersData.forEach(p => {
             if (p.clubName) uniqueCsvClubs.add(p.clubName.trim());
             if (p.teamName && p.clubName) uniqueCsvTeams.set(p.teamName.trim(), p.clubName.trim());
         });
 
-        // 2. Fetch existing Clubs directly to bypass state cache
         let { data: existingClubs, error: clubsError } = await supabase.from('clubs').select('*');
         if (clubsError) throw new Error(`Failed to fetch clubs: ${clubsError.message}`);
         
         let clubMap = new Map<string, Club>();
         (existingClubs || []).forEach((c: any) => clubMap.set(normalize(c.name), mapClub(c)));
 
-        // 3. Create missing Clubs
         const newClubsToInsert: any[] = [];
         uniqueCsvClubs.forEach(csvClubName => {
             if (!clubMap.has(normalize(csvClubName))) {
@@ -679,7 +675,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const { error } = await supabase.from('clubs').insert(newClubsToInsert);
             if (error) throw new Error(`Failed to create missing clubs: ${error.message}`);
             
-            // Re-fetch clubs to get IDs
             const { data: refreshedClubs, error: refreshError } = await supabase.from('clubs').select('*');
             if (refreshError) throw refreshError;
             
@@ -687,14 +682,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             (refreshedClubs || []).forEach((c: any) => clubMap.set(normalize(c.name), mapClub(c)));
         }
 
-        // 4. Fetch existing Teams directly
         let { data: existingTeams, error: teamsError } = await supabase.from('teams').select('*');
         if (teamsError) throw new Error(`Failed to fetch teams: ${teamsError.message}`);
 
         let teamMap = new Map<string, Team>();
         (existingTeams || []).forEach((t: any) => teamMap.set(normalize(t.name), mapTeam(t)));
 
-        // 5. Create missing Teams
         const newTeamsToInsert: any[] = [];
         uniqueCsvTeams.forEach((csvClubName, csvTeamName) => {
              if (!teamMap.has(normalize(csvTeamName))) {
@@ -715,7 +708,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             const { error } = await supabase.from('teams').insert(newTeamsToInsert);
              if (error) throw new Error(`Failed to create missing teams: ${error.message}`);
              
-             // Re-fetch teams
              const { data: refreshedTeams, error: refreshTeamsError } = await supabase.from('teams').select('*');
              if (refreshTeamsError) throw refreshTeamsError;
              
@@ -723,7 +715,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
              (refreshedTeams || []).forEach((t: any) => teamMap.set(normalize(t.name), mapTeam(t)));
         }
 
-        // 6. Process Players
         const playersToUpsert = playersData.map(p => {
             const pTeamName = normalize(p.teamName || '');
             const pClubName = normalize(p.clubName || '');
@@ -762,7 +753,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { error } = await supabase.from('players').upsert(playersToUpsert, { onConflict: 'name,team_id' });
         if (error) throw error;
         
-        // Force Refresh UI State
         setState(s => ({ ...s, clubs: null, teams: null, players: null }));
         await Promise.all([fetchData('clubs'), fetchData('teams'), fetchData('players')]);
 
@@ -792,8 +782,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                  setState(s => ({ ...s, playerTransfers: [...(s.playerTransfers || []), ...typedTransfers.map(mapPlayerTransfer)] }));
             }
         }
-        // Note: when assigning to a team, we might also need to ensure club_id matches the new team's club.
-        // However, players in a pool already have the club_id, so this is likely fine for now.
         const { data: updatedPlayers, error } = await supabase.from('players').update({ team_id: teamId }).in('id', playerIds).select();
         if (error) throw error;
         if (updatedPlayers) {
@@ -806,7 +794,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
     }, [supabase, state.players]);
     
-    // MANAGE TOURNAMENT TEAMS
     const updateTournamentTeams = useCallback(async (tournamentId: number, teamIds: number[]) => {
         const { error: deleteError } = await supabase.from('tournament_teams').delete().eq('tournament_id', tournamentId);
         if (deleteError) throw deleteError;
@@ -825,14 +812,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const tournamentFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage);
         const teamIdsInTournament = new Set<number>();
 
-        // 1. Add Explicit Participating Teams
         if (state.tournamentTeams) {
              state.tournamentTeams
                 .filter(tt => tt.tournamentId === tournamentId)
                 .forEach(tt => teamIdsInTournament.add(tt.teamId));
         }
         
-        // 2. Add Implicit Teams from Fixtures (fallback)
         (state.teams || []).forEach(team => {
             if (teamIdsInTournament.has(team.id)) return;
             const teamFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id) && !f.stage);
@@ -902,16 +887,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         await fetchData('tournaments');
     }, [supabase, state.tournaments, getStandingsForTournament, fetchData]);
 
-    // TOURNAMENT ROSTER LOGIC
     const updateTournamentSquad = useCallback(async (tournamentId: number, teamId: number, playerIds: number[]) => {
-        // 1. Remove existing roster entries for this team/tournament
         const { error: deleteError } = await supabase
             .from('tournament_rosters')
             .delete()
             .match({ tournament_id: tournamentId, team_id: teamId });
         if (deleteError) throw deleteError;
 
-        // 2. Insert new entries
         if (playerIds.length > 0) {
             const toInsert = playerIds.map(pid => ({
                 tournament_id: tournamentId,
@@ -922,7 +904,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (insertError) throw insertError;
         }
 
-        // 3. Refresh local state
         const { data, error } = await supabase.from('tournament_rosters').select('*');
         if (error) throw error;
         setState(s => ({ ...s, tournamentRosters: (data || []).map(mapTournamentRoster) }));
@@ -957,7 +938,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const getTeamsByClub = useCallback((clubId: number) => (state.teams || []).filter(t => t.clubId === clubId), [state.teams]);
     const getPlayersByTeam = useCallback((teamId: number) => (state.players || []).filter(p => p.teamId === teamId), [state.players]);
     
-    // Updated to include players who are either on a team in this club OR directly in the club pool
     const getPlayersByClub = useCallback((clubId: number): Player[] => {
         return (state.players || []).filter(p => p.clubId === clubId).sort((a, b) => a.name.localeCompare(b.name));
     }, [state.players]);
