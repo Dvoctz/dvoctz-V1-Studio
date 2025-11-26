@@ -121,6 +121,180 @@ export const ImageUploadOrUrl: React.FC<{
     );
 };
 
+// ... [Admin component logic remains same, updating FixtureForm below]
+
+const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tournament[], onSave: any, onCancel: any, error: any }> = ({ fixture, teams, tournaments, onSave, onCancel, error }) => {
+    const { players } = useSports();
+    const toLocalInputString = (dateStr: string) => { if (!dateStr) return ''; const date = new Date(dateStr); const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)); return localDate.toISOString().slice(0, 16); };
+    const getNowLocalString = () => { const now = new Date(); const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)); return localDate.toISOString().slice(0, 16); };
+
+    const [formData, setFormData] = useState({
+        tournamentId: tournaments[0]?.id, team1Id: teams[0]?.id, team2Id: teams[1]?.id, ground: 'Main Court', status: 'upcoming', referee: '', score: { team1Score: 0, team2Score: 0, sets: [], resultMessage: '' }, manOfTheMatchId: null as number | null, ...fixture, dateTime: fixture?.dateTime ? toLocalInputString(fixture.dateTime) : getNowLocalString()
+    });
+    const [refereeSelection, setRefereeSelection] = useState<string>(() => { const currentRef = fixture?.referee; if (!currentRef) return ''; const isKnownTeam = teams.some(t => t.name === currentRef); return isKnownTeam ? currentRef : '__manual__'; });
+
+    const selectedTournament = useMemo(() => tournaments.find(t => t.id === Number(formData.tournamentId)), [tournaments, formData.tournamentId]);
+    const availableTeams = useMemo(() => { if (!selectedTournament) return teams; return teams.filter(t => t.division === selectedTournament.division).sort((a, b) => a.name.localeCompare(b.name)); }, [teams, selectedTournament]);
+    const eligiblePlayers = useMemo(() => { if (!formData.team1Id || !formData.team2Id) return []; return players.filter(p => p.teamId === formData.team1Id || p.teamId === formData.team2Id).sort((a, b) => a.name.localeCompare(b.name)); }, [players, formData.team1Id, formData.team2Id]);
+
+    const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const newId = Number(e.target.value); const newTourney = tournaments.find(t => t.id === newId); let update: any = { tournamentId: newId }; if (newTourney) { const relevantTeams = teams.filter(t => t.division === newTourney.division).sort((a, b) => a.name.localeCompare(b.name)); const t1Exists = relevantTeams.find(t => t.id === formData.team1Id); const t2Exists = relevantTeams.find(t => t.id === formData.team2Id); if (!t1Exists && relevantTeams.length > 0) update.team1Id = relevantTeams[0].id; if (!t2Exists && relevantTeams.length > 1) update.team2Id = relevantTeams[1].id; else if (!t2Exists && relevantTeams.length > 0) update.team2Id = relevantTeams[0].id; } setFormData({ ...formData, ...update }); };
+    const handleRefereeChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const val = e.target.value; setRefereeSelection(val); if (val === '__manual__') setFormData(prev => ({ ...prev, referee: prev.referee || '' })); else setFormData(prev => ({ ...prev, referee: val === '' ? '' : val })); };
+    const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); const localDate = new Date(formData.dateTime); const utcDate = localDate.toISOString(); onSave({ ...formData, dateTime: utcDate }); };
+
+    const updateSet = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
+        const newSets: any[] = [...(formData.score?.sets || [])];
+        if (!newSets[index]) newSets[index] = { team1Points: 0, team2Points: 0 };
+        const currentSet = newSets[index];
+        newSets[index] = { ...currentSet, [field]: Number(value) };
+        
+        // Reset winner if scores diverge
+        if (field === 'team1Points' || field === 'team2Points') {
+            if (newSets[index].team1Points !== newSets[index].team2Points) {
+                delete newSets[index].winner;
+            }
+        }
+        
+        setFormData({ ...formData, score: { ...formData.score, sets: newSets } });
+    };
+    
+    const setSetWinner = (index: number, winner: 'team1' | 'team2' | undefined) => {
+        const newSets: any[] = [...(formData.score?.sets || [])];
+        if (!newSets[index]) newSets[index] = { team1Points: 0, team2Points: 0 };
+        
+        if (winner) newSets[index].winner = winner;
+        else delete newSets[index].winner;
+        
+        setFormData({ ...formData, score: { ...formData.score, sets: newSets } });
+    };
+
+    const addSet = () => setFormData({ ...formData, score: { ...formData.score, sets: [...(formData.score?.sets || []), { team1Points: 0, team2Points: 0 }] } });
+    const removeSet = (index: number) => { const newSets = [...(formData.score?.sets || [])]; newSets.splice(index, 1); setFormData({ ...formData, score: { ...formData.score, sets: newSets } }); };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div><Label>Tournament</Label><Select value={formData.tournamentId} onChange={handleTournamentChange}>{tournaments.map(t => <option key={t.id} value={t.id}>{t.name} ({t.division})</option>)}</Select></div>
+            <div className="grid grid-cols-2 gap-2"><div><Label>Team 1</Label><Select value={formData.team1Id} onChange={e => setFormData({...formData, team1Id: Number(e.target.value)})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div><div><Label>Team 2</Label><Select value={formData.team2Id} onChange={e => setFormData({...formData, team2Id: Number(e.target.value)})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div></div>
+            {availableTeams.length === 0 && <p className="text-xs text-red-400">No teams found.</p>}
+            <div className="grid grid-cols-2 gap-2"><div><Label>Date</Label><Input type="datetime-local" value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} /></div><div><Label>Ground</Label><Input value={formData.ground} onChange={e => setFormData({...formData, ground: e.target.value})} /></div></div>
+            <div><Label>Status</Label><Select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="completed">Completed</option></Select></div>
+            <div><Label>Referee</Label><Select value={refereeSelection} onChange={handleRefereeChange}><option value="">-- Select Team --</option>{teams.sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.name}>{t.name}</option>)}<option value="__manual__">Manual Entry</option></Select>{refereeSelection === '__manual__' && <Input placeholder="Referee Name" value={formData.referee || ''} onChange={e => setFormData({...formData, referee: e.target.value})} className="mt-2" />}</div>
+
+            {formData.status === 'completed' && (
+                <div className="border-t border-accent pt-4">
+                    <h4 className="font-bold text-white mb-2">Score Details</h4>
+                    <div className="grid grid-cols-2 gap-2 mb-2"><div><Label>T1 Sets Won</Label><Input type="number" value={formData.score.team1Score} onChange={e => setFormData({...formData, score: {...formData.score, team1Score: Number(e.target.value)}})} /></div><div><Label>T2 Sets Won</Label><Input type="number" value={formData.score.team2Score} onChange={e => setFormData({...formData, score: {...formData.score, team2Score: Number(e.target.value)}})} /></div></div>
+                    <div><Label>Result Message</Label><Input value={formData.score.resultMessage} onChange={e => setFormData({...formData, score: {...formData.score, resultMessage: e.target.value}})} placeholder="e.g. Team A won 2-1" /></div>
+                    <div className="mt-2"><Label>Set Scores</Label>
+                        {formData.score.sets?.map((set: any, i: number) => (
+                            <div key={i} className="mb-2 p-2 border border-accent rounded bg-primary/30">
+                                <div className="flex gap-2 items-center">
+                                    <span className="text-xs text-text-secondary w-6">S{i+1}</span>
+                                    <Input type="number" placeholder="T1" value={set.team1Points} onChange={e => updateSet(i, 'team1Points', e.target.value)} className="!mt-0" />
+                                    <Input type="number" placeholder="T2" value={set.team2Points} onChange={e => updateSet(i, 'team2Points', e.target.value)} className="!mt-0" />
+                                    <button type="button" onClick={() => removeSet(i)} className="text-red-500 font-bold px-2">x</button>
+                                </div>
+                                {/* Tie Breaker UI */}
+                                {set.team1Points === set.team2Points && (
+                                    <div className="flex items-center gap-2 mt-2 text-xs">
+                                        <span className="text-text-secondary font-bold">Tie Game Winner:</span>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setSetWinner(i, set.winner === 'team1' ? undefined : 'team1')} 
+                                            className={`px-2 py-1 rounded ${set.winner === 'team1' ? 'bg-green-600 text-white' : 'bg-accent text-text-secondary'}`}
+                                        >
+                                            Team 1
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setSetWinner(i, set.winner === 'team2' ? undefined : 'team2')} 
+                                            className={`px-2 py-1 rounded ${set.winner === 'team2' ? 'bg-green-600 text-white' : 'bg-accent text-text-secondary'}`}
+                                        >
+                                            Team 2
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        <Button onClick={addSet} className="bg-accent text-xs mt-2">Add Set</Button>
+                    </div>
+                    <div className="mt-4 border-t border-accent pt-4"><Label>Man of the Match</Label><Select value={formData.manOfTheMatchId ?? ''} onChange={e => setFormData({...formData, manOfTheMatchId: e.target.value ? Number(e.target.value) : null})}><option value="">-- Select Player --</option>{eligiblePlayers.map(p => { const teamName = teams.find(t => t.id === p.teamId)?.shortName || ''; return <option key={p.id} value={p.id}>{p.name} ({teamName})</option>; })}</Select></div>
+                </div>
+            )}
+            <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
+        </form>
+    );
+};
+
+// ... [Remainder of AdminView content to be included in full]
+// --- SPONSORS ---
+const SponsorsAdmin = () => {
+    const { sponsors, addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter } = useSports();
+    const [editing, setEditing] = useState<Sponsor | Partial<Sponsor> | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const handleSave = async (sponsor: any) => { setError(null); try { sponsor.id ? await updateSponsor(sponsor) : await addSponsor(sponsor); setEditing(null); } catch(e: any) { setError(e.message); } };
+    const handleDelete = async (id: number) => { if(window.confirm('Delete sponsor?')) try { await deleteSponsor(id); } catch(e: any) { alert(e.message); } };
+
+    return (
+        <AdminSection title="Manage Sponsors">
+            <div className="flex justify-end mb-4"><Button onClick={() => setEditing({})}>Add Sponsor</Button></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {sponsors.map(s => (
+                    <div key={s.id} className="bg-accent p-3 rounded flex items-center justify-between">
+                        <div className="flex items-center gap-2">{s.logoUrl ? <img src={s.logoUrl} className="w-8 h-8 object-contain bg-white rounded" alt="" /> : <div className="w-8 h-8 bg-primary rounded" />}<div><p className="font-bold">{s.name}</p><p className="text-xs text-text-secondary">{s.website}</p></div></div>
+                        <div className="flex flex-col gap-1 items-end"><label className="text-xs flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={s.showInFooter} onChange={() => toggleSponsorShowInFooter(s)} /> Footer</label><div className="flex gap-1 mt-1"><Button onClick={() => setEditing(s)} className="bg-blue-600 text-xs px-2 py-1">Edit</Button><Button onClick={() => handleDelete(s.id)} className="bg-red-600 text-xs px-2 py-1">Del</Button></div></div>
+                    </div>
+                ))}
+            </div>
+            {editing && <FormModal title={editing.id ? "Edit Sponsor" : "Add Sponsor"} onClose={() => setEditing(null)}><SponsorForm sponsor={editing} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
+        </AdminSection>
+    );
+};
+const SponsorForm: React.FC<{ sponsor: any, onSave: any, onCancel: any, error: any }> = ({ sponsor, onSave, onCancel, error }) => {
+    const [formData, setFormData] = useState({ name: '', website: '', showInFooter: false, logoUrl: '', ...sponsor });
+    const [file, setFile] = useState<File | null>(null);
+    return (
+        <form onSubmit={e => { e.preventDefault(); onSave({ ...formData, logoFile: file }); }} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
+            <div><Label>Website</Label><Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} /></div>
+            <div><label className="flex items-center gap-2 text-text-primary"><input type="checkbox" checked={formData.showInFooter} onChange={e => setFormData({...formData, showInFooter: e.target.checked})} /> Show in Footer</label></div>
+            <ImageUploadOrUrl label="Logo" urlValue={formData.logoUrl || ''} onUrlChange={(val) => setFormData({...formData, logoUrl: val})} onFileChange={setFile} />
+            <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
+        </form>
+    );
+};
+
+const NoticesAdmin = () => {
+    const { notices, addNotice, deleteNotice } = useSports();
+    const [editing, setEditing] = useState<Partial<Notice> | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const handleSave = async (notice: any) => { setError(null); try { await addNotice(notice); setEditing(null); } catch(e: any) { setError(e.message); } };
+    const handleDelete = async (id: number) => { if(window.confirm('Delete notice?')) try { await deleteNotice(id); } catch(e: any) { alert(e.message); } };
+
+    return (
+        <AdminSection title="Manage Notices">
+             <div className="flex justify-end mb-4"><Button onClick={() => setEditing({ level: 'Information', expiresAt: new Date(Date.now() + 86400000 * 7).toISOString().slice(0,10) })}>Add Notice</Button></div>
+             <div className="space-y-2">{notices.map(n => (<div key={n.id} className="bg-accent p-3 rounded flex justify-between items-start"><div><p className="font-bold text-white"><span className={`text-xs px-1 rounded mr-2 ${n.level === 'Urgent' ? 'bg-red-500' : n.level === 'Warning' ? 'bg-yellow-500 text-black' : 'bg-blue-500'}`}>{n.level}</span>{n.title}</p><p className="text-sm text-text-primary">{n.message}</p><p className="text-xs text-text-secondary mt-1">Expires: {new Date(n.expiresAt).toLocaleDateString()}</p></div><Button onClick={() => handleDelete(n.id)} className="bg-red-600 text-xs px-2 py-1">Del</Button></div>))}</div>
+             {editing && <FormModal title="Add Notice" onClose={() => setEditing(null)}><NoticeForm notice={editing} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
+        </AdminSection>
+    );
+};
+const NoticeForm: React.FC<{ notice: any, onSave: any, onCancel: any, error: any }> = ({ notice, onSave, onCancel, error }) => {
+    const [formData, setFormData] = useState({ title: '', message: '', level: 'Information', expiresAt: '', ...notice });
+    return (
+        <form onSubmit={e => { e.preventDefault(); onSave(formData); }} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div><Label>Title</Label><Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
+            <div><Label>Message</Label><Textarea value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} required rows={3} /></div>
+            <div><Label>Level</Label><Select value={formData.level} onChange={e => setFormData({...formData, level: e.target.value})}><option>Information</option><option>Warning</option><option>Urgent</option></Select></div>
+            <div><Label>Expires At</Label><Input type="date" value={formData.expiresAt} onChange={e => setFormData({...formData, expiresAt: e.target.value})} required /></div>
+            <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
+        </form>
+    );
+};
+
+
 // --- TOURNAMENTS ---
 const TournamentsAdmin = () => {
     const { tournaments, addTournament, updateTournament, deleteTournament, concludeLeaguePhase, fixtures } = useSports();
@@ -201,11 +375,6 @@ const TournamentForm: React.FC<{ tournament: any, onSave: any, onCancel: any, er
         </form>
     );
 };
-
-// ... [Truncated for brevity: Other admin components like TournamentSponsorsModal, TournamentTeamsModal, TournamentSquadsModal, ClubsAdmin, TeamsAdmin, PlayersAdmin, TransfersAdmin kept same as previous code, just re-exporting in full XML block]
-
-// ... TOURNAMENT MODALS, CLUB ADMIN, TEAM ADMIN, PLAYER ADMIN, TRANSFER ADMIN CODE IS IDENTICAL TO PREVIOUS FILE BUT MUST BE INCLUDED IN THE FULL FILE RETURN TO AVOID PARTIAL FILES. 
-// I will include the full file content below.
 
 const TournamentSponsorsModal: React.FC<{ tournament: Tournament, onClose: () => void }> = ({ tournament, onClose }) => {
     const { sponsors, getSponsorsForTournament, updateSponsorsForTournament } = useSports();
@@ -719,176 +888,6 @@ const FixturesAdmin: React.FC<{onEnterLiveMode?: () => void, isManager?: boolean
             </div>
             {editing && <FormModal title={editing.id ? "Edit Fixture" : "Add Fixture"} onClose={() => setEditing(null)}><FixtureForm fixture={editing} teams={teams} tournaments={tournaments} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
         </AdminSection>
-    );
-};
-
-const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tournament[], onSave: any, onCancel: any, error: any }> = ({ fixture, teams, tournaments, onSave, onCancel, error }) => {
-    const { players } = useSports();
-    const toLocalInputString = (dateStr: string) => { if (!dateStr) return ''; const date = new Date(dateStr); const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)); return localDate.toISOString().slice(0, 16); };
-    const getNowLocalString = () => { const now = new Date(); const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)); return localDate.toISOString().slice(0, 16); };
-
-    const [formData, setFormData] = useState({
-        tournamentId: tournaments[0]?.id, team1Id: teams[0]?.id, team2Id: teams[1]?.id, ground: 'Main Court', status: 'upcoming', referee: '', score: { team1Score: 0, team2Score: 0, sets: [], resultMessage: '' }, manOfTheMatchId: null as number | null, ...fixture, dateTime: fixture?.dateTime ? toLocalInputString(fixture.dateTime) : getNowLocalString()
-    });
-    const [refereeSelection, setRefereeSelection] = useState<string>(() => { const currentRef = fixture?.referee; if (!currentRef) return ''; const isKnownTeam = teams.some(t => t.name === currentRef); return isKnownTeam ? currentRef : '__manual__'; });
-
-    const selectedTournament = useMemo(() => tournaments.find(t => t.id === Number(formData.tournamentId)), [tournaments, formData.tournamentId]);
-    const availableTeams = useMemo(() => { if (!selectedTournament) return teams; return teams.filter(t => t.division === selectedTournament.division).sort((a, b) => a.name.localeCompare(b.name)); }, [teams, selectedTournament]);
-    const eligiblePlayers = useMemo(() => { if (!formData.team1Id || !formData.team2Id) return []; return players.filter(p => p.teamId === formData.team1Id || p.teamId === formData.team2Id).sort((a, b) => a.name.localeCompare(b.name)); }, [players, formData.team1Id, formData.team2Id]);
-
-    const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const newId = Number(e.target.value); const newTourney = tournaments.find(t => t.id === newId); let update: any = { tournamentId: newId }; if (newTourney) { const relevantTeams = teams.filter(t => t.division === newTourney.division).sort((a, b) => a.name.localeCompare(b.name)); const t1Exists = relevantTeams.find(t => t.id === formData.team1Id); const t2Exists = relevantTeams.find(t => t.id === formData.team2Id); if (!t1Exists && relevantTeams.length > 0) update.team1Id = relevantTeams[0].id; if (!t2Exists && relevantTeams.length > 1) update.team2Id = relevantTeams[1].id; else if (!t2Exists && relevantTeams.length > 0) update.team2Id = relevantTeams[0].id; } setFormData({ ...formData, ...update }); };
-    const handleRefereeChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const val = e.target.value; setRefereeSelection(val); if (val === '__manual__') setFormData(prev => ({ ...prev, referee: prev.referee || '' })); else setFormData(prev => ({ ...prev, referee: val === '' ? '' : val })); };
-    const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); const localDate = new Date(formData.dateTime); const utcDate = localDate.toISOString(); onSave({ ...formData, dateTime: utcDate }); };
-
-    const updateSet = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
-        const newSets: any[] = [...(formData.score?.sets || [])];
-        if (!newSets[index]) newSets[index] = { team1Points: 0, team2Points: 0 };
-        const currentSet = newSets[index];
-        newSets[index] = { ...currentSet, [field]: Number(value) };
-        
-        // Reset winner if scores diverge
-        if (field === 'team1Points' || field === 'team2Points') {
-            if (newSets[index].team1Points !== newSets[index].team2Points) {
-                delete newSets[index].winner;
-            }
-        }
-        
-        setFormData({ ...formData, score: { ...formData.score, sets: newSets } });
-    };
-    
-    const setSetWinner = (index: number, winner: 'team1' | 'team2' | undefined) => {
-        const newSets: any[] = [...(formData.score?.sets || [])];
-        if (!newSets[index]) newSets[index] = { team1Points: 0, team2Points: 0 };
-        
-        if (winner) newSets[index].winner = winner;
-        else delete newSets[index].winner;
-        
-        setFormData({ ...formData, score: { ...formData.score, sets: newSets } });
-    };
-
-    const addSet = () => setFormData({ ...formData, score: { ...formData.score, sets: [...(formData.score?.sets || []), { team1Points: 0, team2Points: 0 }] } });
-    const removeSet = (index: number) => { const newSets = [...(formData.score?.sets || [])]; newSets.splice(index, 1); setFormData({ ...formData, score: { ...formData.score, sets: newSets } }); };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <ErrorMessage message={error} />}
-            <div><Label>Tournament</Label><Select value={formData.tournamentId} onChange={handleTournamentChange}>{tournaments.map(t => <option key={t.id} value={t.id}>{t.name} ({t.division})</option>)}</Select></div>
-            <div className="grid grid-cols-2 gap-2"><div><Label>Team 1</Label><Select value={formData.team1Id} onChange={e => setFormData({...formData, team1Id: Number(e.target.value)})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div><div><Label>Team 2</Label><Select value={formData.team2Id} onChange={e => setFormData({...formData, team2Id: Number(e.target.value)})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div></div>
-            {availableTeams.length === 0 && <p className="text-xs text-red-400">No teams found.</p>}
-            <div className="grid grid-cols-2 gap-2"><div><Label>Date</Label><Input type="datetime-local" value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} /></div><div><Label>Ground</Label><Input value={formData.ground} onChange={e => setFormData({...formData, ground: e.target.value})} /></div></div>
-            <div><Label>Status</Label><Select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="completed">Completed</option></Select></div>
-            <div><Label>Referee</Label><Select value={refereeSelection} onChange={handleRefereeChange}><option value="">-- Select Team --</option>{teams.sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.name}>{t.name}</option>)}<option value="__manual__">Manual Entry</option></Select>{refereeSelection === '__manual__' && <Input placeholder="Referee Name" value={formData.referee || ''} onChange={e => setFormData({...formData, referee: e.target.value})} className="mt-2" />}</div>
-
-            {formData.status === 'completed' && (
-                <div className="border-t border-accent pt-4">
-                    <h4 className="font-bold text-white mb-2">Score Details</h4>
-                    <div className="grid grid-cols-2 gap-2 mb-2"><div><Label>T1 Sets Won</Label><Input type="number" value={formData.score.team1Score} onChange={e => setFormData({...formData, score: {...formData.score, team1Score: Number(e.target.value)}})} /></div><div><Label>T2 Sets Won</Label><Input type="number" value={formData.score.team2Score} onChange={e => setFormData({...formData, score: {...formData.score, team2Score: Number(e.target.value)}})} /></div></div>
-                    <div><Label>Result Message</Label><Input value={formData.score.resultMessage} onChange={e => setFormData({...formData, score: {...formData.score, resultMessage: e.target.value}})} placeholder="e.g. Team A won 2-1" /></div>
-                    <div className="mt-2"><Label>Set Scores</Label>
-                        {formData.score.sets?.map((set: any, i: number) => (
-                            <div key={i} className="mb-2 p-2 border border-accent rounded bg-primary/30">
-                                <div className="flex gap-2 items-center">
-                                    <span className="text-xs text-text-secondary w-6">S{i+1}</span>
-                                    <Input type="number" placeholder="T1" value={set.team1Points} onChange={e => updateSet(i, 'team1Points', e.target.value)} className="!mt-0" />
-                                    <Input type="number" placeholder="T2" value={set.team2Points} onChange={e => updateSet(i, 'team2Points', e.target.value)} className="!mt-0" />
-                                    <button type="button" onClick={() => removeSet(i)} className="text-red-500 font-bold px-2">x</button>
-                                </div>
-                                {/* Tie Breaker UI */}
-                                {set.team1Points === set.team2Points && (
-                                    <div className="flex items-center gap-2 mt-2 text-xs">
-                                        <span className="text-text-secondary">Service Winner:</span>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setSetWinner(i, set.winner === 'team1' ? undefined : 'team1')} 
-                                            className={`px-2 py-1 rounded ${set.winner === 'team1' ? 'bg-highlight text-white' : 'bg-accent text-text-secondary'}`}
-                                        >
-                                            Team 1
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setSetWinner(i, set.winner === 'team2' ? undefined : 'team2')} 
-                                            className={`px-2 py-1 rounded ${set.winner === 'team2' ? 'bg-highlight text-white' : 'bg-accent text-text-secondary'}`}
-                                        >
-                                            Team 2
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                        <Button onClick={addSet} className="bg-accent text-xs mt-2">Add Set</Button>
-                    </div>
-                    <div className="mt-4 border-t border-accent pt-4"><Label>Man of the Match</Label><Select value={formData.manOfTheMatchId ?? ''} onChange={e => setFormData({...formData, manOfTheMatchId: e.target.value ? Number(e.target.value) : null})}><option value="">-- Select Player --</option>{eligiblePlayers.map(p => { const teamName = teams.find(t => t.id === p.teamId)?.shortName || ''; return <option key={p.id} value={p.id}>{p.name} ({teamName})</option>; })}</Select></div>
-                </div>
-            )}
-            <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
-        </form>
-    );
-};
-
-// --- SPONSORS ---
-const SponsorsAdmin = () => {
-    const { sponsors, addSponsor, updateSponsor, deleteSponsor, toggleSponsorShowInFooter } = useSports();
-    const [editing, setEditing] = useState<Sponsor | Partial<Sponsor> | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const handleSave = async (sponsor: any) => { setError(null); try { sponsor.id ? await updateSponsor(sponsor) : await addSponsor(sponsor); setEditing(null); } catch(e: any) { setError(e.message); } };
-    const handleDelete = async (id: number) => { if(window.confirm('Delete sponsor?')) try { await deleteSponsor(id); } catch(e: any) { alert(e.message); } };
-
-    return (
-        <AdminSection title="Manage Sponsors">
-            <div className="flex justify-end mb-4"><Button onClick={() => setEditing({})}>Add Sponsor</Button></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {sponsors.map(s => (
-                    <div key={s.id} className="bg-accent p-3 rounded flex items-center justify-between">
-                        <div className="flex items-center gap-2">{s.logoUrl ? <img src={s.logoUrl} className="w-8 h-8 object-contain bg-white rounded" alt="" /> : <div className="w-8 h-8 bg-primary rounded" />}<div><p className="font-bold">{s.name}</p><p className="text-xs text-text-secondary">{s.website}</p></div></div>
-                        <div className="flex flex-col gap-1 items-end"><label className="text-xs flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={s.showInFooter} onChange={() => toggleSponsorShowInFooter(s)} /> Footer</label><div className="flex gap-1 mt-1"><Button onClick={() => setEditing(s)} className="bg-blue-600 text-xs px-2 py-1">Edit</Button><Button onClick={() => handleDelete(s.id)} className="bg-red-600 text-xs px-2 py-1">Del</Button></div></div>
-                    </div>
-                ))}
-            </div>
-            {editing && <FormModal title={editing.id ? "Edit Sponsor" : "Add Sponsor"} onClose={() => setEditing(null)}><SponsorForm sponsor={editing} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
-        </AdminSection>
-    );
-};
-const SponsorForm: React.FC<{ sponsor: any, onSave: any, onCancel: any, error: any }> = ({ sponsor, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState({ name: '', website: '', showInFooter: false, logoUrl: '', ...sponsor });
-    const [file, setFile] = useState<File | null>(null);
-    return (
-        <form onSubmit={e => { e.preventDefault(); onSave({ ...formData, logoFile: file }); }} className="space-y-4">
-            {error && <ErrorMessage message={error} />}
-            <div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
-            <div><Label>Website</Label><Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} /></div>
-            <div><label className="flex items-center gap-2 text-text-primary"><input type="checkbox" checked={formData.showInFooter} onChange={e => setFormData({...formData, showInFooter: e.target.checked})} /> Show in Footer</label></div>
-            <ImageUploadOrUrl label="Logo" urlValue={formData.logoUrl || ''} onUrlChange={(val) => setFormData({...formData, logoUrl: val})} onFileChange={setFile} />
-            <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
-        </form>
-    );
-};
-
-const NoticesAdmin = () => {
-    const { notices, addNotice, deleteNotice } = useSports();
-    const [editing, setEditing] = useState<Partial<Notice> | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const handleSave = async (notice: any) => { setError(null); try { await addNotice(notice); setEditing(null); } catch(e: any) { setError(e.message); } };
-    const handleDelete = async (id: number) => { if(window.confirm('Delete notice?')) try { await deleteNotice(id); } catch(e: any) { alert(e.message); } };
-
-    return (
-        <AdminSection title="Manage Notices">
-             <div className="flex justify-end mb-4"><Button onClick={() => setEditing({ level: 'Information', expiresAt: new Date(Date.now() + 86400000 * 7).toISOString().slice(0,10) })}>Add Notice</Button></div>
-             <div className="space-y-2">{notices.map(n => (<div key={n.id} className="bg-accent p-3 rounded flex justify-between items-start"><div><p className="font-bold text-white"><span className={`text-xs px-1 rounded mr-2 ${n.level === 'Urgent' ? 'bg-red-500' : n.level === 'Warning' ? 'bg-yellow-500 text-black' : 'bg-blue-500'}`}>{n.level}</span>{n.title}</p><p className="text-sm text-text-primary">{n.message}</p><p className="text-xs text-text-secondary mt-1">Expires: {new Date(n.expiresAt).toLocaleDateString()}</p></div><Button onClick={() => handleDelete(n.id)} className="bg-red-600 text-xs px-2 py-1">Del</Button></div>))}</div>
-             {editing && <FormModal title="Add Notice" onClose={() => setEditing(null)}><NoticeForm notice={editing} onSave={handleSave} onCancel={() => setEditing(null)} error={error} /></FormModal>}
-        </AdminSection>
-    );
-};
-const NoticeForm: React.FC<{ notice: any, onSave: any, onCancel: any, error: any }> = ({ notice, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState({ title: '', message: '', level: 'Information', expiresAt: '', ...notice });
-    return (
-        <form onSubmit={e => { e.preventDefault(); onSave(formData); }} className="space-y-4">
-            {error && <ErrorMessage message={error} />}
-            <div><Label>Title</Label><Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
-            <div><Label>Message</Label><Textarea value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} required rows={3} /></div>
-            <div><Label>Level</Label><Select value={formData.level} onChange={e => setFormData({...formData, level: e.target.value})}><option>Information</option><option>Warning</option><option>Urgent</option></Select></div>
-            <div><Label>Expires At</Label><Input type="date" value={formData.expiresAt} onChange={e => setFormData({...formData, expiresAt: e.target.value})} required /></div>
-            <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
-        </form>
     );
 };
 

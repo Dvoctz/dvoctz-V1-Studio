@@ -65,9 +65,9 @@ export const ScoreSheetModal: React.FC<ScoreSheetModalProps> = ({ fixture, team1
                     <div key={index} className="flex justify-between items-center bg-accent p-3 rounded-md">
                         <span className="text-sm font-bold text-text-secondary">Set {index + 1}</span>
                         <div className="flex items-center space-x-4 text-lg">
-                            <span className={`font-bold ${t1Won ? 'text-white' : 'text-text-secondary'}`}>{set.team1Points}</span>
+                            <span className={`font-bold ${t1Won ? 'text-white scale-110' : 'text-text-secondary'}`}>{set.team1Points}</span>
                             <span className="text-text-secondary">-</span>
-                            <span className={`font-bold ${t2Won ? 'text-white' : 'text-text-secondary'}`}>{set.team2Points}</span>
+                            <span className={`font-bold ${t2Won ? 'text-white scale-110' : 'text-text-secondary'}`}>{set.team2Points}</span>
                         </div>
                     </div>
                 );

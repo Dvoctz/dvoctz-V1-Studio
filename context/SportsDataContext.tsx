@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer, DbTournamentRoster, DbTournamentTeam } from '../supabaseClient';
@@ -147,14 +147,24 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         error: null,
     });
 
+    // CRITICAL FIX: Use a ref to hold the current state.
+    // This allows fetchData to access the latest state without being recreated
+    // every time the state changes, which breaks the infinite loop in useEffects downstream.
+    const stateRef = useRef(state);
+    useEffect(() => {
+        stateRef.current = state;
+    }, [state]);
+
     const fetchData = useCallback(async <T extends EntityName>(entityName: T): Promise<SportsState[T]> => {
-        if (state[entityName] !== null) {
-            return state[entityName] as SportsState[T];
+        const currentState = stateRef.current;
+
+        if (currentState[entityName] !== null) {
+            return currentState[entityName] as SportsState[T];
         }
 
         // Prevent duplicate requests for the same entity if already loading
-        if (state.loading.has(entityName)) {
-            return state[entityName] as SportsState[T];
+        if (currentState.loading.has(entityName)) {
+            return currentState[entityName] as SportsState[T];
         }
 
         setState(s => ({ ...s, loading: new Set(s.loading).add(entityName) }));
@@ -184,7 +194,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (entityName === 'fixtures') {
                  processedData = (data || []).map(mapFixture);
             } else if (entityName === 'tournaments') {
-                const fixturesData = state.fixtures; 
+                // Access fixtures from the REF to ensure we don't depend on stale closure or trigger rebuilds
+                const fixturesData = stateRef.current.fixtures; 
                 processedData = (data || []).map(mapTournament).map(t => {
                     if (!fixturesData) return { ...t, phase: 'round-robin' as const };
                     const knockoutFixtures = (fixturesData as Fixture[]).some(f => f.tournamentId === t.id && f.stage);
@@ -227,7 +238,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             });
             throw error;
         }
-    }, [supabase, state]);
+    }, [supabase]); // Removed 'state' dependency
 
     const prefetchAllData = useCallback(async () => {
         try {
@@ -393,7 +404,10 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const updatePlayer = useCallback(async (playerData: Player & { photoFile?: File }) => {
-        const originalPlayer = (state.players || []).find(p => p.id === playerData.id);
+        // Use Ref for current players to ensure we have data without adding dependency
+        const currentPlayers = stateRef.current.players || [];
+        const originalPlayer = currentPlayers.find(p => p.id === playerData.id);
+        
         let finalPhotoUrl = playerData.photoUrl;
         if (playerData.photoFile) finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
         
@@ -409,7 +423,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { data, error } = await supabase.from('players').update({ name, team_id: teamId, club_id: clubId, role, stats, photo_url: finalPhotoUrl }).eq('id', id).select().single();
         if (error) throw error;
         setState(s => ({...s, players: (s.players || []).map(p => p.id === id ? mapPlayer(data) : p).sort((a,b) => a.name.localeCompare(b.name)) }));
-    }, [supabase, state.players]);
+    }, [supabase]); // Removed state.players dependency
 
     const deletePlayer = useCallback(async (id: number) => {
         const { error } = await supabase.from('players').delete().eq('id', id);
@@ -772,7 +786,10 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const bulkUpdatePlayerTeam = useCallback(async (playerIds: number[], teamId: number | null) => {
-        const playersToUpdate = (state.players || []).filter(p => playerIds.includes(p.id));
+        // Use ref here to prevent dependency on state.players
+        const currentPlayers = stateRef.current.players || [];
+        const playersToUpdate = currentPlayers.filter(p => playerIds.includes(p.id));
+        
         const newTransfers = playersToUpdate.filter(p => p.teamId !== teamId).map(p => ({ player_id: p.id, from_team_id: p.teamId, to_team_id: teamId, transfer_date: new Date().toISOString(), is_automated: true, notes: 'Automated roster change via admin panel.' }));
         if (newTransfers.length > 0) {
             const { data: insertedTransfers, error: transferError } = await supabase.from('player_transfers').insert(newTransfers).select();
@@ -792,7 +809,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 return { ...s, players: newPlayers.sort((a,b) => a.name.localeCompare(b.name)) };
             });
         }
-    }, [supabase, state.players]);
+    }, [supabase]); // Removed state.players dependency
     
     const updateTournamentTeams = useCallback(async (tournamentId: number, teamIds: number[]) => {
         const { error: deleteError } = await supabase.from('tournament_teams').delete().eq('tournament_id', tournamentId);
@@ -809,24 +826,26 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
 
     const getStandingsForTournament = useCallback((tournamentId: number): TeamStanding[] => {
-        const tournamentFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage);
+        // Access data from REF
+        const currentState = stateRef.current;
+        const tournamentFixtures = (currentState.fixtures || []).filter(f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage);
         const teamIdsInTournament = new Set<number>();
 
-        if (state.tournamentTeams) {
-             state.tournamentTeams
+        if (currentState.tournamentTeams) {
+             currentState.tournamentTeams
                 .filter(tt => tt.tournamentId === tournamentId)
                 .forEach(tt => teamIdsInTournament.add(tt.teamId));
         }
         
-        (state.teams || []).forEach(team => {
+        (currentState.teams || []).forEach(team => {
             if (teamIdsInTournament.has(team.id)) return;
-            const teamFixtures = (state.fixtures || []).filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id) && !f.stage);
+            const teamFixtures = (currentState.fixtures || []).filter(f => f.tournamentId === tournamentId && (f.team1Id === team.id || f.team2Id === team.id) && !f.stage);
             if (teamFixtures.length > 0) teamIdsInTournament.add(team.id);
         });
 
         const standingsMap = new Map<number, TeamStanding>();
         teamIdsInTournament.forEach(id => {
-            const team = (state.teams || []).find(t => t.id === id);
+            const team = (currentState.teams || []).find(t => t.id === id);
             if (team) standingsMap.set(id, { teamId: id, teamName: team.name, logoUrl: team.logoUrl, gamesPlayed: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 });
         });
 
@@ -853,10 +872,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             return a.teamName.localeCompare(b.teamName);
         });
         return standings;
-    }, [state.fixtures, state.teams, state.tournamentTeams]);
+    }, []); // Empty dependency array as we use stateRef
 
      const concludeLeaguePhase = useCallback(async (tournamentId: number) => {
-        const tournament = (state.tournaments || []).find(t => t.id === tournamentId);
+        const currentState = stateRef.current;
+        const tournament = (currentState.tournaments || []).find(t => t.id === tournamentId);
         if (!tournament || tournament.phase !== 'round-robin') throw new Error('Tournament is not in the correct phase.');
         const standings = getStandingsForTournament(tournamentId);
         const newFixtures: Omit<Fixture, 'id' | 'score'>[] = [];
@@ -885,7 +905,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
         await fetchData('fixtures');
         await fetchData('tournaments');
-    }, [supabase, state.tournaments, getStandingsForTournament, fetchData]);
+    }, [supabase, getStandingsForTournament, fetchData]);
 
     const updateTournamentSquad = useCallback(async (tournamentId: number, teamId: number, playerIds: number[]) => {
         const { error: deleteError } = await supabase
@@ -911,38 +931,42 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const getTournamentSquad = useCallback((tournamentId: number, teamId: number): Player[] => {
-        if (!state.tournamentRosters) return [];
-        const rosterPlayerIds = state.tournamentRosters
+        const currentState = stateRef.current;
+        if (!currentState.tournamentRosters) return [];
+        const rosterPlayerIds = currentState.tournamentRosters
             .filter(tr => tr.tournamentId === tournamentId && tr.teamId === teamId)
             .map(tr => tr.playerId);
-        return (state.players || []).filter(p => rosterPlayerIds.includes(p.id));
-    }, [state.tournamentRosters, state.players]);
+        return (currentState.players || []).filter(p => rosterPlayerIds.includes(p.id));
+    }, []);
 
 
     const getActiveNotice = useCallback((): Notice | null => {
-        if (!state.notices) return null;
+        const currentState = stateRef.current;
+        if (!currentState.notices) return null;
         const now = new Date();
-        const activeNotices = state.notices.filter(n => new Date(n.expiresAt) > now).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const activeNotices = currentState.notices.filter(n => new Date(n.expiresAt) > now).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         return activeNotices[0] || null;
-    }, [state.notices]);
+    }, []);
 
     const getSponsorsForTournament = useCallback((tournamentId: number): Sponsor[] => {
-        const sponsorIds = (state.tournamentSponsors || []).filter(ts => ts.tournament_id === tournamentId).map(ts => ts.sponsor_id);
-        return (state.sponsors || []).filter(s => sponsorIds.includes(s.id));
-    }, [state.tournamentSponsors, state.sponsors]);
+        const currentState = stateRef.current;
+        const sponsorIds = (currentState.tournamentSponsors || []).filter(ts => ts.tournament_id === tournamentId).map(ts => ts.sponsor_id);
+        return (currentState.sponsors || []).filter(s => sponsorIds.includes(s.id));
+    }, []);
 
-    const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => (state.tournaments || []).filter(t => t.division === division), [state.tournaments]);
-    const getFixturesByTournament = useCallback((tournamentId: number) => (state.fixtures || []).filter(f => f.tournamentId === tournamentId).sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()), [state.fixtures]);
-    const getClubById = useCallback((clubId: number | null) => (state.clubs || []).find(c => c.id === clubId), [state.clubs]);
-    const getTeamById = useCallback((teamId: number | null) => (state.teams || []).find(t => t.id === teamId), [state.teams]);
-    const getTeamsByClub = useCallback((clubId: number) => (state.teams || []).filter(t => t.clubId === clubId), [state.teams]);
-    const getPlayersByTeam = useCallback((teamId: number) => (state.players || []).filter(p => p.teamId === teamId), [state.players]);
+    // Getters now use stateRef to avoid closure staleness and dependency issues
+    const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => (stateRef.current.tournaments || []).filter(t => t.division === division), []);
+    const getFixturesByTournament = useCallback((tournamentId: number) => (stateRef.current.fixtures || []).filter(f => f.tournamentId === tournamentId).sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()), []);
+    const getClubById = useCallback((clubId: number | null) => (stateRef.current.clubs || []).find(c => c.id === clubId), []);
+    const getTeamById = useCallback((teamId: number | null) => (stateRef.current.teams || []).find(t => t.id === teamId), []);
+    const getTeamsByClub = useCallback((clubId: number) => (stateRef.current.teams || []).filter(t => t.clubId === clubId), []);
+    const getPlayersByTeam = useCallback((teamId: number) => (stateRef.current.players || []).filter(p => p.teamId === teamId), []);
     
     const getPlayersByClub = useCallback((clubId: number): Player[] => {
-        return (state.players || []).filter(p => p.clubId === clubId).sort((a, b) => a.name.localeCompare(b.name));
-    }, [state.players]);
+        return (stateRef.current.players || []).filter(p => p.clubId === clubId).sort((a, b) => a.name.localeCompare(b.name));
+    }, []);
     
-    const getTransfersByPlayerId = useCallback((playerId: number) => (state.playerTransfers || []).filter(t => t.playerId === playerId).sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime()), [state.playerTransfers]);
+    const getTransfersByPlayerId = useCallback((playerId: number) => (stateRef.current.playerTransfers || []).filter(t => t.playerId === playerId).sort((a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime()), []);
 
     const contextValue = {
         ...state,

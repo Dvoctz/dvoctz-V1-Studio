@@ -35,15 +35,15 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
     const handleSetChange = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
         const newSets = [...sets];
         newSets[index] = { ...newSets[index], [field]: parseInt(value) || 0 };
-        // Reset winner if scores become unequal, or keep logic simple and let user change it?
-        // Let's reset winner if the scores are no longer equal to avoid confusion.
-        if (field === 'team1Points' || field === 'team2Points') {
-            const t1 = field === 'team1Points' ? parseInt(value) || 0 : newSets[index].team1Points;
-            const t2 = field === 'team2Points' ? parseInt(value) || 0 : newSets[index].team2Points;
-            if (t1 !== t2) {
-                delete newSets[index].winner;
-            }
+        // If scores become unequal, we generally assume points dictate winner, so we can clear the manual override
+        // However, if they become equal again later, the UI will reappear.
+        const t1 = field === 'team1Points' ? parseInt(value) || 0 : newSets[index].team1Points;
+        const t2 = field === 'team2Points' ? parseInt(value) || 0 : newSets[index].team2Points;
+        
+        if (t1 !== t2) {
+            delete newSets[index].winner;
         }
+        
         setSets(newSets);
     };
 
@@ -64,12 +64,18 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
         let t1Wins = 0;
         let t2Wins = 0;
         sets.forEach(s => {
-            // Priority 1: Explicit winner set (for ties)
-            if (s.winner === 'team1') t1Wins++;
-            else if (s.winner === 'team2') t2Wins++;
+            // Priority 1: Explicit winner set (for ties/service wins)
+            if (s.winner === 'team1') {
+                t1Wins++;
+            } else if (s.winner === 'team2') {
+                t2Wins++;
+            } 
             // Priority 2: Point difference
-            else if (s.team1Points > s.team2Points) t1Wins++;
-            else if (s.team2Points > s.team1Points) t2Wins++;
+            else if (s.team1Points > s.team2Points) {
+                t1Wins++;
+            } else if (s.team2Points > s.team1Points) {
+                t2Wins++;
+            }
         });
         return { 
             team1Score: t1Wins, 
@@ -152,7 +158,7 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
                             {sets.map((set, idx) => {
                                 const isTied = set.team1Points === set.team2Points;
                                 return (
-                                    <div key={idx} className="bg-primary/50 p-2 rounded">
+                                    <div key={idx} className="bg-primary/50 p-2 rounded relative">
                                         <div className="flex items-center gap-2">
                                             <span className="text-text-secondary font-mono w-8 text-sm">S{idx+1}</span>
                                             <input 
@@ -174,20 +180,28 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
                                         </div>
                                         {/* Tie Breaker / Service Winner Selector */}
                                         {isTied && (
-                                            <div className="mt-2 flex items-center justify-between text-xs px-2">
-                                                <span className="text-text-secondary font-semibold">Service Winner:</span>
-                                                <div className="flex gap-2">
+                                            <div className="mt-2 p-2 bg-secondary/50 rounded flex flex-col items-center animate-pulse-slow border border-accent">
+                                                <span className="text-xs text-text-secondary font-bold uppercase tracking-wider mb-2">Tie Game: Select Winner</span>
+                                                <div className="flex gap-2 w-full">
                                                     <button 
                                                         onClick={() => handleSetWinner(idx, set.winner === 'team1' ? undefined : 'team1')}
-                                                        className={`px-3 py-1 rounded transition-colors ${set.winner === 'team1' ? 'bg-highlight text-white' : 'bg-accent text-text-secondary'}`}
+                                                        className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${
+                                                            set.winner === 'team1' 
+                                                                ? 'bg-green-600 text-white shadow-lg transform scale-105' 
+                                                                : 'bg-primary text-text-secondary hover:bg-accent'
+                                                        }`}
                                                     >
-                                                        {team1?.shortName || 'T1'}
+                                                        {team1?.shortName || 'Team 1'}
                                                     </button>
                                                     <button 
                                                         onClick={() => handleSetWinner(idx, set.winner === 'team2' ? undefined : 'team2')}
-                                                        className={`px-3 py-1 rounded transition-colors ${set.winner === 'team2' ? 'bg-highlight text-white' : 'bg-accent text-text-secondary'}`}
+                                                        className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${
+                                                            set.winner === 'team2' 
+                                                                ? 'bg-green-600 text-white shadow-lg transform scale-105' 
+                                                                : 'bg-primary text-text-secondary hover:bg-accent'
+                                                        }`}
                                                     >
-                                                        {team2?.shortName || 'T2'}
+                                                        {team2?.shortName || 'Team 2'}
                                                     </button>
                                                 </div>
                                             </div>
