@@ -5,6 +5,7 @@ import type { Fixture, Tournament, Team, TeamStanding, Player } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
 import { KnockoutBracket } from '../components/KnockoutBracket';
 import { ShareTeamCard } from '../components/ShareTeamCard';
+import { ShareStandingsCard } from '../components/ShareStandingsCard';
 import * as htmlToImage from 'html-to-image';
 
 interface TournamentDetailViewProps {
@@ -530,6 +531,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
   const [refereeFilter, setRefereeFilter] = useState('');
+  const [isGeneratingStandings, setIsGeneratingStandings] = useState(false);
+  const standingsCardRef = useRef<HTMLDivElement>(null);
 
   // Round Robin Fixtures
   const fixtures = useMemo(() => getFixturesByTournament(tournament.id).filter(f => !f.stage), [getFixturesByTournament, tournament.id]);
@@ -609,6 +612,49 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
       if (t) setSelectedTeamForDetails(t);
   }
 
+  const handleShareStandings = async () => {
+        if (!standingsCardRef.current) return;
+        setIsGeneratingStandings(true);
+        
+        try {
+            // Small delay to ensure any rendering is settled
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const dataUrl = await htmlToImage.toPng(standingsCardRef.current, {
+                quality: 0.95,
+                pixelRatio: 2,
+                backgroundColor: '#1a202c',
+                skipFonts: true, // Use system fonts for speed/compatibility
+                width: 540,
+                // DYNAMIC HEIGHT FIX:
+                // We use scrollHeight to capture the full length of the content if it exceeds 960px.
+                height: Math.max(960, standingsCardRef.current.scrollHeight) 
+            });
+
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+            const file = new File([blob], `${tournament.name}-standings.png`, { type: 'image/png' });
+
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `${tournament.name} Standings`,
+                    text: `Current standings for ${tournament.name}`,
+                });
+            } else {
+                const link = document.createElement('a');
+                link.download = `${tournament.name}-standings.png`;
+                link.href = dataUrl;
+                link.click();
+            }
+        } catch (err) {
+            console.error('Failed to generate standings card', err);
+            alert('Could not generate image. Please try again.');
+        } finally {
+            setIsGeneratingStandings(false);
+        }
+    };
+
   const team1 = selectedFixture ? getTeamById(selectedFixture.team1Id) : null;
   const team2 = selectedFixture ? getTeamById(selectedFixture.team2Id) : null;
   
@@ -633,6 +679,16 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
 
   return (
     <div>
+        {/* Hidden Share Card Render */}
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
+            <ShareStandingsCard 
+                ref={standingsCardRef}
+                tournamentName={tournament.name}
+                division={tournament.division}
+                standings={standings}
+            />
+        </div>
+
         <button onClick={onBack} className="flex items-center space-x-2 text-text-secondary hover:text-highlight mb-6 transition-colors">
              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -771,6 +827,22 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
 
             {activeTab === 'standings' && (
                 <>
+                    <div className="flex justify-end mb-4">
+                        <button 
+                            onClick={handleShareStandings}
+                            disabled={isGeneratingStandings}
+                            className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded-full flex items-center gap-2 transition-colors disabled:opacity-50 shadow-lg"
+                        >
+                            {isGeneratingStandings ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                            )}
+                            Share Table
+                        </button>
+                    </div>
                     <StandingsTable standings={standings} onTeamClick={handleTeamClick} />
                         {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
                         <p className="text-center text-yellow-400 p-4 bg-secondary rounded-lg mt-4">The league phase is complete. The top teams have advanced to the knockout stage.</p>
