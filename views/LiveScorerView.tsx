@@ -21,7 +21,7 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
 
     // Initialize state from fixture
     const [status, setStatus] = useState<Fixture['status']>(fixture.status);
-    const [sets, setSets] = useState<{ team1Points: number; team2Points: number }[]>(
+    const [sets, setSets] = useState<{ team1Points: number; team2Points: number; winner?: 'team1' | 'team2' }[]>(
         fixture.score?.sets?.length ? fixture.score.sets : [{ team1Points: 0, team2Points: 0 }]
     );
     const [manOfTheMatchId, setManOfTheMatchId] = useState<number | null>(fixture.manOfTheMatchId || null);
@@ -35,6 +35,25 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
     const handleSetChange = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
         const newSets = [...sets];
         newSets[index] = { ...newSets[index], [field]: parseInt(value) || 0 };
+        // Reset winner if scores become unequal, or keep logic simple and let user change it?
+        // Let's reset winner if the scores are no longer equal to avoid confusion.
+        if (field === 'team1Points' || field === 'team2Points') {
+            const t1 = field === 'team1Points' ? parseInt(value) || 0 : newSets[index].team1Points;
+            const t2 = field === 'team2Points' ? parseInt(value) || 0 : newSets[index].team2Points;
+            if (t1 !== t2) {
+                delete newSets[index].winner;
+            }
+        }
+        setSets(newSets);
+    };
+
+    const handleSetWinner = (index: number, winner: 'team1' | 'team2' | undefined) => {
+        const newSets = [...sets];
+        if (winner) {
+            newSets[index] = { ...newSets[index], winner };
+        } else {
+            delete newSets[index].winner;
+        }
         setSets(newSets);
     };
 
@@ -45,8 +64,12 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
         let t1Wins = 0;
         let t2Wins = 0;
         sets.forEach(s => {
-            if (s.team1Points > s.team2Points) t1Wins++;
-            if (s.team2Points > s.team1Points) t2Wins++;
+            // Priority 1: Explicit winner set (for ties)
+            if (s.winner === 'team1') t1Wins++;
+            else if (s.winner === 'team2') t2Wins++;
+            // Priority 2: Point difference
+            else if (s.team1Points > s.team2Points) t1Wins++;
+            else if (s.team2Points > s.team1Points) t2Wins++;
         });
         return { 
             team1Score: t1Wins, 
@@ -125,28 +148,53 @@ const LiveScoreModal: React.FC<LiveScoreModalProps> = ({ fixture, onClose, onUpd
                     {/* Score Entry */}
                     <div>
                         <label className="block text-sm font-medium text-text-secondary mb-2">Set Scores</label>
-                        <div className="space-y-2">
-                            {sets.map((set, idx) => (
-                                <div key={idx} className="flex items-center gap-2">
-                                    <span className="text-text-secondary font-mono w-8 text-sm">S{idx+1}</span>
-                                    <input 
-                                        type="number" 
-                                        className="bg-primary text-white text-center font-bold text-xl p-2 rounded w-full border border-accent focus:border-highlight"
-                                        value={set.team1Points}
-                                        onChange={(e) => handleSetChange(idx, 'team1Points', e.target.value)}
-                                        onClick={(e) => (e.target as HTMLInputElement).select()}
-                                    />
-                                    <span className="text-text-secondary">-</span>
-                                    <input 
-                                        type="number" 
-                                        className="bg-primary text-white text-center font-bold text-xl p-2 rounded w-full border border-accent focus:border-highlight"
-                                        value={set.team2Points}
-                                        onChange={(e) => handleSetChange(idx, 'team2Points', e.target.value)}
-                                        onClick={(e) => (e.target as HTMLInputElement).select()}
-                                    />
-                                    <button onClick={() => removeSet(idx)} className="p-2 text-red-500 hover:text-red-400">✕</button>
-                                </div>
-                            ))}
+                        <div className="space-y-4">
+                            {sets.map((set, idx) => {
+                                const isTied = set.team1Points === set.team2Points;
+                                return (
+                                    <div key={idx} className="bg-primary/50 p-2 rounded">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-text-secondary font-mono w-8 text-sm">S{idx+1}</span>
+                                            <input 
+                                                type="number" 
+                                                className="bg-primary text-white text-center font-bold text-xl p-2 rounded w-full border border-accent focus:border-highlight"
+                                                value={set.team1Points}
+                                                onChange={(e) => handleSetChange(idx, 'team1Points', e.target.value)}
+                                                onClick={(e) => (e.target as HTMLInputElement).select()}
+                                            />
+                                            <span className="text-text-secondary">-</span>
+                                            <input 
+                                                type="number" 
+                                                className="bg-primary text-white text-center font-bold text-xl p-2 rounded w-full border border-accent focus:border-highlight"
+                                                value={set.team2Points}
+                                                onChange={(e) => handleSetChange(idx, 'team2Points', e.target.value)}
+                                                onClick={(e) => (e.target as HTMLInputElement).select()}
+                                            />
+                                            <button onClick={() => removeSet(idx)} className="p-2 text-red-500 hover:text-red-400">✕</button>
+                                        </div>
+                                        {/* Tie Breaker / Service Winner Selector */}
+                                        {isTied && (
+                                            <div className="mt-2 flex items-center justify-between text-xs px-2">
+                                                <span className="text-text-secondary font-semibold">Service Winner:</span>
+                                                <div className="flex gap-2">
+                                                    <button 
+                                                        onClick={() => handleSetWinner(idx, set.winner === 'team1' ? undefined : 'team1')}
+                                                        className={`px-3 py-1 rounded transition-colors ${set.winner === 'team1' ? 'bg-highlight text-white' : 'bg-accent text-text-secondary'}`}
+                                                    >
+                                                        {team1?.shortName || 'T1'}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleSetWinner(idx, set.winner === 'team2' ? undefined : 'team2')}
+                                                        className={`px-3 py-1 rounded transition-colors ${set.winner === 'team2' ? 'bg-highlight text-white' : 'bg-accent text-text-secondary'}`}
+                                                    >
+                                                        {team2?.shortName || 'T2'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                         <button onClick={addSet} className="mt-3 w-full py-2 bg-accent hover:bg-primary text-text-secondary rounded text-sm font-medium">+ Add Set</button>
                     </div>

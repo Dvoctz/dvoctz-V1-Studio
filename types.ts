@@ -36,7 +36,11 @@ export interface Team {
 export interface Score {
   team1Score: number;
   team2Score: number;
-  sets: { team1Points: number; team2Points: number; }[];
+  sets: { 
+    team1Points: number; 
+    team2Points: number; 
+    winner?: 'team1' | 'team2'; // Explicit winner for tied sets (service rule)
+  }[];
   resultMessage: string;
 }
 
