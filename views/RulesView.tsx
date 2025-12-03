@@ -1,28 +1,47 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
+
+// Helper component to highlight search terms within text
+const HighlightedText: React.FC<{ text: string; highlight: string }> = ({ text, highlight }) => {
+    if (!highlight.trim()) {
+        return <span>{text}</span>;
+    }
+    const regex = new RegExp(`(${highlight})`, 'gi');
+    const parts = text.split(regex);
+    return (
+        <span>
+            {parts.map((part, i) => 
+                regex.test(part) ? (
+                    <span key={i} className="bg-yellow-500 text-black font-bold px-0.5 rounded">{part}</span>
+                ) : (
+                    <span key={i}>{part}</span>
+                )
+            )}
+        </span>
+    );
+};
 
 export const RulesView: React.FC = () => {
     const { updateRules } = useSports();
     const { data: rules, loading } = useEntityData('rules');
     const { userProfile } = useAuth();
+    
+    // Editor State
     const [isEditing, setIsEditing] = useState(false);
     const [content, setContent] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
 
-    // State for AI Q&A
-    const [question, setQuestion] = useState('');
-    const [answer, setAnswer] = useState('');
-    const [isAsking, setIsAsking] = useState(false);
-    const [askError, setAskError] = useState('');
+    // Search State
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         if (rules) {
             setContent(rules);
         }
     }, [rules]);
-    
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -43,51 +62,16 @@ export const RulesView: React.FC = () => {
         setError('');
     };
     
-    const handleAskQuestion = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!question.trim()) return;
-
-        setIsAsking(true);
-        setAnswer('');
-        setAskError('');
+    // Filter logic
+    const displayedParagraphs = useMemo(() => {
+        const rawContent = isEditing ? content : (rules || '');
+        // Split by double newline to identify paragraphs, or single newline if prefer line-by-line
+        const paragraphs = rawContent.split(/\n+/).filter(p => p.trim().length > 0);
         
-        try {
-            const response = await fetch('/api/ask-ai', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ question, rules: content }),
-            });
+        if (!searchTerm.trim()) return paragraphs;
 
-            if (!response.ok) {
-                let errorMessage = `An error occurred: ${response.status} ${response.statusText}`;
-                const responseText = await response.text();
-                try {
-                    const errorData = JSON.parse(responseText);
-                    errorMessage = errorData.error?.message || responseText;
-                } catch (e) {
-                    errorMessage = responseText || errorMessage;
-                }
-                throw new Error(errorMessage);
-            }
-            
-            const data = await response.json();
-            setAnswer(data.answer);
-
-        } catch (err: any) {
-            console.error("Error asking AI assistant:", err);
-            setAskError(err.message || "An unexpected error occurred. Please try again.");
-        } finally {
-            setIsAsking(false);
-        }
-    };
-
-    const handleClear = () => {
-        setQuestion('');
-        setAnswer('');
-        setAskError('');
-    };
+        return paragraphs.filter(p => p.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [rules, content, isEditing, searchTerm]);
 
     const canEdit = userProfile?.role === 'admin' || userProfile?.role === 'content_editor';
 
@@ -105,57 +89,28 @@ export const RulesView: React.FC = () => {
                 )}
             </div>
             
-            <div className="mb-12">
-                 <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
-                     <h2 className="text-2xl font-bold mb-4 text-white">Ask a Question</h2>
-                    <p className="text-text-secondary mb-4">Have a question about the rules? Ask our AI assistant for a clarification based on the official text below.</p>
-                    <form onSubmit={handleAskQuestion} className="space-y-4">
-                        <textarea
-                            value={question}
-                            onChange={(e) => setQuestion(e.target.value)}
-                            className="w-full h-24 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight transition-colors"
-                            placeholder="e.g., How many players are allowed on the court at one time?"
-                            aria-label="Ask a question about the rules"
-                            disabled={isAsking}
+            {/* Search Bar */}
+            <div className="mb-8">
+                <div className="bg-secondary p-4 rounded-lg shadow-lg">
+                    <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                            </svg>
+                        </span>
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search rules (e.g., 'rotation', 'timeouts', 'scoring')..."
+                            className="w-full bg-primary p-3 pl-10 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight transition-colors placeholder-text-secondary"
+                            aria-label="Search rules"
                         />
-                        <div className="flex items-center justify-end space-x-4">
-                            {(answer || askError) && (
-                                <button type="button" onClick={handleClear} disabled={isAsking} className="text-sm text-text-secondary hover:text-white transition-colors">Clear</button>
-                            )}
-                            <button
-                                type="submit"
-                                disabled={!question.trim() || isAsking}
-                                className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
-                            >
-                                {isAsking ? 'Thinking...' : 'Ask Question'}
-                            </button>
-                        </div>
-                    </form>
-                     
-                     {isAsking && (
-                        <div className="text-center p-4 mt-4 text-text-secondary">
-                            <p>Generating answer, please wait...</p>
-                        </div>
-                     )}
-                     
-                     {askError && (
-                         <div className="mt-4 p-4 bg-red-900/50 border border-red-700 text-red-300 rounded-md">
-                             <strong>Error:</strong> {askError}
-                         </div>
-                     )}
+                    </div>
+                </div>
+            </div>
 
-                     {answer && !isAsking && (
-                         <div className="mt-6 pt-6 border-t border-accent">
-                             <h3 className="text-xl font-semibold text-white mb-2">Answer:</h3>
-                             <div className="bg-primary p-4 rounded-md text-text-primary leading-relaxed whitespace-pre-line">
-                                 {answer}
-                             </div>
-                         </div>
-                     )}
-                 </div>
-             </div>
-
-            <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg">
+            <div className="bg-secondary p-6 sm:p-8 rounded-lg shadow-lg min-h-[400px]">
                 {loading ? (
                      <div className="space-y-4 animate-pulse">
                         <div className="h-6 bg-accent rounded w-3/4"></div>
@@ -168,7 +123,7 @@ export const RulesView: React.FC = () => {
                         <textarea
                             value={content}
                             onChange={(e) => setContent(e.target.value)}
-                            className="w-full h-96 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight"
+                            className="w-full h-96 bg-primary p-3 rounded-md text-text-primary border border-accent focus:ring-highlight focus:border-highlight font-mono text-sm"
                             placeholder="Enter the official game rules here. Use double newlines to create separate paragraphs."
                             aria-label="Game rules editor"
                         />
@@ -191,8 +146,19 @@ export const RulesView: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <div className="text-text-primary leading-relaxed whitespace-pre-line prose prose-invert max-w-none">
-                        {content}
+                    <div className="text-text-primary leading-relaxed space-y-4">
+                        {displayedParagraphs.length > 0 ? (
+                            displayedParagraphs.map((paragraph, idx) => (
+                                <p key={idx} className="border-b border-accent/20 pb-2 last:border-0 last:pb-0">
+                                    <HighlightedText text={paragraph} highlight={searchTerm} />
+                                </p>
+                            ))
+                        ) : (
+                            <div className="text-center py-10 text-text-secondary">
+                                <p className="text-lg">No rules found matching "{searchTerm}"</p>
+                                <button onClick={() => setSearchTerm('')} className="mt-2 text-highlight hover:underline">Clear Search</button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
