@@ -2,8 +2,9 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
 import { NoticeBanner } from '../components/NoticeBanner';
-import type { Fixture, Team, Tournament, View, Notice, TeamStanding } from '../types';
+import type { Fixture, Team, Tournament, View, Notice, TeamStanding, Player } from '../types';
 import { ShareFixtureCard } from '../components/ShareFixtureCard';
+import { MVPSpotlightCard } from '../components/MVPSpotlightCard';
 import * as htmlToImage from 'html-to-image';
 
 interface HomeViewProps {
@@ -232,10 +233,11 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
-    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament } = useSports();
+    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams } = useSports();
     // Ensure data is loaded
     useEntityData('fixtures');
     useEntityData('teams');
+    useEntityData('players');
     const { loading: noticesLoading } = useEntityData('notices');
     const { loading: tournamentsLoading } = useEntityData('tournaments');
     
@@ -262,6 +264,44 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     const div2Standings = useMemo(() => 
         activeDiv2Tournament ? getStandingsForTournament(activeDiv2Tournament.id) : [], 
     [activeDiv2Tournament, getStandingsForTournament]);
+
+    // Calculate MVPs for each Division
+    const getMVP = (division: string) => {
+        if (!players || !teams || !fixtures) return null;
+
+        // 1. Identify team IDs in this division
+        const divisionTeamIds = new Set(teams.filter(t => t.division === division).map(t => t.id));
+        
+        // 2. Tally MOTM awards
+        const counts = new Map<number, number>();
+        fixtures.forEach(f => {
+            if (f.manOfTheMatchId) {
+                // Verify player is currently in a team of this division
+                const player = players.find(p => p.id === f.manOfTheMatchId);
+                if (player && player.teamId && divisionTeamIds.has(player.teamId)) {
+                    counts.set(player.id, (counts.get(player.id) || 0) + 1);
+                }
+            }
+        });
+
+        // 3. Find Max
+        let maxId = 0;
+        let maxCount = 0;
+        counts.forEach((count, id) => {
+            if (count > maxCount) {
+                maxCount = count;
+                maxId = id;
+            }
+        });
+
+        if (maxCount === 0) return null;
+        
+        const bestPlayer = players.find(p => p.id === maxId);
+        return bestPlayer ? { player: bestPlayer, count: maxCount } : null;
+    };
+
+    const div1MVP = useMemo(() => getMVP('Division 1'), [players, teams, fixtures]);
+    const div2MVP = useMemo(() => getMVP('Division 2'), [players, teams, fixtures]);
 
 
     return (
@@ -323,6 +363,37 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
                     </div>
                 )}
             </div>
+
+            {/* MVP Section */}
+            {(div1MVP || div2MVP) && (
+                <div className="space-y-6">
+                    <h2 className="text-3xl font-bold text-center mb-6">Season Leaders</h2>
+                    <div className="grid md:grid-cols-2 gap-8 justify-center">
+                        {div1MVP && (
+                            <div className="w-full max-w-sm mx-auto">
+                                <MVPSpotlightCard 
+                                    player={div1MVP.player} 
+                                    team={teams?.find(t => t.id === div1MVP.player.teamId)}
+                                    awardCount={div1MVP.count}
+                                    division="Division 1"
+                                    onClick={() => onNavigate('players')} 
+                                />
+                            </div>
+                        )}
+                        {div2MVP && (
+                            <div className="w-full max-w-sm mx-auto">
+                                <MVPSpotlightCard 
+                                    player={div2MVP.player} 
+                                    team={teams?.find(t => t.id === div2MVP.player.teamId)}
+                                    awardCount={div2MVP.count}
+                                    division="Division 2"
+                                    onClick={() => onNavigate('players')} 
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
             
             {isScheduleModalOpen && <DailyScheduleModal onClose={() => setIsScheduleModalOpen(false)} />}
         </div>
