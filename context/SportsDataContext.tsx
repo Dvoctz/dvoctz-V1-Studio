@@ -483,8 +483,75 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             referee: dbReferee,
             man_of_the_match_id: manOfTheMatchId
         }).eq('id', fixture.id).select().single();
+        
         if (error) throw error;
-        setState(s => ({...s, fixtures: (s.fixtures || []).map(f => f.id === fixture.id ? mapFixture(data) : f) }));
+
+        const updatedFixture = mapFixture(data);
+        setState(s => ({...s, fixtures: (s.fixtures || []).map(f => f.id === fixture.id ? updatedFixture : f) }));
+
+        // --- AUTOMATION FOR DIVISION 2 ---
+        // Automatically generate Final if both Semi-Finals are completed
+        if (updatedFixture.status === 'completed' && updatedFixture.stage === 'semi-final') {
+             const currentTournaments = stateRef.current.tournaments || [];
+             const tournament = currentTournaments.find(t => t.id === updatedFixture.tournamentId);
+             
+             if (tournament && tournament.division === 'Division 2') {
+                 const currentFixtures = stateRef.current.fixtures || [];
+                 const tournamentFixtures = currentFixtures.filter(f => f.tournamentId === updatedFixture.tournamentId);
+                 
+                 // Get Semi Finals
+                 const semiFinals = tournamentFixtures.filter(f => f.stage === 'semi-final');
+                 
+                 // Check if all Semi Finals are completed (should be 2 for Div 2)
+                 const allSemisComplete = semiFinals.length === 2 && semiFinals.every(f => f.status === 'completed');
+                 
+                 if (allSemisComplete) {
+                     // Check if Final already exists
+                     const finalExists = tournamentFixtures.some(f => f.stage === 'final');
+                     
+                     if (!finalExists) {
+                         // Determine Winners
+                         const winners = semiFinals.map(f => {
+                             if (!f.score) return null;
+                             // We assume explicit wins (no draws in knockouts)
+                             if (f.score.team1Score > f.score.team2Score) return f.team1Id;
+                             if (f.score.team2Score > f.score.team1Score) return f.team2Id;
+                             // Fallback: check sets if set scores are tied (shouldn't happen in valid matches)
+                             return null; 
+                         }).filter(id => id !== null) as number[];
+
+                         if (winners.length === 2) {
+                             // Create Final fixture approx 7 days later
+                             const latestDate = semiFinals.reduce((latest, f) => {
+                                 const d = new Date(f.dateTime).getTime();
+                                 return d > latest ? d : latest;
+                             }, 0);
+                             const finalDate = new Date(latestDate + 7 * 24 * 60 * 60 * 1000).toISOString();
+                             
+                             const finalPayload = {
+                                 tournament_id: updatedFixture.tournamentId,
+                                 team1_id: winners[0],
+                                 team2_id: winners[1],
+                                 ground: 'Main Court (TBD)',
+                                 date_time: finalDate,
+                                 status: 'upcoming',
+                                 referee: 'KO_FINAL' // Maps to 'final' stage via mapFixture logic on read
+                             };
+
+                             const { data: finalData, error: finalError } = await supabase.from('fixtures').insert(finalPayload).select().single();
+                             
+                             if (!finalError && finalData) {
+                                 const mappedFinal = mapFixture(finalData);
+                                 setState(s => ({
+                                     ...s,
+                                     fixtures: [...(s.fixtures || []), mappedFinal].sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+                                 }));
+                             }
+                         }
+                     }
+                 }
+             }
+        }
     }, [supabase]);
 
     const deleteFixture = useCallback(async (id: number) => {

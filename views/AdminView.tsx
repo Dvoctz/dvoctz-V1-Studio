@@ -129,7 +129,7 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
     const getNowLocalString = () => { const now = new Date(); const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)); return localDate.toISOString().slice(0, 16); };
 
     const [formData, setFormData] = useState({
-        tournamentId: tournaments[0]?.id, team1Id: teams[0]?.id, team2Id: teams[1]?.id, ground: 'Main Court', status: 'upcoming', referee: '', score: { team1Score: 0, team2Score: 0, sets: [], resultMessage: '' }, manOfTheMatchId: null as number | null, ...fixture, dateTime: fixture?.dateTime ? toLocalInputString(fixture.dateTime) : getNowLocalString()
+        tournamentId: tournaments[0]?.id, team1Id: teams[0]?.id, team2Id: teams[1]?.id, ground: 'Main Court', status: 'upcoming', referee: '', score: { team1Score: 0, team2Score: 0, sets: [], resultMessage: '' }, manOfTheMatchId: null as number | null, stage: '', ...fixture, dateTime: fixture?.dateTime ? toLocalInputString(fixture.dateTime) : getNowLocalString()
     });
     const [refereeSelection, setRefereeSelection] = useState<string>(() => { const currentRef = fixture?.referee; if (!currentRef) return ''; const isKnownTeam = teams.some(t => t.name === currentRef); return isKnownTeam ? currentRef : '__manual__'; });
 
@@ -174,6 +174,15 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
         <form onSubmit={handleSubmit} className="space-y-4">
             {error && <ErrorMessage message={error} />}
             <div><Label>Tournament</Label><Select value={formData.tournamentId} onChange={handleTournamentChange}>{tournaments.map(t => <option key={t.id} value={t.id}>{t.name} ({t.division})</option>)}</Select></div>
+            <div>
+                <Label>Stage</Label>
+                <Select value={formData.stage || ''} onChange={e => setFormData({...formData, stage: e.target.value})}>
+                    <option value="">League / Group Stage</option>
+                    <option value="quarter-final">Quarter Final</option>
+                    <option value="semi-final">Semi Final</option>
+                    <option value="final">Final</option>
+                </Select>
+            </div>
             <div className="grid grid-cols-2 gap-2"><div><Label>Team 1</Label><Select value={formData.team1Id} onChange={e => setFormData({...formData, team1Id: Number(e.target.value)})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div><div><Label>Team 2</Label><Select value={formData.team2Id} onChange={e => setFormData({...formData, team2Id: Number(e.target.value)})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div></div>
             {availableTeams.length === 0 && <p className="text-xs text-red-400">No teams found.</p>}
             <div className="grid grid-cols-2 gap-2"><div><Label>Date</Label><Input type="datetime-local" value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} /></div><div><Label>Ground</Label><Input value={formData.ground} onChange={e => setFormData({...formData, ground: e.target.value})} /></div></div>
