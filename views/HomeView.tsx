@@ -5,7 +5,9 @@ import { NoticeBanner } from '../components/NoticeBanner';
 import type { Fixture, Team, Tournament, View, Notice, TeamStanding, Player } from '../types';
 import { ShareFixtureCard } from '../components/ShareFixtureCard';
 import { MVPSpotlightCard } from '../components/MVPSpotlightCard';
+import { ChampionsCard } from '../components/ChampionsCard';
 import * as htmlToImage from 'html-to-image';
+import confetti from 'canvas-confetti';
 
 interface HomeViewProps {
   onNavigate: (view: View) => void;
@@ -242,6 +244,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     const { loading: tournamentsLoading } = useEntityData('tournaments');
     
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+    const [celebrationShown, setCelebrationShown] = useState(false);
 
     const activeNotice = getActiveNotice();
 
@@ -264,6 +267,65 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     const div2Standings = useMemo(() => 
         activeDiv2Tournament ? getStandingsForTournament(activeDiv2Tournament.id) : [], 
     [activeDiv2Tournament, getStandingsForTournament]);
+
+    // Helper: Determine Champion for a division
+    const getChampion = (tournament: Tournament | null) => {
+        if (!tournament || !fixtures || !teams) return null;
+        
+        const finalFixture = fixtures.find(f => f.tournamentId === tournament.id && f.stage === 'final' && f.status === 'completed');
+        if (!finalFixture || !finalFixture.score) return null;
+        
+        const isTeam1Winner = finalFixture.score.team1Score > finalFixture.score.team2Score;
+        const winningTeamId = isTeam1Winner ? finalFixture.team1Id : finalFixture.team2Id;
+        const winningTeam = teams.find(t => t.id === winningTeamId);
+        
+        if (!winningTeam) return null;
+        
+        const resultText = `Won ${Math.max(finalFixture.score.team1Score, finalFixture.score.team2Score)}-${Math.min(finalFixture.score.team1Score, finalFixture.score.team2Score)} in Final`;
+        
+        return {
+            team: winningTeam,
+            tournamentName: tournament.name,
+            division: tournament.division,
+            resultText
+        };
+    };
+
+    const div1Champion = useMemo(() => getChampion(activeDiv1Tournament), [activeDiv1Tournament, fixtures, teams]);
+    const div2Champion = useMemo(() => getChampion(activeDiv2Tournament), [activeDiv2Tournament, fixtures, teams]);
+    
+    // Trigger Confetti if champions exist and haven't shown yet
+    useEffect(() => {
+        if ((div1Champion || div2Champion) && !celebrationShown) {
+            // Trigger confetti
+            const duration = 2000;
+            const end = Date.now() + duration;
+
+            const frame = () => {
+                confetti({
+                    particleCount: 3,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#FFD700', '#FFA500'] 
+                });
+                confetti({
+                    particleCount: 3,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#C0C0C0', '#FFFFFF']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            };
+            frame();
+            setCelebrationShown(true);
+        }
+    }, [div1Champion, div2Champion, celebrationShown]);
+
 
     // Calculate MVPs for each Division
     const getMVP = (division: string) => {
@@ -303,41 +365,100 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     const div1MVP = useMemo(() => getMVP('Division 1'), [players, teams, fixtures]);
     const div2MVP = useMemo(() => getMVP('Division 2'), [players, teams, fixtures]);
 
+    const showSeasonFinale = !!div1Champion || !!div2Champion;
 
     return (
         <div className="space-y-12">
             {!noticesLoading && activeNotice && <NoticeBanner notice={activeNotice} />}
 
-            <div className="text-center p-8 bg-secondary rounded-xl shadow-lg relative overflow-hidden">
-                <div className="relative z-10">
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Welcome to DVOC Tanzania</h1>
-                    <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-6">Your one-stop destination for all Tanzania Traditional Volleyball tournaments, fixtures, teams, and player stats.</p>
-                    
-                    <button 
-                        onClick={() => setIsScheduleModalOpen(true)}
-                        className="inline-flex items-center px-6 py-3 bg-highlight hover:bg-teal-400 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg gap-2"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Get Daily Schedule Card
-                    </button>
-                </div>
-                 {/* Decorative background element */}
-                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-highlight/10 rounded-full blur-3xl"></div>
-                <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
-            </div>
+            {/* CONDITIONAL HEADER: SEASON FINALE OR WELCOME BANNER */}
+            {showSeasonFinale ? (
+                <div className="space-y-8 animate-fade-in-up">
+                    <div className="text-center">
+                         <h1 className="text-4xl md:text-5xl font-black text-white mb-2 uppercase tracking-tight">Season Finale</h1>
+                         <p className="text-highlight font-bold text-lg uppercase tracking-widest">Champions & Award Winners</p>
+                    </div>
 
-            <div className="grid md:grid-cols-2 gap-8">
-                <div className="bg-secondary p-6 rounded-lg cursor-pointer hover:bg-highlight transition-all duration-300 group" onClick={() => onNavigate('tournaments')}>
-                     <h2 className="text-2xl font-bold mb-2 group-hover:text-white">Division 1</h2>
-                     <p className="text-text-secondary group-hover:text-white">Elite competition featuring the top teams.</p>
+                    <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+                         {/* Division 1 Section */}
+                         {div1Champion && (
+                             <div className="space-y-6">
+                                 <ChampionsCard 
+                                     team={div1Champion.team}
+                                     division={div1Champion.division}
+                                     tournamentName={div1Champion.tournamentName}
+                                     resultText={div1Champion.resultText}
+                                     onClick={() => onSelectTournament(activeDiv1Tournament!)}
+                                 />
+                                 {div1MVP && (
+                                     <MVPSpotlightCard 
+                                        player={div1MVP.player} 
+                                        team={teams?.find(t => t.id === div1MVP.player.teamId)}
+                                        awardCount={div1MVP.count}
+                                        division="Division 1"
+                                        onClick={() => onNavigate('players')} 
+                                    />
+                                 )}
+                             </div>
+                         )}
+
+                         {/* Division 2 Section */}
+                         {div2Champion && (
+                             <div className="space-y-6">
+                                 <ChampionsCard 
+                                     team={div2Champion.team}
+                                     division={div2Champion.division}
+                                     tournamentName={div2Champion.tournamentName}
+                                     resultText={div2Champion.resultText}
+                                     onClick={() => onSelectTournament(activeDiv2Tournament!)}
+                                 />
+                                  {div2MVP && (
+                                     <MVPSpotlightCard 
+                                        player={div2MVP.player} 
+                                        team={teams?.find(t => t.id === div2MVP.player.teamId)}
+                                        awardCount={div2MVP.count}
+                                        division="Division 2"
+                                        onClick={() => onNavigate('players')} 
+                                    />
+                                 )}
+                             </div>
+                         )}
+                    </div>
                 </div>
-                 <div className="bg-secondary p-6 rounded-lg cursor-pointer hover:bg-highlight transition-all duration-300 group" onClick={() => onNavigate('tournaments')}>
-                     <h2 className="text-2xl font-bold mb-2 group-hover:text-white">Division 2</h2>
-                     <p className="text-text-secondary group-hover:text-white">Showcasing the rising stars of the league.</p>
+            ) : (
+                <div className="text-center p-8 bg-secondary rounded-xl shadow-lg relative overflow-hidden">
+                    <div className="relative z-10">
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Welcome to DVOC Tanzania</h1>
+                        <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-6">Your one-stop destination for all Tanzania Traditional Volleyball tournaments, fixtures, teams, and player stats.</p>
+                        
+                        <button 
+                            onClick={() => setIsScheduleModalOpen(true)}
+                            className="inline-flex items-center px-6 py-3 bg-highlight hover:bg-teal-400 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Get Daily Schedule Card
+                        </button>
+                    </div>
+                    {/* Decorative background element */}
+                    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-highlight/10 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
                 </div>
-            </div>
+            )}
+
+            {!showSeasonFinale && (
+                <div className="grid md:grid-cols-2 gap-8">
+                    <div className="bg-secondary p-6 rounded-lg cursor-pointer hover:bg-highlight transition-all duration-300 group" onClick={() => onNavigate('tournaments')}>
+                        <h2 className="text-2xl font-bold mb-2 group-hover:text-white">Division 1</h2>
+                        <p className="text-text-secondary group-hover:text-white">Elite competition featuring the top teams.</p>
+                    </div>
+                    <div className="bg-secondary p-6 rounded-lg cursor-pointer hover:bg-highlight transition-all duration-300 group" onClick={() => onNavigate('tournaments')}>
+                        <h2 className="text-2xl font-bold mb-2 group-hover:text-white">Division 2</h2>
+                        <p className="text-text-secondary group-hover:text-white">Showcasing the rising stars of the league.</p>
+                    </div>
+                </div>
+            )}
 
              <div className="space-y-6">
                 <h2 className="text-3xl font-bold text-center mb-6">League Standings</h2>
@@ -364,8 +485,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
                 )}
             </div>
 
-            {/* MVP Section */}
-            {(div1MVP || div2MVP) && (
+            {/* MVP Section - Only show if NOT in Season Finale mode (since they appear at top then) */}
+            {!showSeasonFinale && (div1MVP || div2MVP) && (
                 <div className="space-y-6">
                     <h2 className="text-3xl font-bold text-center mb-6">Season Leaders</h2>
                     <div className="grid md:grid-cols-2 gap-8 justify-center">
