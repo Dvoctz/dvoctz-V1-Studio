@@ -235,7 +235,7 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
-    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams, lastUpdated, prefetchAllData } = useSports();
+    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams, lastUpdated, prefetchAllData, tournaments } = useSports();
     // Ensure data is loaded
     useEntityData('fixtures');
     useEntityData('teams');
@@ -267,21 +267,21 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     const activeDiv1Tournament = useMemo(() => {
         const list = getTournamentsByDivision('Division 1');
         return list.length > 0 ? list.sort((a,b) => b.id - a.id)[0] : null;
-    }, [getTournamentsByDivision]);
+    }, [getTournamentsByDivision, tournaments]); // Added tournaments dependency
 
     const activeDiv2Tournament = useMemo(() => {
         const list = getTournamentsByDivision('Division 2');
         return list.length > 0 ? list.sort((a,b) => b.id - a.id)[0] : null;
-    }, [getTournamentsByDivision]);
+    }, [getTournamentsByDivision, tournaments]); // Added tournaments dependency
 
     // Calculate Standings
     const div1Standings = useMemo(() => 
         activeDiv1Tournament ? getStandingsForTournament(activeDiv1Tournament.id) : [], 
-    [activeDiv1Tournament, getStandingsForTournament]);
+    [activeDiv1Tournament, getStandingsForTournament, fixtures]); // Added fixtures dependency
 
     const div2Standings = useMemo(() => 
         activeDiv2Tournament ? getStandingsForTournament(activeDiv2Tournament.id) : [], 
-    [activeDiv2Tournament, getStandingsForTournament]);
+    [activeDiv2Tournament, getStandingsForTournament, fixtures]); // Added fixtures dependency
 
     // Helper: Determine Champion for a division
     const getChampion = (tournament: Tournament | null) => {
