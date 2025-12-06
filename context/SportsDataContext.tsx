@@ -20,6 +20,7 @@ interface SportsState {
     rules: string | null;
     tournamentRosters: TournamentRoster[] | null;
     tournamentTeams: TournamentTeam[] | null;
+    lastUpdated: Date | null;
     loading: Set<EntityName>;
     error: Error | null;
 }
@@ -143,6 +144,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const { supabase } = useSupabase();
     const [state, setState] = useState<SportsState>({
         tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null, tournamentRosters: null, tournamentTeams: null,
+        lastUpdated: null,
         loading: new Set(),
         error: null,
     });
@@ -313,6 +315,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 rules: processedRules,
                 tournamentRosters: (tournamentRosters || []).map(mapTournamentRoster),
                 tournamentTeams: (tournamentTeams || []).map(mapTournamentTeam),
+                lastUpdated: new Date(),
                 loading: new Set(),
                 error: null
             }));
@@ -1050,6 +1053,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         rules: state.rules || '',
         tournamentRosters: state.tournamentRosters || [],
         tournamentTeams: state.tournamentTeams || [],
+        lastUpdated: state.lastUpdated,
         fetchData,
         prefetchAllData,
         addTournament, updateTournament, deleteTournament,

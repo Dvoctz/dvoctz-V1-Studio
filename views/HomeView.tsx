@@ -235,7 +235,7 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
-    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams } = useSports();
+    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams, lastUpdated } = useSports();
     // Ensure data is loaded
     useEntityData('fixtures');
     useEntityData('teams');
@@ -370,6 +370,13 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     return (
         <div className="space-y-12">
             {!noticesLoading && activeNotice && <NoticeBanner notice={activeNotice} />}
+
+            {/* Last Updated Label - Positioned discreetly */}
+            <div className="flex justify-end -mb-8 relative z-10 mr-2">
+                 <p className="text-[10px] text-text-secondary bg-primary/80 px-2 py-1 rounded border border-accent/50 backdrop-blur-sm">
+                    {lastUpdated ? `Live Data: ${lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Updating...'}
+                 </p>
+            </div>
 
             {/* CONDITIONAL HEADER: SEASON FINALE OR WELCOME BANNER */}
             {showSeasonFinale ? (

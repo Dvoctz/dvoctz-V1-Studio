@@ -49,6 +49,21 @@ const AppContent: React.FC = () => {
       loadData();
   }, [prefetchAllData]);
 
+  // Auto-refresh when app comes to foreground (tab switch, mobile unlock)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('App is visible, refreshing data...');
+        prefetchAllData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [prefetchAllData]);
+
 
   useEffect(() => {
     if (authLoading) return;
