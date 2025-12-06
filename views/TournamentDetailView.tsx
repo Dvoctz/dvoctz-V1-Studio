@@ -67,13 +67,17 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
 
 
     const handleShare = async () => {
-        if (!cardRef.current) return;
         setIsGenerating(true);
         
         try {
-            // Small delay to ensure any rendering is settled
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Delay to ensure render is complete and ref is populated
+            await new Promise(resolve => setTimeout(resolve, 500));
             
+            if (!cardRef.current) {
+                console.error("Card ref not found");
+                return;
+            }
+
             const dataUrl = await htmlToImage.toPng(cardRef.current, {
                 quality: 0.95,
                 pixelRatio: 2,
@@ -155,18 +159,20 @@ const TournamentTeamDetailsModal: React.FC<{ tournament: Tournament; team: Team;
                     </div>
                 </div>
 
-                {/* Hidden Share Card Render */}
-                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
-                    <ShareTeamCard 
-                        ref={cardRef}
-                        team={team}
-                        tournament={tournament}
-                        roster={roster}
-                        upcomingFixtures={upcomingFixtures}
-                        officiatingFixtures={upcomingOfficiating}
-                        getTeam={getTeamById}
-                    />
-                </div>
+                {/* Conditional Share Card Render - Only when needed */}
+                {isGenerating && (
+                    <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
+                        <ShareTeamCard 
+                            ref={cardRef}
+                            team={team}
+                            tournament={tournament}
+                            roster={roster}
+                            upcomingFixtures={upcomingFixtures}
+                            officiatingFixtures={upcomingOfficiating}
+                            getTeam={getTeamById}
+                        />
+                    </div>
+                )}
 
                 {/* Tabs */}
                 <div className="flex border-b border-accent flex-shrink-0">
@@ -618,13 +624,17 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   }
 
   const handleShareStandings = async () => {
-        if (!standingsCardRef.current) return;
         setIsGeneratingStandings(true);
         
         try {
             // Small delay to ensure any rendering is settled
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 500));
             
+            if (!standingsCardRef.current) {
+                console.error("Standings card ref not found");
+                return;
+            }
+
             const dataUrl = await htmlToImage.toPng(standingsCardRef.current, {
                 quality: 0.95,
                 pixelRatio: 2,
@@ -661,13 +671,17 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
     };
     
     const handleShareBracket = async () => {
-        if (!bracketCardRef.current) return;
         setIsGeneratingBracket(true);
         
         try {
             // Small delay to ensure any rendering is settled
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 500));
             
+            if (!bracketCardRef.current) {
+                console.error("Bracket card ref not found");
+                return;
+            }
+
             const dataUrl = await htmlToImage.toPng(bracketCardRef.current, {
                 quality: 0.95,
                 pixelRatio: 1, // 1080px is large enough
@@ -725,25 +739,29 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
 
   return (
     <div>
-        {/* Hidden Share Card Render - Standings */}
-        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
-            <ShareStandingsCard 
-                ref={standingsCardRef}
-                tournamentName={tournament.name}
-                division={tournament.division}
-                standings={standings}
-            />
-        </div>
+        {/* Conditional Share Card Render - Standings */}
+        {isGeneratingStandings && (
+            <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
+                <ShareStandingsCard 
+                    ref={standingsCardRef}
+                    tournamentName={tournament.name}
+                    division={tournament.division}
+                    standings={standings}
+                />
+            </div>
+        )}
 
-        {/* Hidden Share Card Render - Bracket */}
-        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
-            <ShareBracketCard 
-                ref={bracketCardRef}
-                tournament={tournament}
-                fixtures={knockoutFixtures}
-                getTeam={getTeamById}
-            />
-        </div>
+        {/* Conditional Share Card Render - Bracket */}
+        {isGeneratingBracket && (
+            <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
+                <ShareBracketCard 
+                    ref={bracketCardRef}
+                    tournament={tournament}
+                    fixtures={knockoutFixtures}
+                    getTeam={getTeamById}
+                />
+            </div>
+        )}
 
         <button onClick={onBack} className="flex items-center space-x-2 text-text-secondary hover:text-highlight mb-6 transition-colors">
              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
