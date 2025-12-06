@@ -235,7 +235,7 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
-    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams, lastUpdated } = useSports();
+    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams, lastUpdated, prefetchAllData } = useSports();
     // Ensure data is loaded
     useEntityData('fixtures');
     useEntityData('teams');
@@ -245,6 +245,21 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [celebrationShown, setCelebrationShown] = useState(false);
+
+    // REFRESH LOGIC: Force a refresh if data is old or on initial dashboard mount
+    useEffect(() => {
+        // If data hasn't been updated in the last 60 seconds, fetch fresh data
+        const shouldRefresh = !lastUpdated || (new Date().getTime() - lastUpdated.getTime() > 60000);
+        
+        if (shouldRefresh) {
+            // Use setTimeout to avoid blocking the UI render immediately
+            const timer = setTimeout(() => {
+                console.log('Dashboard mounted with stale data, refreshing...');
+                prefetchAllData();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [lastUpdated, prefetchAllData]);
 
     const activeNotice = getActiveNotice();
 
@@ -373,8 +388,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
 
             {/* Last Updated Label - Positioned discreetly */}
             <div className="flex justify-end -mb-8 relative z-10 mr-2">
-                 <p className="text-[10px] text-text-secondary bg-primary/80 px-2 py-1 rounded border border-accent/50 backdrop-blur-sm">
-                    {lastUpdated ? `Live Data: ${lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Updating...'}
+                 <p className="text-[10px] text-text-secondary bg-primary/80 px-2 py-1 rounded border border-accent/50 backdrop-blur-sm transition-opacity duration-500">
+                    {lastUpdated ? `Live Data: ${lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Checking for updates...'}
                  </p>
             </div>
 
