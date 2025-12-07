@@ -133,3 +133,12 @@ export interface TournamentTeam {
   tournamentId: number;
   teamId: number;
 }
+
+export interface TournamentAward {
+  id: number;
+  tournamentId: number;
+  awardName: string;
+  recipientName: string;
+  playerId: number | null; // Null if recipient is not a registered player (e.g. Referee, Sponsor)
+  imageUrl: string | null;
+}

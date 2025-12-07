@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Fixture, Player, Team, Tournament, Sponsor, Score, Club } from './types';
+import type { Fixture, Player, Team, Tournament, Sponsor, Score, Club, TournamentAward } from './types';
 
 // --- IMPORTANT ACTION REQUIRED ---
 // Replace these placeholder values with your actual Supabase credentials.
@@ -52,4 +52,12 @@ export type DbTournamentRoster = {
 export type DbTournamentTeam = {
     tournament_id: number;
     team_id: number;
+};
+export type DbTournamentAward = {
+    id: number;
+    tournament_id: number;
+    award_name: string;
+    recipient_name: string;
+    player_id: number | null;
+    image_url: string | null;
 };

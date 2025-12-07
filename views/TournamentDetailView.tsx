@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSports, useEntityData } from '../context/SportsDataContext';
-import type { Fixture, Tournament, Team, TeamStanding, Player } from '../types';
+import type { Fixture, Tournament, Team, TeamStanding, Player, TournamentAward } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
 import { KnockoutBracket } from '../components/KnockoutBracket';
 import { ShareTeamCard } from '../components/ShareTeamCard';
@@ -517,9 +517,35 @@ const RefereeFixtureCard: React.FC<{ fixture: Fixture }> = ({ fixture }) => {
     )
 };
 
+const AwardCard: React.FC<{ award: TournamentAward, onPlayerClick: (id: number) => void }> = ({ award, onPlayerClick }) => (
+    <div className="bg-secondary p-4 rounded-lg shadow-lg flex flex-col items-center text-center hover:bg-accent transition-colors border border-transparent hover:border-yellow-500/50 group">
+        <div className="w-20 h-20 mb-3 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-300 p-1 shadow-md flex items-center justify-center overflow-hidden">
+            {award.imageUrl ? (
+                <img src={award.imageUrl} alt={award.awardName} className="w-full h-full object-cover rounded-full" />
+            ) : (
+                <div className="text-4xl">🏆</div>
+            )}
+        </div>
+        <h4 className="font-bold text-yellow-400 uppercase tracking-widest text-xs mb-1">{award.awardName}</h4>
+        {award.playerId ? (
+            <button 
+                onClick={() => onPlayerClick(award.playerId!)} 
+                className="text-lg font-black text-white hover:text-highlight transition-colors underline decoration-dotted decoration-text-secondary/50 hover:decoration-highlight"
+            >
+                {award.recipientName}
+            </button>
+        ) : (
+            <span className="text-lg font-black text-white">{award.recipientName}</span>
+        )}
+    </div>
+);
+
 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament: initialTournament, onBack }) => {
-  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, tournaments, fixtures: globalFixtures, teams } = useSports();
+  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, getAwardsByTournament, tournaments, fixtures: globalFixtures, teams, getPlayerById } = useSports();
+  // We need players loaded to link awards
+  useEntityData('players');
+  const { loading: awardsLoading } = useEntityData('tournamentAwards');
   
   // FIX: Get the absolute latest version of the tournament from context.
   const tournament = useMemo(() => tournaments.find(t => t.id === initialTournament.id) || initialTournament, [tournaments, initialTournament]);
@@ -535,7 +561,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
   const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<Team | null>(null);
-  const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees'>('fixtures');
+  const [activeTab, setActiveTab] = useState<'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees' | 'awards'>('fixtures');
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0);
   const [refereeFilter, setRefereeFilter] = useState('');
   const [isGeneratingStandings, setIsGeneratingStandings] = useState(false);
@@ -547,6 +573,9 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   // Round Robin Fixtures
   const fixtures = useMemo(() => getFixturesByTournament(tournament.id).filter(f => !f.stage), [getFixturesByTournament, tournament.id]);
   const knockoutFixtures = useMemo(() => getFixturesByTournament(tournament.id).filter(f => f.stage), [getFixturesByTournament, tournament.id]);
+  
+  // Awards
+  const awards = useMemo(() => getAwardsByTournament(tournament.id), [getAwardsByTournament, tournament.id]);
   
   // Teams participating in this tournament's division (by name, for filtering referee duties)
   const divisionTeamNames = useMemo(() => {
@@ -622,6 +651,13 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
       const t = typeof team === 'number' ? getTeamById(team) : team;
       if (t) setSelectedTeamForDetails(t);
   }
+  
+  const handlePlayerClick = (playerId: number) => {
+      // In a real implementation this would navigate to PlayerDetailView
+      // Since we don't have direct navigation prop here, we'll just log or alert for now
+      // ideally `onNavigate` would be passed down to handle this.
+      console.log('Navigate to player:', playerId);
+  };
 
   const handleShareStandings = async () => {
         setIsGeneratingStandings(true);
@@ -720,7 +756,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   
   const isDataLoading = fixturesLoading || teamsLoading || sponsorsLoading || tsLoading;
 
-  const TabButton: React.FC<{ tab: 'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees'; children: React.ReactNode }> = ({ tab, children }) => (
+  const TabButton: React.FC<{ tab: 'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees' | 'awards'; children: React.ReactNode }> = ({ tab, children }) => (
     <button
       onClick={() => setActiveTab(tab)}
       className={`px-4 sm:px-6 py-3 text-sm sm:text-lg font-semibold transition-colors duration-300 focus:outline-none whitespace-nowrap ${activeTab === tab ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
@@ -831,6 +867,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
             {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
                 <TabButton tab="knockout">Knockout</TabButton>
             )}
+            <TabButton tab="awards">Awards</TabButton>
       </div>
 
       <div className="space-y-6">
@@ -944,6 +981,26 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                     </div>
                     <KnockoutBracket tournament={tournament} />
                 </>
+            )}
+
+            {activeTab === 'awards' && (
+                awardsLoading ? (
+                    <div className="flex justify-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-highlight"></div>
+                    </div>
+                ) : (
+                    awards.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            {awards.map(award => (
+                                <AwardCard key={award.id} award={award} onPlayerClick={handlePlayerClick} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 bg-secondary rounded-lg">
+                            <p className="text-text-secondary text-lg">No awards have been announced for this tournament yet.</p>
+                        </div>
+                    )
+                )
             )}
       </div>
 

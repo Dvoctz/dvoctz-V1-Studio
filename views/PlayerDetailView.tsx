@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
-import type { Player, PlayerTransfer } from '../types';
+import { useSports, useEntityData } from '../context/SportsDataContext';
+import type { Player, PlayerTransfer, TournamentAward } from '../types';
 
 interface PlayerDetailViewProps {
   player: Player;
@@ -43,12 +43,48 @@ const TransferHistory: React.FC<{ transfers: PlayerTransfer[] }> = ({ transfers 
     );
 };
 
+const TrophyCabinet: React.FC<{ awards: TournamentAward[] }> = ({ awards }) => {
+    const { tournaments } = useSports();
+
+    if (awards.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="bg-secondary rounded-lg shadow-lg p-4 mb-8 border border-yellow-500/20">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <span className="text-2xl">🏆</span> Trophy Cabinet
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {awards.map(award => {
+                    const tournament = tournaments.find(t => t.id === award.tournamentId);
+                    return (
+                        <div key={award.id} className="bg-primary p-3 rounded border border-yellow-500/30 flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-yellow-900/30 flex items-center justify-center text-2xl flex-shrink-0">
+                                {award.imageUrl ? <img src={award.imageUrl} className="w-full h-full object-cover rounded-full" alt="" /> : '🥇'}
+                            </div>
+                            <div>
+                                <p className="font-bold text-yellow-400 text-sm uppercase">{award.awardName}</p>
+                                <p className="text-text-secondary text-xs">{tournament ? tournament.name : 'Unknown Tournament'}</p>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 
 export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBack }) => {
-  const { getTeamById, getClubById, getTransfersByPlayerId, fixtures, tournaments } = useSports();
+  const { getTeamById, getClubById, getTransfersByPlayerId, getAwardsByPlayerId, fixtures, tournaments } = useSports();
   const team = getTeamById(player.teamId);
   const club = getClubById(player.clubId);
   const transfers = getTransfersByPlayerId(player.id);
+  const awards = getAwardsByPlayerId(player.id);
+
+  // We need to fetch awards data if not already present
+  useEntityData('tournamentAwards');
 
   // Calculate Man of the Match Awards
   const motmFixtures = useMemo(() => {
@@ -95,6 +131,8 @@ export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBa
         </div>
       </div>
       
+      <TrophyCabinet awards={awards} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>
             <h2 className="text-2xl font-bold mb-4">Match Awards</h2>

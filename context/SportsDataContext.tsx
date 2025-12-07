@@ -2,10 +2,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer, DbTournamentRoster, DbTournamentTeam } from '../supabaseClient';
-import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice, TournamentRoster, TournamentTeam } from '../types';
+import type { DbTournament, DbTeam, DbPlayer, DbFixture, DbSponsor, DbClub, DbPlayerTransfer, DbTournamentRoster, DbTournamentTeam, DbTournamentAward } from '../supabaseClient';
+import type { Tournament, Team, Player, Fixture, Sponsor, TeamStanding, Score, TournamentSponsor, Club, PlayerTransfer, Notice, TournamentRoster, TournamentTeam, TournamentAward } from '../types';
 
-type EntityName = 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters' | 'tournamentTeams';
+type EntityName = 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters' | 'tournamentTeams' | 'tournamentAwards';
 
 interface SportsState {
     tournaments: Tournament[] | null;
@@ -20,6 +20,7 @@ interface SportsState {
     rules: string | null;
     tournamentRosters: TournamentRoster[] | null;
     tournamentTeams: TournamentTeam[] | null;
+    tournamentAwards: TournamentAward[] | null;
     lastUpdated: Date | null;
     loading: Set<EntityName>;
     error: Error | null;
@@ -29,7 +30,7 @@ export type CsvTeam = Omit<Team, 'id' | 'clubId'> & { clubName: string };
 export type CsvPlayer = Omit<Player, 'id' | 'teamId' | 'clubId' | 'stats'> & { teamName?: string; clubName?: string; matches?: string; aces?: string; kills?: string; blocks?: string; };
 
 
-interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters' | 'tournamentTeams'> {
+interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 'teams' | 'players' | 'fixtures' | 'sponsors' | 'tournamentSponsors' | 'playerTransfers' | 'notices' | 'rules' | 'tournamentRosters' | 'tournamentTeams' | 'tournamentAwards'> {
     tournaments: Tournament[];
     clubs: Club[];
     teams: Team[];
@@ -42,6 +43,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     rules: string;
     tournamentRosters: TournamentRoster[];
     tournamentTeams: TournamentTeam[];
+    tournamentAwards: TournamentAward[];
     _internal_state: SportsState;
     fetchData: <T extends EntityName>(entityName: T) => Promise<SportsState[T]>;
     prefetchAllData: () => Promise<void>;
@@ -79,6 +81,8 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     concludeLeaguePhase: (tournamentId: number) => Promise<void>;
     updateTournamentSquad: (tournamentId: number, teamId: number, playerIds: number[]) => Promise<void>;
     updateTournamentTeams: (tournamentId: number, teamIds: number[]) => Promise<void>;
+    addTournamentAward: (award: Omit<TournamentAward, 'id'> & { imageFile?: File }) => Promise<void>;
+    deleteTournamentAward: (id: number) => Promise<void>;
     getActiveNotice: () => Notice | null;
     getSponsorsForTournament: (tournamentId: number) => Sponsor[];
     getTournamentsByDivision: (division: 'Division 1' | 'Division 2') => Tournament[];
@@ -91,6 +95,8 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     getTransfersByPlayerId: (playerId: number) => PlayerTransfer[];
     getStandingsForTournament: (tournamentId: number) => TeamStanding[];
     getTournamentSquad: (tournamentId: number, teamId: number) => Player[];
+    getAwardsByTournament: (tournamentId: number) => TournamentAward[];
+    getAwardsByPlayerId: (playerId: number) => TournamentAward[];
 }
 
 const SportsDataContext = createContext<SportsContextType | undefined>(undefined);
@@ -130,6 +136,7 @@ const mapFixture = (f: any): Fixture => {
 const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({ id: pt.id, playerId: pt.player_id, fromTeamId: pt.from_team_id, toTeamId: pt.to_team_id, transferDate: pt.transfer_date, notes: pt.notes, isAutomated: pt.is_automated });
 const mapTournamentRoster = (tr: DbTournamentRoster): TournamentRoster => ({ id: tr.id, tournamentId: tr.tournament_id, teamId: tr.team_id, playerId: tr.player_id });
 const mapTournamentTeam = (tt: DbTournamentTeam): TournamentTeam => ({ tournamentId: tt.tournament_id, teamId: tt.team_id });
+const mapTournamentAward = (ta: DbTournamentAward): TournamentAward => ({ id: ta.id, tournamentId: ta.tournament_id, awardName: ta.award_name, recipientName: ta.recipient_name, playerId: ta.player_id, imageUrl: ta.image_url });
 
 const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
@@ -143,15 +150,12 @@ const uploadAsset = async (supabase: SupabaseClient, file: File): Promise<string
 export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { supabase } = useSupabase();
     const [state, setState] = useState<SportsState>({
-        tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null, tournamentRosters: null, tournamentTeams: null,
+        tournaments: null, clubs: null, teams: null, players: null, fixtures: null, sponsors: null, tournamentSponsors: null, playerTransfers: null, notices: null, rules: null, tournamentRosters: null, tournamentTeams: null, tournamentAwards: null,
         lastUpdated: null,
         loading: new Set(),
         error: null,
     });
 
-    // CRITICAL FIX: Use a ref to hold the current state.
-    // This allows fetchData to access the latest state without being recreated
-    // every time the state changes, which breaks the infinite loop in useEffects downstream.
     const stateRef = useRef(state);
     useEffect(() => {
         stateRef.current = state;
@@ -164,7 +168,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             return currentState[entityName] as SportsState[T];
         }
 
-        // Prevent duplicate requests for the same entity if already loading
         if (currentState.loading.has(entityName)) {
             return currentState[entityName] as SportsState[T];
         }
@@ -188,6 +191,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 case 'rules': ({ data, error } = await supabase.from('game_rules').select('content').limit(1).maybeSingle()); break;
                 case 'tournamentRosters': ({ data, error } = await supabase.from('tournament_rosters').select('*')); break;
                 case 'tournamentTeams': ({ data, error } = await supabase.from('tournament_teams').select('*')); break;
+                case 'tournamentAwards': ({ data, error } = await supabase.from('tournament_awards').select('*')); break;
             }
 
             if (error) throw error;
@@ -196,7 +200,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (entityName === 'fixtures') {
                  processedData = (data || []).map(mapFixture);
             } else if (entityName === 'tournaments') {
-                // Access fixtures from the REF to ensure we don't depend on stale closure or trigger rebuilds
                 const fixturesData = stateRef.current.fixtures; 
                 processedData = (data || []).map(mapTournament).map(t => {
                     if (!fixturesData) return { ...t, phase: 'round-robin' as const };
@@ -219,8 +222,9 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                     playerTransfers: mapPlayerTransfer, 
                     tournamentSponsors: (d: any) => d,
                     tournamentRosters: mapTournamentRoster,
-                    tournamentTeams: mapTournamentTeam
-                }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors' | 'tournamentRosters' | 'tournamentTeams'];
+                    tournamentTeams: mapTournamentTeam,
+                    tournamentAwards: mapTournamentAward
+                }[entityName as 'clubs' | 'teams' | 'players' | 'sponsors' | 'notices' | 'playerTransfers' | 'tournamentSponsors' | 'tournamentRosters' | 'tournamentTeams' | 'tournamentAwards'];
                 processedData = (data || []).map(mapFn);
             }
             
@@ -240,11 +244,10 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             });
             throw error;
         }
-    }, [supabase]); // Removed 'state' dependency
+    }, [supabase]);
 
     const prefetchAllData = useCallback(async () => {
         try {
-            // Batch 1: Core Data (Split to avoid connection limits)
             const [
                 { data: tournaments, error: errTournaments },
                 { data: fixtures, error: errFixtures },
@@ -262,7 +265,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             if (errTeams) throw errTeams;
             if (errPlayers) throw errPlayers;
 
-            // Batch 2: Secondary Data
             const [
                 { data: clubs, error: errClubs },
                 { data: sponsors, error: errSponsors },
@@ -271,7 +273,8 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 { data: notices, error: errNotices },
                 { data: rules, error: errRules },
                 { data: tournamentRosters, error: errTR },
-                { data: tournamentTeams, error: errTT }
+                { data: tournamentTeams, error: errTT },
+                { data: tournamentAwards, error: errAwards }
             ] = await Promise.all([
                 supabase.from('clubs').select('*').order('name'),
                 supabase.from('sponsors').select('*').order('name'),
@@ -280,16 +283,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 supabase.from('notices').select('*'),
                 supabase.from('game_rules').select('content').limit(1).maybeSingle(),
                 supabase.from('tournament_rosters').select('*'),
-                supabase.from('tournament_teams').select('*')
+                supabase.from('tournament_teams').select('*'),
+                supabase.from('tournament_awards').select('*')
             ]);
             
-            // Note: We don't throw on secondary data errors to allow app to partially load
             if (errClubs) console.error("Error fetching clubs:", errClubs);
 
-            // Process Fixtures First
             const processedFixtures = (fixtures || []).map(mapFixture);
             
-            // Process Tournaments with phase logic
             const processedTournaments = (tournaments || []).map(mapTournament).map(t => {
                 const knockoutFixtures = processedFixtures.some(f => f.tournamentId === t.id && f.stage);
                 const finalFixture = processedFixtures.find(f => f.tournamentId === t.id && f.stage === 'final');
@@ -315,6 +316,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 rules: processedRules,
                 tournamentRosters: (tournamentRosters || []).map(mapTournamentRoster),
                 tournamentTeams: (tournamentTeams || []).map(mapTournamentTeam),
+                tournamentAwards: (tournamentAwards || []).map(mapTournamentAward),
                 lastUpdated: new Date(),
                 loading: new Set(),
                 error: null
@@ -407,14 +409,12 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const updatePlayer = useCallback(async (playerData: Player & { photoFile?: File }) => {
-        // Use Ref for current players to ensure we have data without adding dependency
         const currentPlayers = stateRef.current.players || [];
         const originalPlayer = currentPlayers.find(p => p.id === playerData.id);
         
         let finalPhotoUrl = playerData.photoUrl;
         if (playerData.photoFile) finalPhotoUrl = await uploadAsset(supabase, playerData.photoFile);
         
-        // Transfer Logic
         if (originalPlayer && originalPlayer.teamId !== playerData.teamId) {
             const newTransfer = { player_id: playerData.id, from_team_id: originalPlayer.teamId, to_team_id: playerData.teamId, transfer_date: new Date().toISOString().split('T')[0], is_automated: true, notes: 'Player details updated via admin panel.' };
             const { data: insertedTransfer, error: transferError } = await supabase.from('player_transfers').insert(newTransfer).select().single();
@@ -426,7 +426,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const { data, error } = await supabase.from('players').update({ name, team_id: teamId, club_id: clubId, role, stats, photo_url: finalPhotoUrl }).eq('id', id).select().single();
         if (error) throw error;
         setState(s => ({...s, players: (s.players || []).map(p => p.id === id ? mapPlayer(data) : p).sort((a,b) => a.name.localeCompare(b.name)) }));
-    }, [supabase]); // Removed state.players dependency
+    }, [supabase]);
 
     const deletePlayer = useCallback(async (id: number) => {
         const { error } = await supabase.from('players').delete().eq('id', id);
@@ -492,8 +492,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         const updatedFixture = mapFixture(data);
         setState(s => ({...s, fixtures: (s.fixtures || []).map(f => f.id === fixture.id ? updatedFixture : f) }));
 
-        // --- AUTOMATION FOR DIVISION 2 ---
-        // Automatically generate Final if both Semi-Finals are completed
         if (updatedFixture.status === 'completed' && updatedFixture.stage === 'semi-final') {
              const currentTournaments = stateRef.current.tournaments || [];
              const tournament = currentTournaments.find(t => t.id === updatedFixture.tournamentId);
@@ -502,29 +500,22 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                  const currentFixtures = stateRef.current.fixtures || [];
                  const tournamentFixtures = currentFixtures.filter(f => f.tournamentId === updatedFixture.tournamentId);
                  
-                 // Get Semi Finals
                  const semiFinals = tournamentFixtures.filter(f => f.stage === 'semi-final');
                  
-                 // Check if all Semi Finals are completed (should be 2 for Div 2)
                  const allSemisComplete = semiFinals.length === 2 && semiFinals.every(f => f.status === 'completed');
                  
                  if (allSemisComplete) {
-                     // Check if Final already exists
                      const finalExists = tournamentFixtures.some(f => f.stage === 'final');
                      
                      if (!finalExists) {
-                         // Determine Winners
                          const winners = semiFinals.map(f => {
                              if (!f.score) return null;
-                             // We assume explicit wins (no draws in knockouts)
                              if (f.score.team1Score > f.score.team2Score) return f.team1Id;
                              if (f.score.team2Score > f.score.team1Score) return f.team2Id;
-                             // Fallback: check sets if set scores are tied (shouldn't happen in valid matches)
                              return null; 
                          }).filter(id => id !== null) as number[];
 
                          if (winners.length === 2) {
-                             // Create Final fixture approx 7 days later
                              const latestDate = semiFinals.reduce((latest, f) => {
                                  const d = new Date(f.dateTime).getTime();
                                  return d > latest ? d : latest;
@@ -538,7 +529,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                                  ground: 'Main Court (TBD)',
                                  date_time: finalDate,
                                  status: 'upcoming',
-                                 referee: 'KO_FINAL' // Maps to 'final' stage via mapFixture logic on read
+                                 referee: 'KO_FINAL'
                              };
 
                              const { data: finalData, error: finalError } = await supabase.from('fixtures').insert(finalPayload).select().single();
@@ -856,7 +847,6 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }, [supabase]);
 
     const bulkUpdatePlayerTeam = useCallback(async (playerIds: number[], teamId: number | null) => {
-        // Use ref here to prevent dependency on state.players
         const currentPlayers = stateRef.current.players || [];
         const playersToUpdate = currentPlayers.filter(p => playerIds.includes(p.id));
         
@@ -879,7 +869,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 return { ...s, players: newPlayers.sort((a,b) => a.name.localeCompare(b.name)) };
             });
         }
-    }, [supabase]); // Removed state.players dependency
+    }, [supabase]);
     
     const updateTournamentTeams = useCallback(async (tournamentId: number, teamIds: number[]) => {
         const { error: deleteError } = await supabase.from('tournament_teams').delete().eq('tournament_id', tournamentId);
@@ -894,9 +884,31 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         setState(s => ({ ...s, tournamentTeams: (data || []).map(mapTournamentTeam) }));
     }, [supabase]);
 
+    const addTournamentAward = useCallback(async (award: Omit<TournamentAward, 'id'> & { imageFile?: File }) => {
+        let finalImageUrl = award.imageUrl;
+        if (award.imageFile) finalImageUrl = await uploadAsset(supabase, award.imageFile);
+        
+        const payload = {
+            tournament_id: award.tournamentId,
+            award_name: award.awardName,
+            recipient_name: award.recipientName,
+            player_id: award.playerId,
+            image_url: finalImageUrl
+        };
+
+        const { data, error } = await supabase.from('tournament_awards').insert(payload).select().single();
+        if (error) throw error;
+        setState(s => ({ ...s, tournamentAwards: [...(s.tournamentAwards || []), mapTournamentAward(data)] }));
+    }, [supabase]);
+
+    const deleteTournamentAward = useCallback(async (id: number) => {
+        const { error } = await supabase.from('tournament_awards').delete().eq('id', id);
+        if (error) throw error;
+        setState(s => ({ ...s, tournamentAwards: (s.tournamentAwards || []).filter(a => a.id !== id) }));
+    }, [supabase]);
+
 
     const getStandingsForTournament = useCallback((tournamentId: number): TeamStanding[] => {
-        // Access data from REF
         const currentState = stateRef.current;
         const tournamentFixtures = (currentState.fixtures || []).filter(f => f.tournamentId === tournamentId && f.status === 'completed' && f.score && f.score.sets?.length > 0 && !f.stage);
         const teamIdsInTournament = new Set<number>();
@@ -942,7 +954,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             return a.teamName.localeCompare(b.teamName);
         });
         return standings;
-    }, []); // Empty dependency array as we use stateRef
+    }, []);
 
      const concludeLeaguePhase = useCallback(async (tournamentId: number) => {
         const currentState = stateRef.current;
@@ -1024,7 +1036,16 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         return (currentState.sponsors || []).filter(s => sponsorIds.includes(s.id));
     }, []);
 
-    // Getters now use stateRef to avoid closure staleness and dependency issues
+    const getAwardsByTournament = useCallback((tournamentId: number): TournamentAward[] => {
+        const currentState = stateRef.current;
+        return (currentState.tournamentAwards || []).filter(a => a.tournamentId === tournamentId);
+    }, []);
+
+    const getAwardsByPlayerId = useCallback((playerId: number): TournamentAward[] => {
+        const currentState = stateRef.current;
+        return (currentState.tournamentAwards || []).filter(a => a.playerId === playerId);
+    }, []);
+
     const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => (stateRef.current.tournaments || []).filter(t => t.division === division), []);
     const getFixturesByTournament = useCallback((tournamentId: number) => (stateRef.current.fixtures || []).filter(f => f.tournamentId === tournamentId).sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()), []);
     const getClubById = useCallback((clubId: number | null) => (stateRef.current.clubs || []).find(c => c.id === clubId), []);
@@ -1053,6 +1074,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         rules: state.rules || '',
         tournamentRosters: state.tournamentRosters || [],
         tournamentTeams: state.tournamentTeams || [],
+        tournamentAwards: state.tournamentAwards || [],
         lastUpdated: state.lastUpdated,
         fetchData,
         prefetchAllData,
@@ -1068,10 +1090,11 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         bulkAddOrUpdateTeams, bulkAddOrUpdatePlayers,
         updateSponsorsForTournament, bulkUpdatePlayerTeam, concludeLeaguePhase,
         updateTournamentSquad, updateTournamentTeams,
+        addTournamentAward, deleteTournamentAward,
         getActiveNotice, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
         getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament,
-        getTournamentSquad
+        getTournamentSquad, getAwardsByTournament, getAwardsByPlayerId
     };
 
     return (
@@ -1090,14 +1113,16 @@ export const useSports = (): SportsContextType => {
 };
 
 export const useEntityData = <T extends EntityName>(entityName: T) => {
-    const { [entityName]: data, loading, fetchData } = useSports();
-    
-    useEffect(() => {
-        fetchData(entityName).catch((err) => console.error(`Failed to fetch ${entityName}`, err));
-    }, [entityName, fetchData]);
+    const { _internal_state, fetchData } = useSports();
+    const data = _internal_state[entityName];
+    const loading = _internal_state.loading.has(entityName);
+    const error = _internal_state.error;
 
-    return { 
-        data: data as SportsState[T], 
-        loading: loading.has(entityName) 
-    };
+    useEffect(() => {
+        if (data === null && !loading) {
+            fetchData(entityName);
+        }
+    }, [entityName, data, loading, fetchData]);
+
+    return { data: data as SportsState[T], loading, error };
 };
