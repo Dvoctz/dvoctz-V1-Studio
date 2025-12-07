@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
 import { useSupabase } from './SupabaseContext';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -92,6 +91,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     getTeamsByClub: (clubId: number) => Team[];
     getPlayersByTeam: (teamId: number) => Player[];
     getPlayersByClub: (clubId: number) => Player[];
+    getPlayerById: (playerId: number) => Player | undefined;
     getTransfersByPlayerId: (playerId: number) => PlayerTransfer[];
     getStandingsForTournament: (tournamentId: number) => TeamStanding[];
     getTournamentSquad: (tournamentId: number, teamId: number) => Player[];
@@ -1052,6 +1052,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     const getTeamById = useCallback((teamId: number | null) => (stateRef.current.teams || []).find(t => t.id === teamId), []);
     const getTeamsByClub = useCallback((clubId: number) => (stateRef.current.teams || []).filter(t => t.clubId === clubId), []);
     const getPlayersByTeam = useCallback((teamId: number) => (stateRef.current.players || []).filter(p => p.teamId === teamId), []);
+    const getPlayerById = useCallback((playerId: number) => (stateRef.current.players || []).find(p => p.id === playerId), []);
     
     const getPlayersByClub = useCallback((clubId: number): Player[] => {
         return (stateRef.current.players || []).filter(p => p.clubId === clubId).sort((a, b) => a.name.localeCompare(b.name));
@@ -1093,7 +1094,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         addTournamentAward, deleteTournamentAward,
         getActiveNotice, getSponsorsForTournament, getTournamentsByDivision,
         getFixturesByTournament, getClubById, getTeamById, getTeamsByClub,
-        getPlayersByTeam, getPlayersByClub, getTransfersByPlayerId, getStandingsForTournament,
+        getPlayersByTeam, getPlayersByClub, getPlayerById, getTransfersByPlayerId, getStandingsForTournament,
         getTournamentSquad, getAwardsByTournament, getAwardsByPlayerId
     };
 

@@ -7,6 +7,7 @@ import { TournamentsView } from './views/TournamentsView';
 import { ClubsView } from './views/ClubsView';
 import { PlayersView } from './views/PlayersView';
 import { TransfersView } from './views/TransfersView';
+import { AwardsView } from './views/AwardsView';
 import { TournamentDetailView } from './views/TournamentDetailView';
 import { ClubDetailView } from './views/ClubDetailView';
 import { TeamDetailView } from './views/TeamDetailView';
@@ -171,6 +172,8 @@ const AppContent: React.FC = () => {
         return <ClubsView onSelectClub={handleSelectClub} />;
       case 'players':
         return <PlayersView onSelectPlayer={handleSelectPlayer} />;
+      case 'awards':
+        return <AwardsView onNavigate={handleNavigate} />;
       case 'transfers':
         return <TransfersView />;
       case 'rules':

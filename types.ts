@@ -1,5 +1,5 @@
 
-export type View = 'home' | 'tournaments' | 'clubs' | 'players' | 'transfers' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules' | 'club-detail' | 'player-detail';
+export type View = 'home' | 'tournaments' | 'clubs' | 'players' | 'transfers' | 'awards' | 'tournament-detail' | 'team-detail' | 'admin' | 'login' | 'rules' | 'club-detail' | 'player-detail';
 
 export type PlayerRole = 'Main Netty' | 'Left Front' | 'Right Front' | 'Net Center' | 'Back Center' | 'Left Back' | 'Right Back' | 'Right Netty' | 'Left Netty' | 'Service Man';
 

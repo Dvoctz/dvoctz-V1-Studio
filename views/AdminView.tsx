@@ -121,6 +121,119 @@ export const ImageUploadOrUrl: React.FC<{
     );
 };
 
+const AddAwardForm: React.FC<{ tournamentId: number, players: Player[], onSuccess: () => void, onCancel: () => void, addTournamentAward: any }> = ({ tournamentId, players, onSuccess, onCancel, addTournamentAward }) => {
+    const [awardName, setAwardName] = useState('');
+    const [recipientType, setRecipientType] = useState<'player' | 'manual'>('player');
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
+    const [manualName, setManualName] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [imageUrl, setImageUrl] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const sortedPlayers = useMemo(() => [...players].sort((a,b) => a.name.localeCompare(b.name)), [players]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        setError(null);
+
+        try {
+            if (recipientType === 'player') {
+                const player = players.find(p => p.id === Number(selectedPlayerId));
+                if (!player) throw new Error("Please select a player.");
+                
+                await addTournamentAward({
+                    tournamentId,
+                    awardName,
+                    recipientName: player.name,
+                    playerId: player.id,
+                    imageUrl,
+                    imageFile: file || undefined
+                });
+            } else {
+                if (!manualName.trim()) throw new Error("Please enter recipient name(s).");
+                
+                // Bulk entry logic: split by comma or newline
+                const names = manualName.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+                
+                if (names.length === 0) throw new Error("Please enter at least one name.");
+
+                const promises = names.map(name => addTournamentAward({
+                    tournamentId,
+                    awardName,
+                    recipientName: name,
+                    playerId: null,
+                    imageUrl, // They share the same image (e.g. logo) if provided
+                    imageFile: file || undefined
+                }));
+
+                await Promise.all(promises);
+            }
+            onSuccess();
+        } catch (err: any) {
+            setError(err.message);
+            setSaving(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div>
+                <Label>Award Name</Label>
+                <Input value={awardName} onChange={e => setAwardName(e.target.value)} placeholder="e.g. Most Valuable Player" required />
+            </div>
+            
+            <div>
+                <Label>Recipient Type</Label>
+                <div className="flex gap-4 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" checked={recipientType === 'player'} onChange={() => setRecipientType('player')} className="text-highlight focus:ring-highlight" />
+                        <span className="text-white">Registered Player</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" checked={recipientType === 'manual'} onChange={() => setRecipientType('manual')} className="text-highlight focus:ring-highlight" />
+                        <span className="text-white">External / Other (Bulk)</span>
+                    </label>
+                </div>
+            </div>
+
+            {recipientType === 'player' ? (
+                <div>
+                    <Label>Select Player</Label>
+                    <Select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>
+                        <option value="">-- Choose Player --</option>
+                        {sortedPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </Select>
+                </div>
+            ) : (
+                <div>
+                    <Label>Recipient Name(s)</Label>
+                    <Textarea 
+                        value={manualName} 
+                        onChange={e => setManualName(e.target.value)} 
+                        placeholder="Enter names separated by commas or new lines for bulk entry. e.g. John Doe, Jane Smith" 
+                        rows={4}
+                    />
+                    <p className="text-xs text-text-secondary mt-1">Separate multiple names with commas (,) or new lines to create multiple awards at once.</p>
+                </div>
+            )}
+
+            <ImageUploadOrUrl label="Award Image / Trophy Photo (Optional)" urlValue={imageUrl} onUrlChange={setImageUrl} onFileChange={setFile} />
+
+            <div className="flex justify-end gap-2 pt-4">
+                <Button onClick={onCancel} className="bg-gray-600">Cancel</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Award(s)'}</Button>
+            </div>
+        </form>
+    );
+};
+
+// ... (Rest of AdminView file content remains unchanged, but needs to be included for context if replacing the whole file. 
+// However, since I only provided the specific component update above, I will assume the user or system handles partial updates or I need to provide the full file content if partials aren't supported. 
+// Given the instructions say "Full content of file", I will provide the FULL AdminView.tsx below with the specific change integrated.)
+
 const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tournament[], onSave: any, onCancel: any, error: any }> = ({ fixture, teams, tournaments, onSave, onCancel, error }) => {
     const { players } = useSports();
     const toLocalInputString = (dateStr: string) => { if (!dateStr) return ''; const date = new Date(dateStr); const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)); return localDate.toISOString().slice(0, 16); };
@@ -375,98 +488,6 @@ const TournamentAwardsModal: React.FC<{ tournament: Tournament, onClose: () => v
                 />
             )}
         </FormModal>
-    );
-};
-
-const AddAwardForm: React.FC<{ tournamentId: number, players: Player[], onSuccess: () => void, onCancel: () => void, addTournamentAward: any }> = ({ tournamentId, players, onSuccess, onCancel, addTournamentAward }) => {
-    const [awardName, setAwardName] = useState('');
-    const [recipientType, setRecipientType] = useState<'player' | 'manual'>('player');
-    const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-    const [manualName, setManualName] = useState('');
-    const [file, setFile] = useState<File | null>(null);
-    const [imageUrl, setImageUrl] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const sortedPlayers = useMemo(() => [...players].sort((a,b) => a.name.localeCompare(b.name)), [players]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
-        setError(null);
-
-        try {
-            let recipientName = manualName;
-            let playerId: number | null = null;
-
-            if (recipientType === 'player') {
-                const player = players.find(p => p.id === Number(selectedPlayerId));
-                if (!player) throw new Error("Please select a player.");
-                recipientName = player.name;
-                playerId = player.id;
-            } else {
-                if (!manualName.trim()) throw new Error("Please enter a recipient name.");
-            }
-
-            await addTournamentAward({
-                tournamentId,
-                awardName,
-                recipientName,
-                playerId,
-                imageUrl,
-                imageFile: file || undefined
-            });
-            onSuccess();
-        } catch (err: any) {
-            setError(err.message);
-            setSaving(false);
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <ErrorMessage message={error} />}
-            <div>
-                <Label>Award Name</Label>
-                <Input value={awardName} onChange={e => setAwardName(e.target.value)} placeholder="e.g. Most Valuable Player" required />
-            </div>
-            
-            <div>
-                <Label>Recipient Type</Label>
-                <div className="flex gap-4 mt-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" checked={recipientType === 'player'} onChange={() => setRecipientType('player')} className="text-highlight focus:ring-highlight" />
-                        <span className="text-white">Registered Player</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" checked={recipientType === 'manual'} onChange={() => setRecipientType('manual')} className="text-highlight focus:ring-highlight" />
-                        <span className="text-white">External / Other</span>
-                    </label>
-                </div>
-            </div>
-
-            {recipientType === 'player' ? (
-                <div>
-                    <Label>Select Player</Label>
-                    <Select value={selectedPlayerId} onChange={e => setSelectedPlayerId(e.target.value)}>
-                        <option value="">-- Choose Player --</option>
-                        {sortedPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </Select>
-                </div>
-            ) : (
-                <div>
-                    <Label>Recipient Name</Label>
-                    <Input value={manualName} onChange={e => setManualName(e.target.value)} placeholder="e.g. John Doe (Referee)" />
-                </div>
-            )}
-
-            <ImageUploadOrUrl label="Award Image / Trophy Photo (Optional)" urlValue={imageUrl} onUrlChange={setImageUrl} onFileChange={setFile} />
-
-            <div className="flex justify-end gap-2 pt-4">
-                <Button onClick={onCancel} className="bg-gray-600">Cancel</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Award'}</Button>
-            </div>
-        </form>
     );
 };
 
