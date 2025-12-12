@@ -509,37 +509,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
                     </div>
                 )}
             </div>
-
-            {/* MVP Section - Only show if NOT in Season Finale mode (since they appear at top then) */}
-            {!showSeasonFinale && (div1MVP || div2MVP) && (
-                <div className="space-y-6">
-                    <h2 className="text-3xl font-bold text-center mb-6">Season Leaders</h2>
-                    <div className="grid md:grid-cols-2 gap-8 justify-center">
-                        {div1MVP && (
-                            <div className="w-full max-w-sm mx-auto">
-                                <MVPSpotlightCard 
-                                    player={div1MVP.player} 
-                                    team={teams?.find(t => t.id === div1MVP.player.teamId)}
-                                    awardCount={div1MVP.count}
-                                    division="Division 1"
-                                    onClick={() => onNavigate('players')} 
-                                />
-                            </div>
-                        )}
-                        {div2MVP && (
-                            <div className="w-full max-w-sm mx-auto">
-                                <MVPSpotlightCard 
-                                    player={div2MVP.player} 
-                                    team={teams?.find(t => t.id === div2MVP.player.teamId)}
-                                    awardCount={div2MVP.count}
-                                    division="Division 2"
-                                    onClick={() => onNavigate('players')} 
-                                />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
             
             {isScheduleModalOpen && <DailyScheduleModal onClose={() => setIsScheduleModalOpen(false)} />}
         </div>
