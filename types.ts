@@ -63,6 +63,7 @@ export interface Tournament {
   name: string;
   division: 'Division 1' | 'Division 2';
   phase?: 'round-robin' | 'knockout' | 'completed';
+  showChampionBanner?: boolean;
 }
 
 export interface Sponsor {

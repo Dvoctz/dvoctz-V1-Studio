@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'dvoc-tanzania-cache-v7.3.5'; // Increment version to force update & clear old caches
+const CACHE_NAME = 'dvoc-tanzania-cache-v7.3.6'; // Increment version to force update & clear old caches
 const APP_SHELL_URLS = [
   '/',
   '/index.html',

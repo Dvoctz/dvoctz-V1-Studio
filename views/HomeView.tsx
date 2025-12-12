@@ -287,6 +287,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
     const getChampion = (tournament: Tournament | null) => {
         if (!tournament || !fixtures || !teams) return null;
         
+        // Respect the "Show Champion Banner" toggle from Admin Panel
+        if (tournament.showChampionBanner === false) return null;
+
         const finalFixture = fixtures.find(f => f.tournamentId === tournament.id && f.stage === 'final' && f.status === 'completed');
         if (!finalFixture || !finalFixture.score) return null;
         

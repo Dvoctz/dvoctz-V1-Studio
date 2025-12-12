@@ -230,9 +230,6 @@ const AddAwardForm: React.FC<{ tournamentId: number, players: Player[], onSucces
     );
 };
 
-// ... (Rest of AdminView file content remains unchanged, but needs to be included for context if replacing the whole file. 
-// However, since I only provided the specific component update above, I will assume the user or system handles partial updates or I need to provide the full file content if partials aren't supported. 
-// Given the instructions say "Full content of file", I will provide the FULL AdminView.tsx below with the specific change integrated.)
 
 const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tournament[], onSave: any, onCancel: any, error: any }> = ({ fixture, teams, tournaments, onSave, onCancel, error }) => {
     const { players } = useSports();
@@ -418,12 +415,31 @@ const TournamentsAdmin = () => {
 };
 
 const TournamentForm: React.FC<{ tournament: any, onSave: any, onCancel: any, error: any }> = ({ tournament, onSave, onCancel, error }) => {
-    const [formData, setFormData] = useState({ name: '', division: 'Division 1', ...tournament });
+    // Default showChampionBanner to true if not present
+    const [formData, setFormData] = useState({ 
+        name: '', 
+        division: 'Division 1', 
+        showChampionBanner: true, 
+        ...tournament 
+    });
+    
     return (
         <form onSubmit={e => { e.preventDefault(); onSave(formData); }} className="space-y-4">
             {error && <ErrorMessage message={error} />}
             <div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
             <div><Label>Division</Label><Select value={formData.division} onChange={e => setFormData({...formData, division: e.target.value})}><option>Division 1</option><option>Division 2</option></Select></div>
+            
+             <div className="flex items-center gap-2 bg-primary p-3 rounded border border-accent">
+                <input 
+                    type="checkbox" 
+                    id="showBanner"
+                    checked={formData.showChampionBanner} 
+                    onChange={e => setFormData({...formData, showChampionBanner: e.target.checked})}
+                    className="h-5 w-5 text-highlight rounded focus:ring-highlight bg-secondary border-gray-600"
+                />
+                <label htmlFor="showBanner" className="text-white font-medium cursor-pointer">Show Champion Banner on Dashboard</label>
+            </div>
+
             <div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div>
         </form>
     );
