@@ -747,9 +747,91 @@ const PlayersAdmin = () => {
     );
 }
 const PlayerForm = ({ player, teams, clubs, onSave, onCancel, error }: any) => {
-    const [formData, setFormData] = useState({ name: '', role: 'Main Netty', teamId: '' as string | number, clubId: clubs[0]?.id, photoUrl: '', stats: { matches: 0, aces: 0, kills: 0, blocks: 0 }, ...player });
+    // Helper to format ISO date to YYYY-MM-DD
+    const toInputDate = (isoString?: string) => {
+        if (!isoString) return '';
+        return isoString.split('T')[0];
+    };
+
+    const [formData, setFormData] = useState({ 
+        name: '', 
+        role: 'Main Netty', 
+        teamId: '' as string | number, 
+        clubId: clubs[0]?.id, 
+        photoUrl: '', 
+        joinedAt: player?.joinedAt || new Date().toISOString(), // Initialize with existing or now
+        stats: { matches: 0, aces: 0, kills: 0, blocks: 0 }, 
+        ...player 
+    });
     const [file, setFile] = useState<File | null>(null);
-    return (<form onSubmit={e => { e.preventDefault(); onSave({ ...formData, teamId: formData.teamId ? Number(formData.teamId) : null, clubId: Number(formData.clubId), photoFile: file }); }} className="space-y-4">{error && <ErrorMessage message={error} />}<div><Label>Name</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div><div><Label>Role</Label><Select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>{['Main Netty', 'Left Front', 'Right Front', 'Net Center', 'Back Center', 'Left Back', 'Right Back', 'Right Netty', 'Left Netty', 'Service Man'].map(r => <option key={r} value={r}>{r}</option>)}</Select></div><div><Label>Club</Label><Select value={formData.clubId} onChange={e => setFormData({...formData, clubId: e.target.value})}>{clubs.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></div><div><Label>Team</Label><Select value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}><option value="">-- Unassigned (Club Pool) --</option>{teams.filter((t: any) => t.clubId == formData.clubId).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div><ImageUploadOrUrl label="Photo" urlValue={formData.photoUrl} onUrlChange={v => setFormData({...formData, photoUrl: v})} onFileChange={setFile} /><div className="grid grid-cols-4 gap-2"><div><Label>Matches</Label><Input type="number" value={formData.stats.matches} onChange={e => setFormData({...formData, stats: {...formData.stats, matches: Number(e.target.value)}})} /></div><div><Label>Aces</Label><Input type="number" value={formData.stats.aces} onChange={e => setFormData({...formData, stats: {...formData.stats, aces: Number(e.target.value)}})} /></div><div><Label>Kills</Label><Input type="number" value={formData.stats.kills} onChange={e => setFormData({...formData, stats: {...formData.stats, kills: Number(e.target.value)}})} /></div><div><Label>Blocks</Label><Input type="number" value={formData.stats.blocks} onChange={e => setFormData({...formData, stats: {...formData.stats, blocks: Number(e.target.value)}})} /></div></div><div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div></form>);
+
+    return (
+        <form onSubmit={e => { 
+            e.preventDefault(); 
+            onSave({ 
+                ...formData, 
+                teamId: formData.teamId ? Number(formData.teamId) : null, 
+                clubId: Number(formData.clubId), 
+                photoFile: file 
+            }); 
+        }} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            <div>
+                <Label>Name</Label>
+                <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+            </div>
+            
+            <div>
+                <Label>Role</Label>
+                <Select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                    {['Main Netty', 'Left Front', 'Right Front', 'Net Center', 'Back Center', 'Left Back', 'Right Back', 'Right Netty', 'Left Netty', 'Service Man'].map(r => <option key={r} value={r}>{r}</option>)}
+                </Select>
+            </div>
+            
+            <div>
+                <Label>Joining Date (Registration)</Label>
+                <Input 
+                    type="date" 
+                    value={toInputDate(formData.joinedAt)} 
+                    onChange={e => {
+                        // Create a date object from input value, ensuring it's treated as local time then converted to ISO
+                        // Or simply append a time to make it a valid ISO string
+                        const dateVal = e.target.value ? new Date(e.target.value).toISOString() : new Date().toISOString();
+                        setFormData({...formData, joinedAt: dateVal});
+                    }} 
+                />
+            </div>
+
+            <div>
+                <Label>Club</Label>
+                <Select value={formData.clubId} onChange={e => setFormData({...formData, clubId: e.target.value})}>
+                    {clubs.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+            </div>
+            
+            <div>
+                <Label>Team</Label>
+                <Select value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>
+                    <option value="">-- Unassigned (Club Pool) --</option>
+                    {teams.filter((t: any) => t.clubId == formData.clubId).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </Select>
+            </div>
+            
+            <ImageUploadOrUrl label="Photo" urlValue={formData.photoUrl} onUrlChange={v => setFormData({...formData, photoUrl: v})} onFileChange={setFile} />
+            
+            <div className="grid grid-cols-4 gap-2">
+                <div><Label>Matches</Label><Input type="number" value={formData.stats.matches} onChange={e => setFormData({...formData, stats: {...formData.stats, matches: Number(e.target.value)}})} /></div>
+                <div><Label>Aces</Label><Input type="number" value={formData.stats.aces} onChange={e => setFormData({...formData, stats: {...formData.stats, aces: Number(e.target.value)}})} /></div>
+                <div><Label>Kills</Label><Input type="number" value={formData.stats.kills} onChange={e => setFormData({...formData, stats: {...formData.stats, kills: Number(e.target.value)}})} /></div>
+                <div><Label>Blocks</Label><Input type="number" value={formData.stats.blocks} onChange={e => setFormData({...formData, stats: {...formData.stats, blocks: Number(e.target.value)}})} /></div>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+                <Button onClick={onCancel} className="bg-gray-600">Cancel</Button>
+                <Button type="submit">Save</Button>
+            </div>
+        </form>
+    );
 }
 
 const TransfersAdmin = () => {

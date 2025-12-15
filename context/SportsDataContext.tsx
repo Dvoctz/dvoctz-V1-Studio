@@ -362,7 +362,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         if (player.photoFile) {
             photoUrl = await uploadAsset(supabase, player.photoFile);
         }
-        // Include joined_at defaulting to now for new players
+        
         const { error } = await supabase.from('players').insert([{ 
             name: player.name, 
             role: player.role, 
@@ -370,7 +370,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             club_id: player.clubId, 
             photo_url: photoUrl, 
             stats: player.stats,
-            joined_at: new Date().toISOString()
+            joined_at: player.joinedAt || new Date().toISOString()
         }]);
         if (error) throw error;
         setState(s => ({...s, players: null}));
@@ -382,7 +382,15 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         if (player.photoFile) {
             photoUrl = await uploadAsset(supabase, player.photoFile);
         }
-        const { error } = await supabase.from('players').update({ name: player.name, role: player.role, team_id: player.teamId, club_id: player.clubId, photo_url: photoUrl, stats: player.stats }).eq('id', player.id);
+        const { error } = await supabase.from('players').update({ 
+            name: player.name, 
+            role: player.role, 
+            team_id: player.teamId, 
+            club_id: player.clubId, 
+            photo_url: photoUrl, 
+            stats: player.stats,
+            joined_at: player.joinedAt 
+        }).eq('id', player.id);
         if (error) throw error;
         setState(s => ({...s, players: null}));
         await fetchData('players');
