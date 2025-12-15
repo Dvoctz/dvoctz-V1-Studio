@@ -767,8 +767,181 @@ const TransfersAdmin = () => {
     );
 }
 const TransferForm = ({ transfer, players, teams, onSave, onCancel, error }: any) => {
-    const [formData, setFormData] = useState({ playerId: players[0]?.id, fromTeamId: '' as string | number, toTeamId: '' as string | number, transferDate: new Date().toISOString().slice(0,10), notes: '', ...transfer });
-    return (<form onSubmit={e => { e.preventDefault(); onSave({ ...formData, fromTeamId: formData.fromTeamId ? Number(formData.fromTeamId) : null, toTeamId: formData.toTeamId ? Number(formData.toTeamId) : null }); }} className="space-y-4">{error && <ErrorMessage message={error} />}<div><Label>Player</Label><Select value={formData.playerId} onChange={e => setFormData({...formData, playerId: Number(e.target.value)})}>{players.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div><div className="grid grid-cols-2 gap-2"><div><Label>From Team</Label><Select value={formData.fromTeamId} onChange={e => setFormData({...formData, fromTeamId: e.target.value})}><option value="">Free Agent</option>{teams.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div><div><Label>To Team</Label><Select value={formData.toTeamId} onChange={e => setFormData({...formData, toTeamId: e.target.value})}><option value="">Free Agent</option>{teams.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></div></div><div><Label>Date</Label><Input type="date" value={formData.transferDate} onChange={e => setFormData({...formData, transferDate: e.target.value})} /></div><div><Label>Notes</Label><Input value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} /></div><div className="flex justify-end gap-2"><Button onClick={onCancel} className="bg-gray-600">Cancel</Button><Button type="submit">Save</Button></div></form>);
+    const { getTransfersByPlayerId } = useSports();
+    const [formData, setFormData] = useState({ 
+        playerId: players[0]?.id, 
+        fromTeamId: '' as string | number, 
+        toTeamId: '' as string | number, 
+        transferDate: new Date().toISOString().slice(0,10), 
+        notes: '', 
+        forceOverride: false,
+        ...transfer 
+    });
+    
+    // Eligibility State
+    const [validationStatus, setValidationStatus] = useState<{ status: 'allowed' | 'blocked' | 'internal', message?: string }>({ status: 'allowed' });
+
+    // Derive clubs from selected teams
+    const getClubIdForTeam = (teamId: string | number) => {
+        const team = teams.find((t: any) => t.id === Number(teamId));
+        return team ? team.clubId : null;
+    }
+
+    const fromClubId = getClubIdForTeam(formData.fromTeamId);
+    const toClubId = getClubIdForTeam(formData.toTeamId);
+
+    // Effect to run validation when selections change
+    useEffect(() => {
+        // Reset if basic info missing
+        if (!formData.playerId || !formData.toTeamId) {
+            setValidationStatus({ status: 'allowed' });
+            return;
+        }
+
+        // 1. Check for Internal Movement
+        if (fromClubId && toClubId && fromClubId === toClubId) {
+            setValidationStatus({ 
+                status: 'internal', 
+                message: 'Internal club movement. No waiting period required.' 
+            });
+            return;
+        }
+
+        // 2. External Transfer Logic
+        // Get player history
+        const history = getTransfersByPlayerId(Number(formData.playerId));
+        // Filter history for only external transfers (where fromClub != toClub)
+        // Note: For historical data without club IDs, we assume external if we can't prove internal, 
+        // but better to rely on what we have. If club IDs missing in history, we might fallback to timestamps.
+        const externalTransfers = history.filter(t => {
+             // If we have explicit club IDs in history (after update), use them
+             if (t.fromClubId && t.toClubId) return t.fromClubId !== t.toClubId;
+             // Fallback: assume all historical records might be transfers if not marked otherwise
+             return true; 
+        });
+
+        const player = players.find((p: any) => p.id === Number(formData.playerId));
+        const now = new Date();
+        let eligibilityDate: Date;
+        let reason = "";
+
+        if (externalTransfers.length === 0) {
+            // First Transfer Rule: 6 months from joinedAt
+            const joinedDate = player?.joinedAt ? new Date(player.joinedAt) : new Date(0); // Default to long ago if unknown
+            eligibilityDate = new Date(joinedDate);
+            eligibilityDate.setMonth(eligibilityDate.getMonth() + 6);
+            reason = "First transfer requires 6 months from registration.";
+        } else {
+            // Subsequent Transfer Rule: 1 year from last external transfer
+            // Sort history desc
+            const lastTransfer = externalTransfers[0]; // Already sorted in getTransfersByPlayerId
+            const lastDate = new Date(lastTransfer.transferDate);
+            eligibilityDate = new Date(lastDate);
+            eligibilityDate.setFullYear(eligibilityDate.getFullYear() + 1);
+            reason = "Subsequent transfers require 1 year from last club transfer.";
+        }
+
+        if (now < eligibilityDate) {
+            setValidationStatus({
+                status: 'blocked',
+                message: `Restricted: ${reason} Eligible on ${eligibilityDate.toLocaleDateString()}.`
+            });
+        } else {
+            setValidationStatus({ status: 'allowed' });
+        }
+
+    }, [formData.playerId, formData.fromTeamId, formData.toTeamId, fromClubId, toClubId, getTransfersByPlayerId, players]);
+
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        // Prevent submission if blocked and not overridden
+        if (validationStatus.status === 'blocked' && !formData.forceOverride) {
+            return; // UI disables button, but just in case
+        }
+
+        onSave({ 
+            ...formData, 
+            fromTeamId: formData.fromTeamId ? Number(formData.fromTeamId) : null, 
+            toTeamId: formData.toTeamId ? Number(formData.toTeamId) : null,
+            // Include derived club IDs for the record
+            fromClubId,
+            toClubId
+        }); 
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <ErrorMessage message={error} />}
+            
+            <div>
+                <Label>Player</Label>
+                <Select value={formData.playerId} onChange={e => setFormData({...formData, playerId: Number(e.target.value)})}>
+                    {players.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <Label>From Team</Label>
+                    <Select value={formData.fromTeamId} onChange={e => setFormData({...formData, fromTeamId: e.target.value})}>
+                        <option value="">Free Agent</option>
+                        {teams.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                </div>
+                <div>
+                    <Label>To Team</Label>
+                    <Select value={formData.toTeamId} onChange={e => setFormData({...formData, toTeamId: e.target.value})}>
+                        <option value="">Free Agent</option>
+                        {teams.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                </div>
+            </div>
+
+            {/* Validation Feedback */}
+            {formData.toTeamId && (
+                <div className={`p-3 rounded-md text-sm border ${
+                    validationStatus.status === 'internal' ? 'bg-green-900/30 border-green-700 text-green-200' :
+                    validationStatus.status === 'blocked' ? 'bg-red-900/30 border-red-700 text-red-200' :
+                    'bg-gray-800 border-gray-700 text-gray-400'
+                }`}>
+                    {validationStatus.status === 'internal' && <span className="font-bold block mb-1">✅ Internal Movement</span>}
+                    {validationStatus.status === 'blocked' && <span className="font-bold block mb-1">🚫 Transfer Restricted</span>}
+                    {validationStatus.message || "Standard transfer checks apply."}
+                </div>
+            )}
+
+            {validationStatus.status === 'blocked' && (
+                <div className="flex items-center gap-2 mt-2 bg-red-900/20 p-2 rounded">
+                    <input 
+                        type="checkbox" 
+                        id="override" 
+                        checked={formData.forceOverride}
+                        onChange={e => setFormData({...formData, forceOverride: e.target.checked})}
+                        className="rounded text-red-500 focus:ring-red-500"
+                    />
+                    <label htmlFor="override" className="text-sm text-red-200 font-bold cursor-pointer">
+                        Admin Override (Force Transfer)
+                    </label>
+                </div>
+            )}
+
+            <div><Label>Date</Label><Input type="date" value={formData.transferDate} onChange={e => setFormData({...formData, transferDate: e.target.value})} /></div>
+            <div><Label>Notes</Label><Input value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} /></div>
+            
+            <div className="flex justify-end gap-2">
+                <Button onClick={onCancel} className="bg-gray-600">Cancel</Button>
+                <Button 
+                    type="submit" 
+                    disabled={validationStatus.status === 'blocked' && !formData.forceOverride}
+                    className={validationStatus.status === 'blocked' && !formData.forceOverride ? 'opacity-50 cursor-not-allowed' : ''}
+                >
+                    Save
+                </Button>
+            </div>
+        </form>
+    );
 }
 
 const FixturesAdmin = () => {

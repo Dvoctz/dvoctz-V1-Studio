@@ -105,7 +105,16 @@ const SportsDataContext = createContext<SportsContextType | undefined>(undefined
 // MAPPING FUNCTIONS to convert snake_case from DB to camelCase for the app
 const mapClub = (c: any): Club => ({ id: c.id, name: c.name, logoUrl: c.logo_url });
 const mapTeam = (t: any): Team => ({ id: t.id, name: t.name, shortName: t.short_name, logoUrl: t.logo_url, division: t.division, clubId: t.club_id });
-const mapPlayer = (p: any): Player => ({ id: p.id, name: p.name, teamId: p.team_id, clubId: p.club_id, photoUrl: p.photo_url, role: p.role, stats: p.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 } });
+const mapPlayer = (p: any): Player => ({ 
+    id: p.id, 
+    name: p.name, 
+    teamId: p.team_id, 
+    clubId: p.club_id, 
+    photoUrl: p.photo_url, 
+    role: p.role, 
+    joinedAt: p.joined_at, // Map new field
+    stats: p.stats || { matches: 0, aces: 0, kills: 0, blocks: 0 } 
+});
 const mapSponsor = (s: any): Sponsor => ({ id: s.id, name: s.name, website: s.website, logoUrl: s.logo_url, showInFooter: s.show_in_footer || false });
 const mapTournament = (t: any): Tournament => ({ 
     id: t.id, 
@@ -140,7 +149,17 @@ const mapFixture = (f: any): Fixture => {
         manOfTheMatchId: f.man_of_the_match_id 
     };
 };
-const mapPlayerTransfer = (pt: DbPlayerTransfer): PlayerTransfer => ({ id: pt.id, playerId: pt.player_id, fromTeamId: pt.from_team_id, toTeamId: pt.to_team_id, transferDate: pt.transfer_date, notes: pt.notes, isAutomated: pt.is_automated });
+const mapPlayerTransfer = (pt: any): PlayerTransfer => ({ 
+    id: pt.id, 
+    playerId: pt.player_id, 
+    fromTeamId: pt.from_team_id, 
+    toTeamId: pt.to_team_id, 
+    fromClubId: pt.from_club_id, // Map new field
+    toClubId: pt.to_club_id,     // Map new field
+    transferDate: pt.transfer_date, 
+    notes: pt.notes, 
+    isAutomated: pt.is_automated 
+});
 const mapTournamentRoster = (tr: DbTournamentRoster): TournamentRoster => ({ id: tr.id, tournamentId: tr.tournament_id, teamId: tr.team_id, playerId: tr.player_id });
 const mapTournamentTeam = (tt: DbTournamentTeam): TournamentTeam => ({ tournamentId: tt.tournament_id, teamId: tt.team_id });
 const mapTournamentAward = (ta: DbTournamentAward): TournamentAward => ({ id: ta.id, tournamentId: ta.tournament_id, awardName: ta.award_name, recipientName: ta.recipient_name, playerId: ta.player_id, imageUrl: ta.image_url });
@@ -343,7 +362,16 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         if (player.photoFile) {
             photoUrl = await uploadAsset(supabase, player.photoFile);
         }
-        const { error } = await supabase.from('players').insert([{ name: player.name, role: player.role, team_id: player.teamId, club_id: player.clubId, photo_url: photoUrl, stats: player.stats }]);
+        // Include joined_at defaulting to now for new players
+        const { error } = await supabase.from('players').insert([{ 
+            name: player.name, 
+            role: player.role, 
+            team_id: player.teamId, 
+            club_id: player.clubId, 
+            photo_url: photoUrl, 
+            stats: player.stats,
+            joined_at: new Date().toISOString()
+        }]);
         if (error) throw error;
         setState(s => ({...s, players: null}));
         await fetchData('players');
@@ -469,11 +497,25 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }
 
     const addPlayerTransfer = async (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => {
-        // 1. Record Transfer
-        const { error } = await supabase.from('player_transfers').insert([{ player_id: transfer.playerId, from_team_id: transfer.fromTeamId, to_team_id: transfer.toTeamId, transfer_date: transfer.transferDate, notes: transfer.notes, is_automated: false }]);
+        // 1. Record Transfer with Club info
+        const { error } = await supabase.from('player_transfers').insert([{ 
+            player_id: transfer.playerId, 
+            from_team_id: transfer.fromTeamId, 
+            to_team_id: transfer.toTeamId, 
+            from_club_id: transfer.fromClubId,
+            to_club_id: transfer.toClubId,
+            transfer_date: transfer.transferDate, 
+            notes: transfer.notes, 
+            is_automated: false 
+        }]);
         if (error) throw error;
-        // 2. Update Player's Current Team
-        const { error: pError } = await supabase.from('players').update({ team_id: transfer.toTeamId }).eq('id', transfer.playerId);
+        // 2. Update Player's Current Team and Club
+        // Note: transfer.toClubId must be provided if available, otherwise fallback to team's club via DB triggers or just update team_id
+        // We will update both to be safe
+        const { error: pError } = await supabase.from('players').update({ 
+            team_id: transfer.toTeamId,
+            club_id: transfer.toClubId // Keep club affiliation in sync
+        }).eq('id', transfer.playerId);
         if (pError) throw pError;
         
         setState(s => ({...s, playerTransfers: null, players: null}));
@@ -481,7 +523,15 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
     
     const updatePlayerTransfer = async (transfer: PlayerTransfer) => {
-         const { error } = await supabase.from('player_transfers').update({ player_id: transfer.playerId, from_team_id: transfer.fromTeamId, to_team_id: transfer.toTeamId, transfer_date: transfer.transferDate, notes: transfer.notes }).eq('id', transfer.id);
+         const { error } = await supabase.from('player_transfers').update({ 
+             player_id: transfer.playerId, 
+             from_team_id: transfer.fromTeamId, 
+             to_team_id: transfer.toTeamId, 
+             from_club_id: transfer.fromClubId,
+             to_club_id: transfer.toClubId,
+             transfer_date: transfer.transferDate, 
+             notes: transfer.notes 
+        }).eq('id', transfer.id);
         if (error) throw error;
         setState(s => ({...s, playerTransfers: null}));
         await fetchData('playerTransfers');

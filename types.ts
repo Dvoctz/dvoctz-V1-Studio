@@ -10,6 +10,7 @@ export interface Player {
   clubId: number | null; // Added to support Club Pools
   photoUrl: string | null;
   role: PlayerRole;
+  joinedAt?: string; // New field for registration date
   stats?: {
     matches: number;
     aces: number;
@@ -107,6 +108,9 @@ export interface PlayerTransfer {
   playerId: number;
   fromTeamId: number | null;
   toTeamId: number | null;
+  // New fields for club-level logic
+  fromClubId?: number | null;
+  toClubId?: number | null;
   transferDate: string;
   notes: string | null;
   isAutomated: boolean;
