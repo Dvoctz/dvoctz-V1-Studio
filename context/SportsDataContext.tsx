@@ -926,7 +926,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         await fetchData('tournamentAwards');
     };
 
-    const value = {
+    const value: SportsContextType = {
         ...state,
         _internal_state: state,
         fetchData,
@@ -982,6 +982,19 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         addTournamentAward,
         deleteTournamentAward,
         getAwardsByPlayerId,
+        // Overrides to prevent null values being passed to consumers
+        tournaments: state.tournaments || [],
+        clubs: state.clubs || [],
+        teams: state.teams || [],
+        players: state.players || [],
+        fixtures: state.fixtures || [],
+        sponsors: state.sponsors || [],
+        tournamentSponsors: state.tournamentSponsors || [],
+        playerTransfers: state.playerTransfers || [],
+        notices: state.notices || [],
+        rules: state.rules || '',
+        tournamentRosters: state.tournamentRosters || [],
+        tournamentTeams: state.tournamentTeams || [],
         tournamentAwards: state.tournamentAwards || []
     };
 
