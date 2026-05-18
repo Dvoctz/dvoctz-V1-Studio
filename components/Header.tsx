@@ -89,9 +89,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
             <NavLink view="awards" currentView={currentView} onNavigate={onNavigate}>Awards</NavLink>
             <NavLink view="transfers" currentView={currentView} onNavigate={onNavigate}>Transfers</NavLink>
             <NavLink view="rules" currentView={currentView} onNavigate={onNavigate}>Rules</NavLink>
-            <NavLink view="admin" currentView={currentView} onNavigate={onNavigate}>
-              {getAdminLinkText()}
-            </NavLink>
+            {(!currentUser || (userProfile && userProfile.role !== 'user')) && (
+              <NavLink view="admin" currentView={currentView} onNavigate={onNavigate}>
+                {getAdminLinkText()}
+              </NavLink>
+            )}
           </nav>
           
           <div className="hidden xl:flex items-center space-x-4">
@@ -150,9 +152,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
             <NavLink view="transfers" currentView={currentView} onNavigate={handleNavClick}>Transfers</NavLink>
             <NavLink view="rules" currentView={currentView} onNavigate={handleNavClick}>Rules</NavLink>
             <div className="border-t border-accent/30 my-2 pt-2"></div>
-            <NavLink view="admin" currentView={currentView} onNavigate={handleNavClick}>
-              {getAdminLinkText()}
-            </NavLink>
+            {(!currentUser || (userProfile && userProfile.role !== 'user')) && (
+              <NavLink view="admin" currentView={currentView} onNavigate={handleNavClick}>
+                {getAdminLinkText()}
+              </NavLink>
+            )}
              {currentUser && (
               <button type="button" onClick={handleLogout} className="px-4 py-3 rounded-xl text-sm font-bold transition-colors duration-300 w-full text-left bg-red-900/20 text-red-400 hover:bg-red-900/40 mt-2">
                 Logout

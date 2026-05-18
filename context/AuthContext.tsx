@@ -46,11 +46,11 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                         throw profileError;
                     }
 
-                    setUserProfile(profile ? {
-                        id: profile.id,
-                        fullName: profile.full_name,
-                        role: profile.role,
-                    } : null);
+                    setUserProfile({
+                        id: session.user.id,
+                        fullName: profile ? profile.full_name : session.user.user_metadata?.full_name || null,
+                        role: (profile?.role || session.user.app_metadata?.role || session.user.user_metadata?.role || 'user').toLowerCase().trim(),
+                    });
                 } else {
                     setUserProfile(null);
                 }
@@ -78,14 +78,19 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                         .select('*')
                         .eq('id', session.user.id)
                         .single();
-                     setUserProfile(profile ? {
-                        id: profile.id,
-                        fullName: profile.full_name,
-                        role: profile.role,
-                    } : null);
+                     setUserProfile({
+                        id: session.user.id,
+                        fullName: profile ? profile.full_name : session.user.user_metadata?.full_name || null,
+                        role: (profile?.role || session.user.app_metadata?.role || session.user.user_metadata?.role || 'user').toLowerCase().trim(),
+                    });
                 } catch (error) {
                     console.error("Error fetching profile on auth state change:", error);
-                    setUserProfile(null);
+                    // Fallback to metadata if DB fetch fails
+                    setUserProfile({
+                        id: session.user.id,
+                        fullName: session.user.user_metadata?.full_name || null,
+                        role: (session.user.app_metadata?.role || session.user.user_metadata?.role || 'user').toLowerCase().trim(),
+                    });
                 }
             } else {
                 setUserProfile(null);
