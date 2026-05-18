@@ -198,10 +198,17 @@ const AppContent: React.FC = () => {
   // LOADING SCREEN
   if (!isAppReady) {
       return (
-          <div className="min-h-screen bg-primary flex flex-col items-center justify-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-highlight mb-4"></div>
-              <h1 className="text-2xl font-bold text-white">DVOC Tanzania</h1>
-              <p className="text-text-secondary mt-2">Loading application data...</p>
+          <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-4">
+              <div className="relative mb-8">
+                  <div className="absolute inset-0 bg-highlight/30 blur-2xl rounded-full scale-150 animate-pulse"></div>
+                  <div className="relative bg-secondary p-4 rounded-full border border-highlight/20 shadow-glow flex items-center justify-center">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-highlight animate-spin" style={{ animationDuration: '3s' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 2a10 10 0 100 20 10 10 0 000-20zM12 2v4m0 14v4M2 12h4m14 0h4m-12.828-7.071l2.828 2.828m8.486 8.486l2.828 2.828M4.929 19.071l2.828-2.828m8.486-8.486l2.828-2.828" />
+                     </svg>
+                  </div>
+              </div>
+              <h1 className="text-3xl font-extrabold text-white tracking-widest uppercase shadow-black drop-shadow-md">DVOC <span className="text-highlight">TZ</span></h1>
+              <p className="text-text-secondary mt-2 tracking-widest text-xs uppercase animate-pulse">Initializing Platform...</p>
           </div>
       );
   }

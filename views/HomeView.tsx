@@ -15,50 +15,66 @@ interface HomeViewProps {
 }
 
 const MiniStandingsTable: React.FC<{ title: string; standings: TeamStanding[]; onViewFull: () => void }> = ({ title, standings, onViewFull }) => (
-    <div className="bg-secondary rounded-lg shadow-lg overflow-hidden flex flex-col h-full border border-accent">
-        <div className="p-4 border-b border-accent flex justify-between items-center bg-secondary">
-            <h3 className="text-xl font-bold text-white">{title}</h3>
-            <span className="text-[10px] font-bold bg-highlight text-primary px-2 py-1 rounded uppercase tracking-wider">Top 5</span>
+    <div className="bg-secondary rounded-xl shadow-premium overflow-hidden flex flex-col h-full border border-accent/50 backdrop-blur-md relative group">
+        <div className="absolute inset-0 bg-gradient-to-br from-highlight/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+        <div className="p-5 border-b border-accent/50 flex justify-between items-center bg-secondary/80 backdrop-blur-sm relative z-10">
+            <h3 className="text-xl font-extrabold text-white tracking-wide">{title}</h3>
+            <span className="text-[10px] font-bold bg-highlight/20 text-highlight border border-highlight/30 px-3 py-1 rounded-full uppercase tracking-widest shadow-glow">Top 5</span>
         </div>
-        <div className="flex-grow overflow-x-auto">
+        <div className="flex-grow overflow-x-auto relative z-10">
             <table className="min-w-full text-sm">
-                <thead className="bg-primary/50 text-text-secondary">
+                <thead className="bg-primary/80 text-text-secondary/80 uppercase text-[10px] tracking-widest font-semibold">
                     <tr>
-                        <th className="px-3 py-2 text-center w-8">#</th>
-                        <th className="px-3 py-2 text-left">Team</th>
-                        <th className="px-3 py-2 text-center w-8">P</th>
-                        <th className="px-3 py-2 text-center w-8 font-bold text-white">Pts</th>
+                        <th className="px-4 py-3 text-center w-10">Rank</th>
+                        <th className="px-4 py-3 text-left">Club Name</th>
+                        <th className="px-4 py-3 text-center w-10">Pld</th>
+                        <th className="px-4 py-3 text-center w-12 font-bold text-white">Pts</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-accent">
-                    {standings.length > 0 ? standings.slice(0, 5).map((s, i) => (
-                        <tr key={s.teamId} className="hover:bg-primary/50 transition-colors">
-                            <td className="px-3 py-2 text-center text-text-secondary font-medium">{i + 1}</td>
-                            <td className="px-3 py-2 flex items-center gap-2 text-white font-medium">
-                                {s.logoUrl ? (
-                                    <img src={s.logoUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
-                                ) : (
-                                    <div className="w-6 h-6 rounded-full bg-accent flex-shrink-0" />
-                                )}
-                                <span className="truncate max-w-[140px]">{s.teamName}</span>
-                            </td>
-                            <td className="px-3 py-2 text-center text-text-secondary">{s.gamesPlayed}</td>
-                            <td className="px-3 py-2 text-center font-bold text-highlight">{s.points}</td>
-                        </tr>
-                    )) : (
-                        <tr><td colSpan={4} className="px-4 py-8 text-center text-text-secondary">No standings available yet.</td></tr>
+                <tbody className="divide-y divide-accent/30">
+                    {standings.length > 0 ? standings.slice(0, 5).map((s, i) => {
+                        let rankColor = "text-text-secondary";
+                        let rowBg = "hover:bg-primary/40";
+                        const isFirst = i === 0;
+                        if (i === 0) { rankColor = "text-[#FFD700] drop-shadow-md"; rowBg = "bg-highlight/5 hover:bg-highlight/10"; }
+                        if (i === 1) rankColor = "text-[#C0C0C0]";
+                        if (i === 2) rankColor = "text-[#CD7F32]";
+                        
+                        return (
+                            <tr key={s.teamId} className={`${rowBg} transition-colors duration-300 group/row`}>
+                                <td className={`px-4 py-3 text-center font-black text-lg ${rankColor}`}>
+                                    {i + 1}
+                                </td>
+                                <td className="px-4 py-3 flex items-center gap-3 text-white font-semibold">
+                                    <div className={`relative flex-shrink-0 rounded-full p-[2px] ${isFirst ? 'bg-gradient-to-tr from-[#FFD700] to-yellow-600 shadow-glow' : 'bg-accent'}`}>
+                                        <div className="bg-primary rounded-full p-[2px]">
+                                            {s.logoUrl ? (
+                                                <img src={s.logoUrl} className="w-8 h-8 rounded-full object-cover" alt="" />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-text-secondary">#</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <span className="truncate max-w-[150px] group-hover/row:text-highlight transition-colors">{s.teamName}</span>
+                                </td>
+                                <td className="px-4 py-3 text-center text-text-secondary font-medium">{s.gamesPlayed}</td>
+                                <td className="px-4 py-3 text-center font-black text-lg text-white group-hover/row:text-highlight transition-colors">{s.points}</td>
+                            </tr>
+                        );
+                    }) : (
+                        <tr><td colSpan={4} className="px-4 py-12 text-center text-text-secondary/60 font-medium tracking-wide">No standings available yet.</td></tr>
                     )}
                 </tbody>
             </table>
         </div>
-        <div className="p-3 border-t border-accent bg-secondary text-center mt-auto">
+        <div className="p-4 bg-secondary/80 text-center mt-auto relative z-10 border-t border-accent/30">
             <button 
                 onClick={onViewFull} 
-                className="text-sm font-semibold text-highlight hover:text-white transition-colors flex items-center justify-center gap-1 mx-auto"
+                className="text-xs font-bold text-text-secondary uppercase tracking-widest hover:text-highlight transition-all duration-300 flex items-center justify-center gap-2 mx-auto"
             >
                 View Full Table
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
             </button>
         </div>
@@ -451,36 +467,51 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTourname
                     </div>
                 </div>
             ) : (
-                <div className="text-center p-8 bg-secondary rounded-xl shadow-lg relative overflow-hidden">
-                    <div className="relative z-10">
-                        <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Welcome to DVOC Tanzania</h1>
-                        <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-6">Your one-stop destination for all Tanzania Traditional Volleyball tournaments, fixtures, teams, and player stats.</p>
+                <div className="text-center p-12 bg-secondary rounded-2xl shadow-premium relative overflow-hidden border border-accent/30 group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-highlight/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                    <div className="relative z-10 w-full max-w-3xl mx-auto">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/80 border border-highlight/30 rounded-full mb-6 backdrop-blur-md shadow-glow">
+                             <span className="w-2 h-2 rounded-full bg-highlight animate-pulse"></span>
+                             <span className="text-[10px] text-highlight uppercase tracking-[0.2em] font-bold">DVOC TZ v2.0 Platform</span>
+                        </div>
+                        <h1 className="text-5xl md:text-6xl font-black text-white mb-6 tracking-tight drop-shadow-lg">
+                            Elevating <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#F5E6A3] shadow-glow">Volleyball.</span>
+                        </h1>
+                        <p className="text-lg md:text-xl text-text-secondary mb-8 font-medium leading-relaxed">
+                            The premium destination for all Tanzania Traditional Volleyball tournaments, live stats, player performance, and club rankings.
+                        </p>
                         
                         <button 
                             onClick={() => setIsScheduleModalOpen(true)}
-                            className="inline-flex items-center px-6 py-3 bg-highlight hover:bg-teal-400 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg gap-2"
+                            className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-highlight to-[#B8942B] text-primary hover:from-[#F5E6A3] hover:to-highlight font-black rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1 shadow-glow gap-3 uppercase tracking-widest text-sm"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            Get Daily Schedule Card
+                            View Match Schedule
                         </button>
                     </div>
                     {/* Decorative background element */}
-                    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-highlight/10 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
+                    <div className="absolute -top-32 -right-32 w-96 h-96 bg-highlight/10 rounded-full blur-[100px] pointer-events-none"></div>
+                    <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none"></div>
                 </div>
             )}
 
             {!showSeasonFinale && (
                 <div className="grid md:grid-cols-2 gap-8">
-                    <div className="bg-secondary p-6 rounded-lg cursor-pointer hover:bg-highlight transition-all duration-300 group" onClick={() => onNavigate('tournaments')}>
-                        <h2 className="text-2xl font-bold mb-2 group-hover:text-white">Division 1</h2>
-                        <p className="text-text-secondary group-hover:text-white">Elite competition featuring the top teams.</p>
+                    <div className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] p-8 rounded-2xl cursor-pointer hover:shadow-glow transition-all duration-500 group border border-accent/40 hover:border-highlight/50 transform hover:-translate-y-1" onClick={() => onNavigate('tournaments')}>
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-6 shadow-md border border-accent/50 group-hover:bg-[#D4AF37] group-hover:border-[#D4AF37] transition-colors">
+                            <span className="text-white font-black group-hover:text-primary">1</span>
+                        </div>
+                        <h2 className="text-3xl font-black mb-3 text-white group-hover:text-[#D4AF37] transition-colors tracking-wide">Division 1</h2>
+                        <p className="text-text-secondary text-sm md:text-base leading-relaxed">Elite competition featuring the premier clubs and players in the nation.</p>
                     </div>
-                    <div className="bg-secondary p-6 rounded-lg cursor-pointer hover:bg-highlight transition-all duration-300 group" onClick={() => onNavigate('tournaments')}>
-                        <h2 className="text-2xl font-bold mb-2 group-hover:text-white">Division 2</h2>
-                        <p className="text-text-secondary group-hover:text-white">Showcasing the rising stars of the league.</p>
+                    <div className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] p-8 rounded-2xl cursor-pointer hover:shadow-premium transition-all duration-500 group border border-accent/40 hover:border-slate-300/50 transform hover:-translate-y-1" onClick={() => onNavigate('tournaments')}>
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-6 shadow-md border border-accent/50 group-hover:bg-slate-300 group-hover:border-slate-300 transition-colors">
+                            <span className="text-white font-black group-hover:text-primary">2</span>
+                        </div>
+                        <h2 className="text-3xl font-black mb-3 text-white group-hover:text-slate-300 transition-colors tracking-wide">Division 2</h2>
+                        <p className="text-text-secondary text-sm md:text-base leading-relaxed">Showcasing the rising stars and ambitious challengers of the league.</p>
                     </div>
                 </div>
             )}
