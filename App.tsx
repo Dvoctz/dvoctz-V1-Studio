@@ -220,7 +220,7 @@ const AppContent: React.FC = () => {
         {renderView()}
       </main>
       <Footer />
-      {showIosInstallPrompt && <AddToHomeScreenPrompt onClose={handleIosInstallPromptClose} />}
+      {/* {showIosInstallPrompt && <AddToHomeScreenPrompt onClose={handleIosInstallPromptClose} />} */}
       <ServiceWorkerManager />
     </div>
   );
