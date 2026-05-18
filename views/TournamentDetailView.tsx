@@ -16,13 +16,11 @@ interface TournamentDetailViewProps {
 
 const TeamLogo: React.FC<{ logoUrl: string | null; alt: string; className?: string; }> = ({ logoUrl, alt, className = "w-10 h-10" }) => {
     if (logoUrl) {
-        return <img src={logoUrl} alt={alt} className={`${className} rounded-full object-cover`} />;
+        return <img src={logoUrl} alt={alt} className={`${className} rounded-full object-cover border-2 border-white/10`} />;
     }
     return (
-        <div className={`${className} rounded-full bg-accent flex items-center justify-center text-text-secondary`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1a6 6 0 00-9-5.197" />
-            </svg>
+        <div className={`${className} rounded-full bg-secondary border border-white/10 flex items-center justify-center text-slate-500`}>
+            <span className="text-[10px] font-bold uppercase">{alt.charAt(0)}</span>
         </div>
     );
 };
@@ -348,50 +346,68 @@ const FixtureItem: React.FC<{ fixture: Fixture, onScorecardClick: (fixture: Fixt
     const renderStatusBadge = () => {
         switch (fixture.status) {
             case 'live':
-                return <span className="absolute top-2 right-2 text-xs font-bold bg-red-500 text-white px-2 py-1 rounded-full animate-pulse">LIVE</span>
+                return <span className="absolute top-0 right-0 m-4 text-[9px] font-black uppercase tracking-[0.2em] bg-red-600 shadow-glow shadow-red-600/30 text-white px-3 py-1 rounded-full animate-pulse border border-red-500/50">Live</span>
             case 'completed':
-                return <span className="absolute top-2 right-2 text-xs font-bold bg-gray-500 text-white px-2 py-1 rounded-full">COMPLETED</span>
+                return <span className="absolute top-0 right-0 m-4 text-[9px] font-black uppercase tracking-[0.2em] bg-white/10 text-white px-3 py-1 rounded-full border border-white/20">Final</span>
             default:
-                return null;
+                return <span className="absolute top-0 right-0 m-4 text-[9px] font-black uppercase tracking-[0.2em] bg-white/5 text-slate-400 px-3 py-1 rounded-full border border-white/10">Upcoming</span>;
         }
     };
     
-    const renderTeam = (team: Team) => (
-        <div className="flex items-center space-x-3 flex-1 cursor-pointer group" onClick={() => onTeamClick(team)}>
-            <TeamLogo logoUrl={team.logoUrl} alt={team.name} />
-            <span className="font-semibold text-base sm:text-lg text-text-primary group-hover:text-highlight transition-colors">{team.name}</span>
+    const renderTeam = (team: Team, isLeft: boolean) => (
+        <div className={`flex items-center gap-3 flex-1 cursor-pointer group ${isLeft ? 'justify-end md:justify-end flex-row-reverse md:flex-row-reverse' : 'justify-start md:justify-start'}`} onClick={() => onTeamClick(team)}>
+            <TeamLogo logoUrl={team.logoUrl} alt={team.name} className="w-10 h-10 md:w-14 md:h-14 grayscale-[20%] group-hover:grayscale-0 transition-all"/>
+            <span className={`font-black text-sm md:text-xl text-white group-hover:text-[#D4AF37] transition-colors uppercase tracking-wider ${isLeft ? 'text-right' : 'text-left'}`}>{team.name}</span>
         </div>
     );
 
     return (
-        <div className="bg-secondary rounded-lg shadow-lg overflow-hidden relative">
+        <div className="bg-secondary/40 backdrop-blur-md rounded-3xl shadow-lg border border-white/5 overflow-hidden relative group hover:border-[#D4AF37]/30 transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-0"></div>
             {renderStatusBadge()}
-            <div className="p-4 flex items-center justify-between">
-                {renderTeam(team1)}
-                <div className="text-center px-2 sm:px-4">
+            
+            <div className="p-6 md:p-8 flex items-center justify-between relative z-10">
+                {renderTeam(team1, true)}
+                <div className="text-center px-4 md:px-8 flex-shrink-0 min-w-[100px] md:min-w-[140px]">
                     {fixture.score ? (
-                        <span className="text-xl sm:text-2xl font-bold text-white">{fixture.score.team1Score} - {fixture.score.team2Score}</span>
+                        <div className="flex items-center justify-center gap-3">
+                            <span className="text-3xl md:text-5xl font-black text-white leading-none drop-shadow-md">{fixture.score.team1Score}</span>
+                            <span className="text-xl text-slate-600 font-bold">-</span>
+                            <span className="text-3xl md:text-5xl font-black text-white leading-none drop-shadow-md">{fixture.score.team2Score}</span>
+                        </div>
                     ) : (
-                        <span className="text-xl sm:text-2xl font-bold text-text-secondary">VS</span>
+                        <span className="text-xs uppercase font-black tracking-[0.3em] text-slate-500">VS</span>
                     )}
                 </div>
-                {renderTeam(team2)}
+                {renderTeam(team2, false)}
             </div>
-            <div className="bg-accent px-4 py-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
-                <div className="text-text-secondary">
-                    <p>{new Date(fixture.dateTime).toLocaleString()}</p>
-                    <p>{fixture.ground}</p>
+            
+            <div className="bg-primary/50 border-t border-white/5 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-sm relative z-10 transition-colors group-hover:bg-primary/70">
+                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-6 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    <div className="flex items-center gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>{new Date(fixture.dateTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>{fixture.ground}</span>
+                    </div>
                     {fixture.referee && (
-                        <p className="flex items-center mt-1">
-                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                        <div className="flex items-center gap-2">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
-                            Referee: {fixture.referee}
-                        </p>
+                            <span>Ref: <span className="text-slate-300">{fixture.referee}</span></span>
+                        </div>
                     )}
                 </div>
                 {fixture.status === 'completed' && (
-                    <button onClick={() => onScorecardClick(fixture)} className="bg-highlight text-white px-3 py-1 rounded-md font-semibold hover:bg-teal-400 transition-colors w-full sm:w-auto">View Scorecard</button>
+                    <button onClick={() => onScorecardClick(fixture)} className="bg-white/5 hover:bg-[#D4AF37]/20 border border-white/10 hover:border-[#D4AF37]/50 text-white hover:text-[#D4AF37] px-4 py-2 rounded-full text-[10px] uppercase tracking-widest font-black transition-all w-full md:w-auto">View Scorecard</button>
                 )}
             </div>
         </div>
@@ -403,15 +419,15 @@ const StandingsTable: React.FC<{ standings: TeamStanding[], onTeamClick: (teamId
         return <p className="text-center text-text-secondary">No completed matches yet to generate standings.</p>;
     }
 
-    const tableHeaderClasses = "px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider";
-    const tableCellClasses = "px-4 py-4 whitespace-nowrap text-sm";
+    const tableHeaderClasses = "px-4 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest";
+    const tableCellClasses = "px-4 py-4 whitespace-nowrap text-sm font-bold text-slate-300";
 
     return (
-        <div className="bg-secondary rounded-lg shadow-lg overflow-hidden">
+        <div className="bg-secondary/40 backdrop-blur-md rounded-3xl shadow-lg border border-white/5 overflow-hidden">
              {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-accent">
-                    <thead className="bg-accent">
+                <table className="min-w-full divide-y divide-white/5">
+                    <thead className="bg-white/5 border-b border-white/10">
                         <tr>
                             <th scope="col" className={`${tableHeaderClasses} text-center`}>Pos</th>
                             <th scope="col" className={tableHeaderClasses}>Team</th>
@@ -422,27 +438,29 @@ const StandingsTable: React.FC<{ standings: TeamStanding[], onTeamClick: (teamId
                             <th scope="col" className={`${tableHeaderClasses} text-center`}>GF</th>
                             <th scope="col" className={`${tableHeaderClasses} text-center`}>GA</th>
                             <th scope="col" className={`${tableHeaderClasses} text-center`}>GD</th>
-                            <th scope="col" className={`${tableHeaderClasses} text-center font-extrabold`}>Pts</th>
+                            <th scope="col" className={`${tableHeaderClasses} text-center text-[#D4AF37]`}>Pts</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-secondary divide-y divide-accent">
+                    <tbody className="divide-y divide-white/5">
                         {standings.map((s, index) => (
-                            <tr key={s.teamId} className="hover:bg-accent transition-colors">
-                                <td className={`${tableCellClasses} text-text-secondary font-semibold text-center`}>{index + 1}</td>
-                                <td className={`${tableCellClasses} text-text-primary font-medium`}>
-                                    <div className="flex items-center cursor-pointer group" onClick={() => onTeamClick(s.teamId)}>
-                                        <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-8 w-8 mr-3"/>
-                                        <span className="group-hover:text-highlight transition-colors">{s.teamName}</span>
+                            <tr key={s.teamId} className="hover:bg-white/5 transition-colors group">
+                                <td className={`${tableCellClasses} text-center ${index < 4 ? 'text-[#D4AF37]' : ''}`}>{index + 1}</td>
+                                <td className={`${tableCellClasses} text-white`}>
+                                    <div className="flex items-center cursor-pointer" onClick={() => onTeamClick(s.teamId)}>
+                                        <div className="relative mr-4 shadow-sm rounded-full overflow-hidden">
+                                            <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-8 w-8 object-cover grayscale-[30%] group-hover:grayscale-0 transition-all"/>
+                                        </div>
+                                        <span className="group-hover:text-[#D4AF37] transition-colors uppercase tracking-wider">{s.teamName}</span>
                                     </div>
                                 </td>
-                                <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.gamesPlayed}</td>
-                                <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.wins}</td>
-                                <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.draws}</td>
-                                <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.losses}</td>
-                                <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.goalsFor}</td>
-                                <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.goalsAgainst}</td>
-                                <td className={`${tableCellClasses} text-text-secondary text-center`}>{s.goalDifference > 0 ? `+${s.goalDifference}` : s.goalDifference}</td>
-                                <td className={`${tableCellClasses} text-white font-bold text-center`}>{s.points}</td>
+                                <td className={`${tableCellClasses} text-center opacity-80`}>{s.gamesPlayed}</td>
+                                <td className={`${tableCellClasses} text-center opacity-80`}>{s.wins}</td>
+                                <td className={`${tableCellClasses} text-center opacity-80`}>{s.draws}</td>
+                                <td className={`${tableCellClasses} text-center opacity-80`}>{s.losses}</td>
+                                <td className={`${tableCellClasses} text-center opacity-80`}>{s.goalsFor}</td>
+                                <td className={`${tableCellClasses} text-center opacity-80`}>{s.goalsAgainst}</td>
+                                <td className={`${tableCellClasses} text-center font-black ${s.goalDifference > 0 ? 'text-green-400' : s.goalDifference < 0 ? 'text-red-400' : ''}`}>{s.goalDifference > 0 ? `+${s.goalDifference}` : s.goalDifference}</td>
+                                <td className={`${tableCellClasses} text-center text-[#D4AF37] font-black text-lg`}>{s.points}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -450,37 +468,37 @@ const StandingsTable: React.FC<{ standings: TeamStanding[], onTeamClick: (teamId
             </div>
 
             {/* Mobile Card View */}
-            <div className="md:hidden space-y-3 p-3">
+            <div className="md:hidden space-y-4 p-4 text-xs">
                 {standings.map((s, index) => (
-                    <div key={s.teamId} className="bg-accent p-4 rounded-lg shadow">
-                        <div className="flex justify-between items-center mb-4">
-                            <div className="flex items-center cursor-pointer" onClick={() => onTeamClick(s.teamId)}>
-                                <span className="text-text-secondary font-semibold mr-3">{index + 1}</span>
-                                <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-8 w-8 mr-3"/>
-                                <span className="text-text-primary font-bold hover:text-highlight">{s.teamName}</span>
+                    <div key={s.teamId} className="bg-primary/50 border border-white/5 p-5 rounded-2xl shadow-md">
+                        <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-4">
+                            <div className="flex items-center cursor-pointer group" onClick={() => onTeamClick(s.teamId)}>
+                                <span className={`font-black text-lg mr-4 ${index < 4 ? 'text-[#D4AF37]' : 'text-slate-500'}`}>{index + 1}</span>
+                                <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="h-10 w-10 mr-3 grayscale-[30%] group-hover:grayscale-0 transition-all"/>
+                                <span className="text-white font-black uppercase tracking-wider group-hover:text-[#D4AF37] transition-colors text-sm">{s.teamName}</span>
                             </div>
-                            <div className="text-right">
-                                <span className="text-white font-bold text-xl">{s.points}</span>
-                                <span className="text-text-secondary text-xs block">Pts</span>
+                            <div className="text-right flex flex-col items-end">
+                                <span className="text-[#D4AF37] font-black text-2xl leading-none">{s.points}</span>
+                                <span className="text-[9px] uppercase tracking-widest text-[#D4AF37]/50 mt-1 font-bold">Pts</span>
                             </div>
                         </div>
-                        <div className="grid grid-cols-4 gap-2 text-center text-sm">
-                            <div><span className="font-bold text-text-primary block">{s.gamesPlayed}</span><span className="text-text-secondary text-xs">GP</span></div>
-                            <div><span className="font-bold text-text-primary block">{s.wins}</span><span className="text-text-secondary text-xs">W</span></div>
-                            <div><span className="font-bold text-text-primary block">{s.draws}</span><span className="text-text-secondary text-xs">D</span></div>
-                            <div><span className="font-bold text-text-primary block">{s.losses}</span><span className="text-text-secondary text-xs">L</span></div>
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                            <div className="bg-white/5 rounded-lg py-2"><span className="font-black text-white block">{s.gamesPlayed}</span><span className="text-slate-500 text-[9px] tracking-widest uppercase font-bold">GP</span></div>
+                            <div className="bg-white/5 rounded-lg py-2"><span className="font-black text-white block">{s.wins}</span><span className="text-slate-500 text-[9px] tracking-widest uppercase font-bold">W</span></div>
+                            <div className="bg-white/5 rounded-lg py-2"><span className="font-black text-white block">{s.draws}</span><span className="text-slate-500 text-[9px] tracking-widest uppercase font-bold">D</span></div>
+                            <div className="bg-white/5 rounded-lg py-2"><span className="font-black text-white block">{s.losses}</span><span className="text-slate-500 text-[9px] tracking-widest uppercase font-bold">L</span></div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 text-center text-sm mt-3 pt-3 border-t border-primary">
-                             <div><span className="font-bold text-text-primary block">{s.goalsFor}</span><span className="text-text-secondary text-xs">GF</span></div>
-                             <div><span className="font-bold text-text-primary block">{s.goalsAgainst}</span><span className="text-text-secondary text-xs">GA</span></div>
-                             <div><span className="font-bold text-text-primary block">{s.goalDifference > 0 ? `+${s.goalDifference}` : s.goalDifference}</span><span className="text-text-secondary text-xs">GD</span></div>
+                        <div className="grid grid-cols-3 gap-2 text-center mt-2">
+                             <div className="bg-white/5 rounded-lg py-2"><span className="font-black text-white block">{s.goalsFor}</span><span className="text-slate-500 text-[9px] tracking-widest uppercase font-bold">GF</span></div>
+                             <div className="bg-white/5 rounded-lg py-2"><span className="font-black text-white block">{s.goalsAgainst}</span><span className="text-slate-500 text-[9px] tracking-widest uppercase font-bold">GA</span></div>
+                             <div className="bg-white/5 rounded-lg py-2"><span className={`font-black uppercase block ${s.goalDifference > 0 ? 'text-green-400' : s.goalDifference < 0 ? 'text-red-400' : 'text-white'}`}>{s.goalDifference > 0 ? `+${s.goalDifference}` : s.goalDifference}</span><span className="text-slate-500 text-[9px] tracking-widest uppercase font-bold">GD</span></div>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="p-2 bg-accent text-xs text-text-secondary text-center border-t border-primary hidden md:block">
-                <span className="font-bold">GP:</span> Games Played, <span className="font-bold">W:</span> Wins, <span className="font-bold">D:</span> Draws, <span className="font-bold">L:</span> Losses, <span className="font-bold">GF:</span> Goals For, <span className="font-bold">GA:</span> Goals Against, <span className="font-bold">GD:</span> Goal Difference, <span className="font-bold">Pts:</span> Points
+            <div className="p-3 bg-white/5 text-[9px] uppercase tracking-widest text-slate-500 font-bold text-center border-t border-white/5 hidden md:block">
+                <span>GP:</span> Games Played &nbsp;&bull;&nbsp; <span>W:</span> Wins &nbsp;&bull;&nbsp; <span>D:</span> Draws &nbsp;&bull;&nbsp; <span>L:</span> Losses &nbsp;&bull;&nbsp; <span>GF:</span> Goals For &nbsp;&bull;&nbsp; <span>GA:</span> Goals Against &nbsp;&bull;&nbsp; <span>GD:</span> Goal Difference &nbsp;&bull;&nbsp; <span>Pts:</span> Points
             </div>
         </div>
     );
@@ -494,48 +512,73 @@ const RefereeFixtureCard: React.FC<{ fixture: Fixture }> = ({ fixture }) => {
     const fixtureTournament = tournaments.find(t => t.id === fixture.tournamentId);
 
     return (
-        <div className="bg-secondary p-4 rounded-lg shadow flex flex-col sm:flex-row items-center justify-between gap-4 border-l-4 border-highlight hover:bg-accent transition-colors">
-            <div className="text-center sm:text-left w-full">
-                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
-                    <div className="text-xs text-text-secondary font-bold uppercase tracking-wide">
-                        {dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} • {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+        <div className="bg-secondary/40 backdrop-blur-md p-6 rounded-3xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-6 border border-white/5 hover:border-[#D4AF37]/30 transition-all duration-300 relative group overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#D4AF37]/5 to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+            <div className="text-center sm:text-left w-full z-10">
+                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2 border-b border-white/10 pb-4">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#D4AF37]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} &bull; {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </div>
-                    <span className="text-[10px] bg-primary text-highlight px-2 py-1 rounded font-semibold uppercase tracking-wider self-center sm:self-auto">
+                    <span className="text-[9px] bg-primary/80 border border-white/10 text-slate-300 px-3 py-1.5 rounded-full font-black uppercase tracking-widest self-center sm:self-auto shadow-inner">
                        {fixtureTournament ? fixtureTournament.name : 'Unknown Tournament'}
                     </span>
                  </div>
-                 <div className="font-bold text-white text-lg">
-                    {team1 ? team1.name : 'TBD'} <span className="text-text-secondary mx-1">vs</span> {team2 ? team2.name : 'TBD'}
+                 <div className="font-black text-white text-xl uppercase tracking-wider flex items-center justify-center sm:justify-start flex-wrap gap-2">
+                    <span>{team1 ? team1.name : 'TBD'}</span>
+                    <span className="text-slate-600 text-sm">vs</span>
+                    <span>{team2 ? team2.name : 'TBD'}</span>
                  </div>
-                 <div className="text-xs text-text-secondary mt-1">{fixture.ground} {fixture.stage ? `• ${fixture.stage.replace('-', ' ')}` : ''}</div>
+                 <div className="text-[10px] uppercase font-bold tracking-widest text-[#D4AF37] mt-3 flex items-center justify-center sm:justify-start gap-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {fixture.ground} {fixture.stage ? `• ${fixture.stage.replace('-', ' ')}` : ''}
+                </div>
             </div>
-            <div className="flex flex-col items-center sm:items-end bg-primary/50 p-2 rounded min-w-[150px] flex-shrink-0">
-                <span className="text-[10px] text-text-secondary uppercase font-semibold">Officiating</span>
-                <span className="font-bold text-highlight text-center truncate max-w-[180px]">{fixture.referee}</span>
+            <div className="flex flex-col items-center sm:items-end bg-primary/60 border border-white/10 p-4 rounded-2xl min-w-[180px] flex-shrink-0 z-10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-8 h-8 bg-[#D4AF37]/20 blur-xl rounded-full"></div>
+                <span className="text-[9px] text-slate-400 uppercase font-black tracking-[0.2em] mb-1">Officiating Duty</span>
+                <span className="font-black text-[#D4AF37] text-lg text-center truncate max-w-[200px] uppercase tracking-wider">{fixture.referee}</span>
             </div>
         </div>
     )
 };
 
 const AwardCard: React.FC<{ award: TournamentAward, onPlayerClick: (id: number) => void }> = ({ award, onPlayerClick }) => (
-    <div className="bg-secondary p-4 rounded-lg shadow-lg flex flex-col items-center text-center hover:bg-accent transition-colors border border-transparent hover:border-yellow-500/50 group">
-        <div className="w-20 h-20 mb-3 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-300 p-1 shadow-md flex items-center justify-center overflow-hidden">
-            {award.imageUrl ? (
-                <img src={award.imageUrl} alt={award.awardName} className="w-full h-full object-cover rounded-full" />
-            ) : (
-                <div className="text-4xl">🏆</div>
-            )}
+    <div className="bg-gradient-to-b from-secondary/80 to-secondary/40 backdrop-blur-md p-6 rounded-3xl shadow-xl flex flex-col items-center text-center hover:scale-[1.02] transition-all duration-500 border border-white/5 hover:border-[#D4AF37]/50 group relative overflow-hidden">
+        {/* Glow effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-[#D4AF37]/20 blur-[50px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+
+        <div className="relative mb-6">
+            <div className="absolute inset-0 bg-[#D4AF37] blur-md opacity-20 rounded-full animate-pulse-slow"></div>
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#F9F295] via-[#E0AA3E] to-[#B8860B] p-1.5 shadow-xl flex items-center justify-center relative z-10 transform group-hover:rotate-[5deg] transition-transform duration-500">
+                <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center overflow-hidden border-2 border-secondary overflow-hidden">
+                    {award.imageUrl ? (
+                        <img src={award.imageUrl} alt={award.awardName} className="w-full h-full object-cover rounded-full" />
+                    ) : (
+                        <span className="text-4xl drop-shadow-md">🏆</span>
+                    )}
+                </div>
+            </div>
+            {/* Sparkles */}
+            <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">✨</div>
+            <div className="absolute -bottom-2 -left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-200 text-sm">✨</div>
         </div>
-        <h4 className="font-bold text-yellow-400 uppercase tracking-widest text-xs mb-1">{award.awardName}</h4>
+        <h4 className="font-black text-[#D4AF37] uppercase tracking-[0.3em] text-[10px] mb-2 z-10">{award.awardName}</h4>
         {award.playerId ? (
             <button 
                 onClick={() => onPlayerClick(award.playerId!)} 
-                className="text-lg font-black text-white hover:text-highlight transition-colors underline decoration-dotted decoration-text-secondary/50 hover:decoration-highlight"
+                className="text-lg font-black text-white hover:text-[#D4AF37] transition-colors relative z-10 uppercase tracking-widest"
             >
                 {award.recipientName}
+                <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[#D4AF37]/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform origin-center mt-1"></div>
             </button>
         ) : (
-            <span className="text-lg font-black text-white">{award.recipientName}</span>
+            <span className="text-lg font-black text-white uppercase tracking-widest relative z-10">{award.recipientName}</span>
         )}
     </div>
 );
@@ -759,7 +802,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   const TabButton: React.FC<{ tab: 'fixtures' | 'standings' | 'knockout' | 'teams' | 'referees' | 'awards'; children: React.ReactNode }> = ({ tab, children }) => (
     <button
       onClick={() => setActiveTab(tab)}
-      className={`px-4 sm:px-6 py-3 text-sm sm:text-lg font-semibold transition-colors duration-300 focus:outline-none whitespace-nowrap ${activeTab === tab ? 'text-highlight border-b-2 border-highlight' : 'text-text-secondary hover:text-white'}`}
+      className={`px-4 sm:px-6 py-4 text-sm uppercase tracking-widest font-black transition-all duration-300 focus:outline-none whitespace-nowrap ${activeTab === tab ? 'text-[#D4AF37] border-b-2 border-[#D4AF37] bg-highlight/5' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
     >
       {children}
     </button>
@@ -768,13 +811,13 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
   if (isDataLoading) {
       return (
           <div className="flex justify-center py-24">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-highlight"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4AF37]"></div>
           </div>
       );
   }
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
         {/* Conditional Share Card Render - Standings */}
         {isGeneratingStandings && (
             <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
@@ -799,26 +842,33 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
             </div>
         )}
 
-        <button onClick={onBack} className="flex items-center space-x-2 text-text-secondary hover:text-highlight mb-6 transition-colors">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back to Tournaments</span>
+        <button onClick={onBack} className="flex items-center space-x-2 text-slate-400 hover:text-[#D4AF37] mb-8 transition-colors text-sm font-bold uppercase tracking-wider group">
+             <div className="w-8 h-8 rounded-full bg-secondary border border-white/10 flex items-center justify-center group-hover:bg-[#D4AF37]/10 group-hover:border-[#D4AF37]/30 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+             </div>
+            <span>Tournaments</span>
         </button>
-      <h1 className="text-4xl font-extrabold text-center mb-2">{tournament.name}</h1>
-      <p className="text-center text-highlight font-semibold mb-8">{tournament.division}</p>
+      <h1 className="text-4xl md:text-6xl font-black text-center mb-2 tracking-tight drop-shadow-md uppercase text-transparent bg-clip-text bg-gradient-to-r from-white to-text-secondary">{tournament.name}</h1>
+      <p className="text-center text-[#D4AF37] text-sm uppercase tracking-[0.3em] font-black mb-12 flex items-center justify-center gap-3">
+          <span className="w-8 h-px bg-[#D4AF37]/40"></span>
+          {tournament.division}
+          <span className="w-8 h-px bg-[#D4AF37]/40"></span>
+      </p>
 
       {sponsors.length > 0 && (
-          <div className="mb-8">
-              <h3 className="text-center text-md font-semibold text-text-secondary mb-4">Sponsored By</h3>
-              <div className="bg-secondary p-1 sm:p-2 rounded-lg shadow-lg relative aspect-[21/9] max-w-4xl mx-auto overflow-hidden">
+          <div className="mb-12">
+              <h3 className="text-center text-xs font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Official Sponsors</h3>
+              <div className="bg-secondary/40 backdrop-blur-md p-1 sm:p-2 rounded-3xl shadow-lg relative aspect-[21/9] max-w-4xl mx-auto overflow-hidden border border-white/5">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none z-10"></div>
                 {sponsors.map((sponsor, index) => (
                     <a 
                         key={sponsor.id} 
                         href={sponsor.website} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out flex items-center justify-center p-4 ${index === currentSponsorIndex ? 'opacity-100' : 'opacity-0'}`}
+                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out flex items-center justify-center p-4 sm:p-8 ${index === currentSponsorIndex ? 'opacity-100 relative z-20' : 'opacity-0 pointer-events-none'}`}
                         aria-hidden={index !== currentSponsorIndex}
                     >
                         {sponsor.logoUrl ? (
@@ -880,37 +930,44 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
             )}
 
             {activeTab === 'referees' && (
-                <div className="space-y-4">
-                    <div className="bg-secondary p-4 rounded-lg shadow-lg mb-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-6 animate-fade-in-up">
+                    <div className="bg-secondary/40 backdrop-blur-md p-6 rounded-3xl shadow-lg mb-8 border border-white/5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                             <div>
-                                <h3 className="text-xl font-bold text-white">Officiating Schedule</h3>
-                                <p className="text-sm text-text-secondary">View fixture assignments for referees and officiating teams.</p>
+                                <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider mb-1">Officiating Schedule</h3>
+                                <p className="text-xs text-[#D4AF37] uppercase tracking-[0.2em] font-bold">Assignments & Duties</p>
                             </div>
-                            <select 
-                                className="bg-primary text-white p-2 rounded border border-accent focus:border-highlight focus:outline-none w-full sm:w-auto"
-                                value={refereeFilter}
-                                onChange={(e) => setRefereeFilter(e.target.value)}
-                            >
-                                <option value="">All Officials</option>
-                                {uniqueReferees.map(ref => (
-                                    <option key={ref} value={ref}>{ref}</option>
-                                ))}
-                            </select>
+                            <div className="relative group min-w-[200px]">
+                                <select 
+                                    className="appearance-none bg-primary/80 border border-white/10 text-white p-4 pl-6 pr-12 rounded-full focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] focus:outline-none w-full sm:w-auto font-bold text-sm uppercase tracking-wider transition-all cursor-pointer shadow-inner z-10 relative"
+                                    value={refereeFilter}
+                                    onChange={(e) => setRefereeFilter(e.target.value)}
+                                >
+                                    <option value="">All Officials</option>
+                                    {uniqueReferees.map(ref => (
+                                        <option key={ref} value={ref}>{ref}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-focus-within:text-[#D4AF37] z-20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     {refereeFixtures.length > 0 ? (
-                        refereeFixtures.map(f => <RefereeFixtureCard key={f.id} fixture={f} />)
+                        <div className="flex flex-col gap-4">
+                            {refereeFixtures.map(f => <RefereeFixtureCard key={f.id} fixture={f} />)}
+                        </div>
                     ) : (
-                        <div className="text-center py-12 bg-secondary rounded-lg">
-                            <div className="flex justify-center mb-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-text-secondary opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                </svg>
+                        <div className="text-center py-20 bg-primary/40 rounded-3xl border border-dashed border-white/10 max-w-2xl mx-auto">
+                            <div className="flex justify-center mb-6">
+                                <span className="text-5xl opacity-40 grayscale blur-[1px]">📋</span>
                             </div>
-                            <p className="text-text-secondary font-medium">No officiating assignments found.</p>
-                            {refereeFilter && <p className="text-sm text-text-secondary mt-2">Try clearing the filter to see all fixtures.</p>}
+                            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No officiating assignments found.</p>
+                            {refereeFilter && <p className="text-[10px] text-slate-500 mt-2 uppercase tracking-wide">Try clearing the filter to see all.</p>}
                         </div>
                     )}
                 </div>
@@ -918,31 +975,34 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
 
             {activeTab === 'teams' && (
                 standings.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {standings.map(s => (
                             <div 
                                 key={s.teamId} 
                                 onClick={() => handleTeamClick(s.teamId)}
-                                className="bg-secondary p-4 rounded-lg shadow-md hover:bg-accent hover:scale-105 transition-all duration-300 cursor-pointer flex flex-col items-center text-center group"
+                                className="bg-secondary/40 backdrop-blur-md p-6 rounded-3xl shadow-lg hover:shadow-2xl hover:bg-white/5 hover:scale-[1.02] transition-all duration-300 cursor-pointer flex flex-col items-center text-center group border border-white/5 hover:border-[#D4AF37]/30 relative overflow-hidden"
                             >
-                                <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="w-20 h-20 mb-3 shadow-lg" />
-                                <h3 className="font-bold text-white group-hover:text-highlight transition-colors">{s.teamName}</h3>
-                                <span className="text-xs text-text-secondary mt-1 bg-primary px-2 py-1 rounded-full">More Details</span>
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <TeamLogo logoUrl={s.logoUrl} alt={s.teamName} className="w-24 h-24 mb-4 shadow-xl z-10 grayscale-[20%] group-hover:grayscale-0 transition-all border-2 border-white/10 group-hover:border-[#D4AF37]/50" />
+                                <h3 className="font-black text-white group-hover:text-[#D4AF37] transition-colors uppercase tracking-wider text-sm z-10">{s.teamName}</h3>
+                                <span className="text-[10px] text-slate-400 mt-4 bg-primary/50 border border-white/10 px-3 py-1.5 rounded-full uppercase tracking-widest font-bold group-hover:bg-[#D4AF37]/10 group-hover:text-[#D4AF37] group-hover:border-[#D4AF37]/30 transition-all z-10">More Details</span>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <p className="text-center text-text-secondary">Participating teams will appear here once fixtures are generated or teams are selected by admin.</p>
+                    <div className="text-center py-20 bg-primary/40 rounded-3xl border border-dashed border-white/10 max-w-2xl mx-auto">
+                        <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Participating teams will appear here.</p>
+                    </div>
                 )
             )}
 
             {activeTab === 'standings' && (
-                <>
-                    <div className="flex justify-end mb-4">
+                <div className="animate-fade-in-up">
+                    <div className="flex justify-end mb-6">
                         <button 
                             onClick={handleShareStandings}
                             disabled={isGeneratingStandings}
-                            className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded-full flex items-center gap-2 transition-colors disabled:opacity-50 shadow-lg"
+                            className="bg-secondary/40 backdrop-blur-sm border border-white/10 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 text-white hover:text-[#D4AF37] font-black py-3 px-6 rounded-full flex items-center gap-3 transition-all disabled:opacity-50 text-[10px] uppercase tracking-widest"
                         >
                             {isGeneratingStandings ? (
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -956,21 +1016,21 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                     </div>
                     <StandingsTable standings={standings} onTeamClick={handleTeamClick} />
                         {(tournament.phase === 'knockout' || tournament.phase === 'completed') && (
-                        <p className="text-center text-yellow-400 p-4 bg-secondary rounded-lg mt-4">The league phase is complete. The top teams have advanced to the knockout stage.</p>
+                        <p className="text-center text-[#D4AF37] p-6 bg-secondary/40 backdrop-blur-md border border-[#D4AF37]/30 rounded-3xl mt-8 shadow-lg text-sm font-bold tracking-widest uppercase shadow-[#D4AF37]/5">The league phase is complete. The top teams have advanced to the knockout stage.</p>
                     )}
-                </>
+                </div>
             )}
             
             {activeTab === 'knockout' && (
-                <>
-                    <div className="flex justify-end mb-4">
+                <div className="animate-fade-in-up">
+                    <div className="flex justify-end mb-6">
                          <button 
                             onClick={handleShareBracket}
                             disabled={isGeneratingBracket}
-                            className="bg-highlight hover:bg-teal-400 text-white font-bold py-2 px-4 rounded-full flex items-center gap-2 transition-colors disabled:opacity-50 shadow-lg"
+                            className="bg-secondary/40 backdrop-blur-sm border border-white/10 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 text-white hover:text-[#D4AF37] font-black py-3 px-6 rounded-full flex items-center gap-3 transition-all disabled:opacity-50 text-[10px] uppercase tracking-widest shadow-lg"
                         >
                             {isGeneratingBracket ? (
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <div className="w-5 h-5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"></div>
                             ) : (
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -980,13 +1040,13 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                         </button>
                     </div>
                     <KnockoutBracket tournament={tournament} />
-                </>
+                </div>
             )}
 
             {activeTab === 'awards' && (
                 awardsLoading ? (
                     <div className="flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-highlight"></div>
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4AF37]"></div>
                     </div>
                 ) : (
                     awards.length > 0 ? (
@@ -996,8 +1056,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tour
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-12 bg-secondary rounded-lg">
-                            <p className="text-text-secondary text-lg">No awards have been announced for this tournament yet.</p>
+                        <div className="text-center py-20 bg-primary/40 rounded-3xl border border-dashed border-white/10 max-w-2xl mx-auto">
+                            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No awards announced yet.</p>
                         </div>
                     )
                 )

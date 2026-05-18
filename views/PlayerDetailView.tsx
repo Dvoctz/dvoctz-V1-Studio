@@ -12,28 +12,30 @@ const TransferHistory: React.FC<{ transfers: PlayerTransfer[] }> = ({ transfers 
     const { getTeamById } = useSports();
 
     if (transfers.length === 0) {
-        return <p className="text-center text-text-secondary mt-4">No transfer history available for this player.</p>
+        return <div className="text-center py-16 bg-primary/40 rounded-3xl border border-dashed border-white/10">
+            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No transfer history available.</p>
+        </div>
     }
 
     return (
-        <div className="bg-secondary rounded-lg shadow-lg overflow-hidden">
+        <div className="bg-secondary/40 backdrop-blur-md rounded-3xl shadow-lg border border-white/5 overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="min-w-full">
-                    <thead className="bg-accent">
+                    <thead className="bg-[#D4AF37]/10 border-b border-[#D4AF37]/20">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Date</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">From</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">To</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider hidden sm:table-cell">Details</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Date</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">From</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">To</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-black text-[#D4AF37] uppercase tracking-widest hidden sm:table-cell">Details</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-secondary divide-y divide-accent">
+                    <tbody className="divide-y divide-white/5">
                         {transfers.map(t => (
-                            <tr key={t.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">{new Date(t.transferDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{getTeamById(t.fromTeamId)?.name || 'Free Agent'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{getTeamById(t.toTeamId)?.name || 'Free Agent'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary hidden sm:table-cell">{t.notes || (t.isAutomated ? 'Automated Roster Change' : 'Manual Entry')}</td>
+                            <tr key={t.id} className="hover:bg-white/5 transition-colors group">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300 font-medium group-hover:text-white transition-colors">{new Date(t.transferDate).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 font-bold group-hover:text-[#D4AF37] transition-colors">{getTeamById(t.fromTeamId)?.name || 'Free Agent'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 font-bold group-hover:text-[#D4AF37] transition-colors">{getTeamById(t.toTeamId)?.name || 'Free Agent'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500 uppercase tracking-wider font-bold hidden sm:table-cell">{t.notes || (t.isAutomated ? 'Automated Roster Change' : 'Manual Entry')}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -51,21 +53,25 @@ const TrophyCabinet: React.FC<{ awards: TournamentAward[] }> = ({ awards }) => {
     }
 
     return (
-        <div className="bg-secondary rounded-lg shadow-lg p-4 mb-8 border border-yellow-500/20">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <span className="text-2xl">🏆</span> Trophy Cabinet
+        <div className="bg-gradient-to-b from-secondary/80 to-secondary/40 backdrop-blur-md rounded-3xl shadow-xl p-8 mb-12 border border-[#D4AF37]/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#D4AF37] blur-[100px] opacity-10 pointer-events-none rounded-full"></div>
+            <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider mb-8 flex items-center gap-4 relative z-10">
+                <span className="w-10 h-10 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37]">🏆</span> 
+                Trophy Cabinet
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
                 {awards.map(award => {
                     const tournament = tournaments.find(t => t.id === award.tournamentId);
                     return (
-                        <div key={award.id} className="bg-primary p-3 rounded border border-yellow-500/30 flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-yellow-900/30 flex items-center justify-center text-2xl flex-shrink-0">
-                                {award.imageUrl ? <img src={award.imageUrl} className="w-full h-full object-cover rounded-full" alt="" /> : '🥇'}
+                        <div key={award.id} className="bg-primary/80 backdrop-blur-sm p-4 rounded-2xl border border-white/5 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5 transition-all duration-300 flex items-center gap-4 group">
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#F9F295] via-[#E0AA3E] to-[#B8860B] p-1 flex items-center justify-center text-2xl flex-shrink-0 shadow-lg group-hover:rotate-[10deg] transition-transform duration-500">
+                                <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                                     {award.imageUrl ? <img src={award.imageUrl} className="w-full h-full object-cover" alt="" /> : '🥇'}
+                                </div>
                             </div>
-                            <div>
-                                <p className="font-bold text-yellow-400 text-sm uppercase">{award.awardName}</p>
-                                <p className="text-text-secondary text-xs">{tournament ? tournament.name : 'Unknown Tournament'}</p>
+                            <div className="overflow-hidden">
+                                <p className="font-black text-[#D4AF37] text-xs uppercase tracking-widest truncate">{award.awardName}</p>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider truncate mt-1">{tournament ? tournament.name : 'Unknown Tournament'}</p>
                             </div>
                         </div>
                     );
@@ -101,44 +107,50 @@ export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBa
   }
 
   return (
-    <div>
-      <button onClick={onBack} className="flex items-center space-x-2 text-text-secondary hover:text-highlight mb-6 transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
+    <div className="animate-fade-in-up">
+      <button onClick={onBack} className="flex items-center space-x-2 text-slate-400 hover:text-[#D4AF37] mb-8 transition-colors text-sm font-bold uppercase tracking-wider group">
+        <div className="w-8 h-8 rounded-full bg-secondary border border-white/10 flex items-center justify-center group-hover:bg-[#D4AF37]/10 group-hover:border-[#D4AF37]/30 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </div>
         <span>Back to Players List</span>
       </button>
 
-      <div className="bg-secondary rounded-xl shadow-lg p-6 flex flex-col md:flex-row items-center gap-6 mb-8">
-        {player.photoUrl ? (
-            <img src={player.photoUrl} alt={player.name} className="w-40 h-40 rounded-full object-cover border-4 border-accent flex-shrink-0" />
-        ) : (
-            <div className="w-40 h-40 rounded-full bg-accent flex items-center justify-center text-text-secondary flex-shrink-0 border-4 border-accent">
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-            </div>
-        )}
-        <div className="text-center md:text-left">
-            <h1 className="text-4xl font-extrabold text-white">{player.name}</h1>
-            <p className="text-xl text-highlight font-semibold mt-1">{player.role}</p>
-            <p className="text-text-secondary mt-2">Current Status: <span className={`font-semibold ${team ? 'text-text-primary' : club ? 'text-yellow-400' : 'text-text-secondary'}`}>{currentAffiliation}</span></p>
+      <div className="bg-secondary/40 backdrop-blur-md rounded-3xl shadow-xl p-8 flex flex-col lg:flex-row items-center gap-8 mb-12 border border-white/5 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 to-transparent pointer-events-none"></div>
+        <div className="relative">
+            <div className="absolute inset-0 bg-[#D4AF37] blur-2xl opacity-20 rounded-full animate-pulse-slow"></div>
+            {player.photoUrl ? (
+                <img src={player.photoUrl} alt={player.name} className="w-48 h-48 rounded-full object-cover border-4 border-secondary shadow-2xl relative z-10" />
+            ) : (
+                <div className="w-48 h-48 rounded-full bg-primary flex items-center justify-center text-slate-500 border-4 border-secondary shadow-2xl relative z-10">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                </div>
+            )}
         </div>
-        <div className="w-full md:w-auto md:ml-auto grid grid-cols-2 sm:grid-cols-5 gap-4 text-center bg-primary p-4 rounded-lg">
-             <div><span className="font-bold text-xl text-white block">{player.stats?.matches ?? 0}</span><span className="text-xs text-text-secondary">Matches</span></div>
-             <div><span className="font-bold text-xl text-white block">{player.stats?.aces ?? 0}</span><span className="text-xs text-text-secondary">Aces</span></div>
-             <div><span className="font-bold text-xl text-white block">{player.stats?.kills ?? 0}</span><span className="text-xs text-text-secondary">Kills</span></div>
-             <div><span className="font-bold text-xl text-white block">{player.stats?.blocks ?? 0}</span><span className="text-xs text-text-secondary">Blocks</span></div>
-             <div><span className="font-bold text-xl text-highlight block">{motmFixtures.length}</span><span className="text-xs text-text-secondary">MOTM</span></div>
+        <div className="text-center lg:text-left flex-1 relative z-10">
+            <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-wider drop-shadow-md">{player.name}</h1>
+            <p className="inline-block px-4 py-1.5 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-black tracking-[0.2em] uppercase text-xs mt-4 mb-4 shadow-[0_0_15px_rgba(212,175,55,0.2)]">{player.role}</p>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mt-2">Current Status: <span className={`font-black ${team ? 'text-[#D4AF37]' : club ? 'text-yellow-400' : 'text-slate-300'}`}>{currentAffiliation}</span></p>
+        </div>
+        <div className="w-full lg:w-auto grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-2 gap-4 text-center bg-primary/80 backdrop-blur-sm p-6 rounded-2xl border border-white/5 relative z-10">
+             <div className="bg-secondary/50 p-3 rounded-xl border border-white/5 hover:border-[#D4AF37]/30 transition-colors"><span className="font-black text-2xl text-white block mb-1">{player.stats?.matches ?? 0}</span><span className="text-[9px] uppercase tracking-widest font-bold text-slate-400">Matches</span></div>
+             <div className="bg-secondary/50 p-3 rounded-xl border border-white/5 hover:border-[#D4AF37]/30 transition-colors"><span className="font-black text-2xl text-white block mb-1">{player.stats?.aces ?? 0}</span><span className="text-[9px] uppercase tracking-widest font-bold text-slate-400">Aces</span></div>
+             <div className="bg-secondary/50 p-3 rounded-xl border border-white/5 hover:border-[#D4AF37]/30 transition-colors"><span className="font-black text-2xl text-white block mb-1">{player.stats?.kills ?? 0}</span><span className="text-[9px] uppercase tracking-widest font-bold text-slate-400">Kills</span></div>
+             <div className="bg-secondary/50 p-3 rounded-xl border border-white/5 hover:border-[#D4AF37]/30 transition-colors"><span className="font-black text-2xl text-white block mb-1">{player.stats?.blocks ?? 0}</span><span className="text-[9px] uppercase tracking-widest font-bold text-slate-400">Blocks</span></div>
+             <div className="bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 p-3 rounded-xl border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 transition-colors sm:col-span-2 lg:col-span-1 xl:col-span-2"><span className="font-black text-3xl text-[#D4AF37] block mb-1">{motmFixtures.length}</span><span className="text-[10px] uppercase tracking-[0.2em] font-black text-[#D4AF37]/80">MOTM</span></div>
         </div>
       </div>
       
       <TrophyCabinet awards={awards} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div>
-            <h2 className="text-2xl font-bold mb-4">Match Awards</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-7xl mx-auto">
+        <div className="space-y-6">
+            <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider pl-4 border-l-4 border-[#D4AF37]">Match Awards</h2>
             {motmFixtures.length > 0 ? (
-                <div className="bg-secondary rounded-lg shadow-lg overflow-hidden">
-                     <div className="space-y-1">
+                <div className="bg-secondary/40 backdrop-blur-md rounded-3xl shadow-lg border border-white/5 overflow-hidden">
+                     <div className="divide-y divide-white/5">
                          {motmFixtures.map(f => {
                              const tournament = tournaments.find(t => t.id === f.tournamentId);
                              const isTeam1 = f.team1Id === player.teamId;
@@ -150,19 +162,19 @@ export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBa
                              else opponent = `${getTeamById(f.team1Id)?.name} vs ${getTeamById(f.team2Id)?.name}`;
 
                              return (
-                                 <div key={f.id} className="flex items-center p-4 bg-secondary hover:bg-accent transition-colors border-b border-accent last:border-0">
-                                     <div className="flex-shrink-0 mr-4">
-                                         <div className="w-10 h-10 rounded-full bg-highlight/20 flex items-center justify-center text-highlight">
-                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                 <div key={f.id} className="flex items-center p-6 bg-transparent hover:bg-white/5 transition-all group">
+                                     <div className="flex-shrink-0 mr-6">
+                                         <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37] border border-[#D4AF37]/20 group-hover:scale-110 transition-transform">
+                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 drop-shadow-[0_0_8px_rgba(212,175,55,0.8)]" viewBox="0 0 20 20" fill="currentColor">
                                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                              </svg>
                                          </div>
                                      </div>
                                      <div>
-                                         <p className="text-white font-bold text-sm sm:text-base">Man of the Match</p>
-                                         <p className="text-text-secondary text-xs sm:text-sm">{opponent}</p>
-                                         <p className="text-highlight text-xs mt-0.5 font-medium">
-                                             {tournament?.name || 'Unknown Tournament'} • {new Date(f.dateTime).toLocaleDateString()}
+                                         <p className="text-white font-black uppercase tracking-wider text-sm group-hover:text-[#D4AF37] transition-colors mb-1">Man of the Match</p>
+                                         <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2">{opponent}</p>
+                                         <p className="text-[#D4AF37] text-[9px] font-black uppercase tracking-[0.2em] bg-[#D4AF37]/10 px-2 py-0.5 rounded inline-block">
+                                             {tournament?.name || 'Unknown Tournament'} &bull; {new Date(f.dateTime).toLocaleDateString()}
                                          </p>
                                      </div>
                                  </div>
@@ -171,14 +183,14 @@ export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBa
                      </div>
                 </div>
             ) : (
-                <div className="bg-secondary rounded-lg p-6 text-center">
-                    <p className="text-text-secondary">No Man of the Match awards yet.</p>
+                <div className="text-center py-16 bg-primary/40 rounded-3xl border border-dashed border-white/10">
+                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No Man of the Match awards yet.</p>
                 </div>
             )}
         </div>
 
-        <div>
-            <h2 className="text-2xl font-bold mb-4">Transfer History</h2>
+        <div className="space-y-6">
+            <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider pl-4 border-l-4 border-[#D4AF37]">Transfer History</h2>
             <TransferHistory transfers={transfers} />
         </div>
       </div>

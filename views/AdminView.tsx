@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import * as Papa from 'papaparse';
+import { parse as papaParse } from 'papaparse';
 import { useSports, CsvTeam, CsvPlayer } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Tournament, Team, Player, Fixture, Sponsor, Score, PlayerRole, UserRole, Club, PlayerTransfer, Notice, NoticeLevel } from '../types';
@@ -8,18 +8,19 @@ import { LiveScorerView } from './LiveScorerView';
 
 // Reusable UI Components
 export const AdminSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-    <div className="bg-secondary p-6 rounded-lg shadow-lg mb-8">
-        <h2 className="text-2xl font-bold mb-4 text-white">{title}</h2>
+    <div className="bg-secondary p-6 rounded-2xl shadow-premium border border-accent mb-8 relative overflow-hidden group">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-highlight to-yellow-600"></div>
+        <h2 className="text-2xl font-black mb-6 text-white tracking-wide uppercase">{title}</h2>
         {children}
     </div>
 );
 
-export const Button: React.FC<{ onClick?: (e?: React.MouseEvent) => void; children: React.ReactNode; className?: string; disabled?: boolean; type?: 'button' | 'submit' }> = ({ onClick, children, className = 'bg-highlight hover:bg-teal-400', disabled = false, type = "button" }) => (
+export const Button: React.FC<{ onClick?: (e?: React.MouseEvent) => void; children: React.ReactNode; className?: string; disabled?: boolean; type?: 'button' | 'submit' }> = ({ onClick, children, className = 'bg-highlight hover:brightness-110 text-primary', disabled = false, type = "button" }) => (
     <button
         type={type}
         onClick={onClick}
         disabled={disabled}
-        className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors duration-300 ${className || ''} disabled:bg-gray-500 disabled:cursor-not-allowed`}
+        className={`px-4 py-2 rounded-md text-sm font-bold transition-all duration-300 ${className || ''} disabled:opacity-50 disabled:cursor-not-allowed`}
     >
         {children}
     </button>
@@ -697,7 +698,7 @@ const TeamsAdmin = () => {
     const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        Papa.parse(file, {
+        papaParse(file, {
             header: true, skipEmptyLines: true,
             complete: async (results) => {
                 try {
@@ -732,7 +733,7 @@ const PlayersAdmin = () => {
     const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        Papa.parse(file, { header: true, skipEmptyLines: true, complete: async (results) => { try { await bulkAddOrUpdatePlayers(results.data as any); alert('Players imported!'); } catch(e: any) { alert('Import failed: ' + e.message); } } });
+        papaParse(file, { header: true, skipEmptyLines: true, complete: async (results) => { try { await bulkAddOrUpdatePlayers(results.data as any); alert('Players imported!'); } catch(e: any) { alert('Import failed: ' + e.message); } } });
     };
 
     const filtered = players.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
