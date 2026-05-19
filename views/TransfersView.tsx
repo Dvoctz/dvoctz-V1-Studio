@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useSports, useEntityData } from '../context/SportsDataContext';
+import { useSports } from '../context/SportsDataContext';
 import type { PlayerTransfer } from '../types';
 
 const TransferItem: React.FC<{ transfer: PlayerTransfer }> = ({ transfer }) => {
@@ -76,10 +76,10 @@ const TransferItem: React.FC<{ transfer: PlayerTransfer }> = ({ transfer }) => {
 };
 
 export const TransfersView: React.FC = () => {
-  const { playerTransfers, players } = useSports();
-  const { loading: transfersLoading } = useEntityData('playerTransfers');
-  const { loading: playersLoading } = useEntityData('players');
-  const { loading: teamsLoading } = useEntityData('teams');
+  const { playerTransfers, players, loading } = useSports();
+  const transfersLoading = loading.has('playerTransfers');
+  const playersLoading = loading.has('players');
+  const teamsLoading = loading.has('teams');
   const [searchTerm, setSearchTerm] = useState('');
 
   const sortedTransfers = useMemo(() => {

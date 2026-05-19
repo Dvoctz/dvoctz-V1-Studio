@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { useSports, useEntityData } from '../context/SportsDataContext';
+import { useSports } from '../context/SportsDataContext';
 import type { Player, PlayerTransfer, TournamentAward } from '../types';
 
 interface PlayerDetailViewProps {
@@ -88,9 +88,6 @@ export const PlayerDetailView: React.FC<PlayerDetailViewProps> = ({ player, onBa
   const club = getClubById(player.clubId);
   const transfers = getTransfersByPlayerId(player.id);
   const awards = getAwardsByPlayerId(player.id);
-
-  // We need to fetch awards data if not already present
-  useEntityData('tournamentAwards');
 
   // Calculate Man of the Match Awards
   const motmFixtures = useMemo(() => {
