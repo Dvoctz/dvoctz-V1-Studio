@@ -597,10 +597,10 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
          
          for (const t of csvTeams) {
              let clubId = clubsMap.get(t.clubName.toLowerCase());
-             if (!clubId) {
+             if (clubId === undefined) {
                  const { data, error } = await supabase.from('clubs').insert({ name: t.clubName }).select().single();
                  if (error) throw error;
-                 clubId = data.id;
+                 clubId = data.id as number;
                  clubsMap.set(t.clubName.toLowerCase(), clubId);
              }
              
@@ -680,28 +680,28 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
     };
     
     // TOURNAMENT LOGIC Helpers
-    const getTournamentsByDivision = (division: 'Division 1' | 'Division 2') => {
+    const getTournamentsByDivision = useCallback((division: 'Division 1' | 'Division 2') => {
         return (state.tournaments || []).filter(t => t.division === division);
-    };
+    }, [state.tournaments]);
 
-    const getFixturesByTournament = (tournamentId: number) => {
+    const getFixturesByTournament = useCallback((tournamentId: number) => {
         return (state.fixtures || []).filter(f => f.tournamentId === tournamentId);
-    };
+    }, [state.fixtures]);
     
-    const getClubById = (id: number | null) => (state.clubs || []).find(c => c.id === id);
-    const getTeamById = (id: number | null) => (state.teams || []).find(t => t.id === id);
-    const getTeamsByClub = (clubId: number) => (state.teams || []).filter(t => t.clubId === clubId);
-    const getPlayersByTeam = (teamId: number) => (state.players || []).filter(p => p.teamId === teamId);
-    const getPlayersByClub = (clubId: number) => (state.players || []).filter(p => p.clubId === clubId);
-    const getPlayerById = (id: number) => (state.players || []).find(p => p.id === id);
-    const getTransfersByPlayerId = (id: number) => (state.playerTransfers || []).filter(t => t.playerId === id).sort((a,b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime());
-    const getSponsorsForTournament = (tournamentId: number) => {
+    const getClubById = useCallback((id: number | null) => (state.clubs || []).find(c => c.id === id), [state.clubs]);
+    const getTeamById = useCallback((id: number | null) => (state.teams || []).find(t => t.id === id), [state.teams]);
+    const getTeamsByClub = useCallback((clubId: number) => (state.teams || []).filter(t => t.clubId === clubId), [state.teams]);
+    const getPlayersByTeam = useCallback((teamId: number) => (state.players || []).filter(p => p.teamId === teamId), [state.players]);
+    const getPlayersByClub = useCallback((clubId: number) => (state.players || []).filter(p => p.clubId === clubId), [state.players]);
+    const getPlayerById = useCallback((id: number) => (state.players || []).find(p => p.id === id), [state.players]);
+    const getTransfersByPlayerId = useCallback((id: number) => (state.playerTransfers || []).filter(t => t.playerId === id).sort((a,b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime()), [state.playerTransfers]);
+    const getSponsorsForTournament = useCallback((tournamentId: number) => {
         const links = (state.tournamentSponsors || []).filter(ts => ts.tournament_id === tournamentId);
         const ids = new Set(links.map(l => l.sponsor_id));
         return (state.sponsors || []).filter(s => ids.has(s.id));
-    };
-    const getAwardsByTournament = (tournamentId: number) => (state.tournamentAwards || []).filter(a => a.tournamentId === tournamentId);
-    const getAwardsByPlayerId = (playerId: number) => (state.tournamentAwards || []).filter(a => a.playerId === playerId);
+    }, [state.tournamentSponsors, state.sponsors]);
+    const getAwardsByTournament = useCallback((tournamentId: number) => (state.tournamentAwards || []).filter(a => a.tournamentId === tournamentId), [state.tournamentAwards]);
+    const getAwardsByPlayerId = useCallback((playerId: number) => (state.tournamentAwards || []).filter(a => a.playerId === playerId), [state.tournamentAwards]);
 
     const getStandingsForTournament = (tournamentId: number): TeamStanding[] => {
         const tournamentFixtures = getFixturesByTournament(tournamentId).filter(f => f.status === 'completed' && !f.stage); // Only Round Robin
@@ -796,7 +796,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         // Let's assume Top 4 for Semis if small, or Top 8 for QF if large.
         // Logic: If >= 8 teams, Quarter Finals. Else Semi Finals.
         
-        const fixturesPayload = [];
+        const fixturesPayload: any[] = [];
         const now = new Date();
         const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1); // Mock schedule for tomorrow
         
@@ -1016,12 +1016,15 @@ export const useSports = (): SportsContextType => {
 // Hook for accessing raw data for a specific entity with loading state
 export const useEntityData = <K extends EntityName>(entityName: K) => {
     const context = useSports();
+    const stateValue = context._internal_state[entityName];
+    const fetchData = context.fetchData;
+
     useEffect(() => {
         // Trigger fetch if data is missing
-        if (context._internal_state[entityName] === null) {
-            context.fetchData(entityName);
+        if (stateValue === null) {
+            fetchData(entityName);
         }
-    }, [entityName, context]);
+    }, [entityName, stateValue, fetchData]);
 
     return {
         data: context._internal_state[entityName] as SportsState[K],

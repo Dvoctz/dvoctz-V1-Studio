@@ -247,7 +247,7 @@ const FixtureForm: React.FC<{ fixture: any, teams: Team[], tournaments: Tourname
     const eligiblePlayers = useMemo(() => { if (!formData.team1Id || !formData.team2Id) return []; return players.filter(p => p.teamId === formData.team1Id || p.teamId === formData.team2Id).sort((a, b) => a.name.localeCompare(b.name)); }, [players, formData.team1Id, formData.team2Id]);
 
     const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const newId = Number(e.target.value); const newTourney = tournaments.find(t => t.id === newId); let update: any = { tournamentId: newId }; if (newTourney) { const relevantTeams = teams.filter(t => t.division === newTourney.division).sort((a, b) => a.name.localeCompare(b.name)); const t1Exists = relevantTeams.find(t => t.id === formData.team1Id); const t2Exists = relevantTeams.find(t => t.id === formData.team2Id); if (!t1Exists && relevantTeams.length > 0) update.team1Id = relevantTeams[0].id; if (!t2Exists && relevantTeams.length > 1) update.team2Id = relevantTeams[1].id; else if (!t2Exists && relevantTeams.length > 0) update.team2Id = relevantTeams[0].id; } setFormData({ ...formData, ...update }); };
-    const handleRefereeChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const val = e.target.value; setRefereeSelection(val); if (val === '__manual__') setFormData(prev => ({ ...prev, referee: prev.referee || '' })); else setFormData(prev => ({ ...prev, referee: val === '' ? '' : val })); };
+    const handleRefereeChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const val = e.target.value; setRefereeSelection(val); if (val === '__manual__') setFormData((prev: any) => ({ ...prev, referee: prev.referee || '' })); else setFormData((prev: any) => ({ ...prev, referee: val === '' ? '' : val })); };
     const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); const localDate = new Date(formData.dateTime); const utcDate = localDate.toISOString(); onSave({ ...formData, dateTime: utcDate }); };
 
     const updateSet = (index: number, field: 'team1Points' | 'team2Points', value: string) => {
@@ -700,7 +700,7 @@ const TeamsAdmin = () => {
         if (!file) return;
         papaParse(file, {
             header: true, skipEmptyLines: true,
-            complete: async (results) => {
+            complete: async (results: any) => {
                 try {
                     const csvTeams: CsvTeam[] = results.data.map((row: any) => ({ name: row.name, shortName: row.shortName || row.name.substring(0,3).toUpperCase(), division: row.division || 'Division 1', logoUrl: row.logoUrl || '', clubName: row.clubName }));
                     await bulkAddOrUpdateTeams(csvTeams); alert('Teams imported successfully!');
@@ -733,7 +733,7 @@ const PlayersAdmin = () => {
     const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        papaParse(file, { header: true, skipEmptyLines: true, complete: async (results) => { try { await bulkAddOrUpdatePlayers(results.data as any); alert('Players imported!'); } catch(e: any) { alert('Import failed: ' + e.message); } } });
+        papaParse(file, { header: true, skipEmptyLines: true, complete: async (results: any) => { try { await bulkAddOrUpdatePlayers(results.data as any); alert('Players imported!'); } catch(e: any) { alert('Import failed: ' + e.message); } } });
     };
 
     const filtered = players.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));

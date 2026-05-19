@@ -94,7 +94,7 @@ export const ShareTeamCard = forwardRef<HTMLDivElement, ShareTeamCardProps>(({ t
                                      </div>
                                     <div className="flex flex-col overflow-hidden leading-tight">
                                         <span className="font-bold text-white text-[12px] truncate">{p.name}</span>
-                                        <span className="text-[9px] text-[#D4AF37] uppercase tracking-wider">{p.role === 'Player' ? 'PLYR' : p.role.split(' ')[0]}</span>
+                                        <span className="text-[9px] text-[#D4AF37] uppercase tracking-wider">{(p.role as string) === 'Player' ? 'PLYR' : p.role.split(' ')[0]}</span>
                                     </div>
                                 </div>
                             ))}

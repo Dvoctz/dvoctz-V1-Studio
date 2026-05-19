@@ -128,7 +128,7 @@ export const ScoreSheetModal: React.FC<ScoreSheetModalProps> = ({ fixture, team1
                              </div>
                              {motmTeam && (
                                  <img 
-                                     src={motmTeam.logoUrl} 
+                                     src={motmTeam.logoUrl || undefined} 
                                      alt={motmTeam.name} 
                                      className="w-8 h-8 rounded-full absolute -bottom-1 -right-1 border-2 border-primary bg-secondary shadow-md grayscale"
                                      title={motmTeam.name}

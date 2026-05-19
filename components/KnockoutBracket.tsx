@@ -8,7 +8,7 @@ const MatchupCard: React.FC<{ fixture?: Fixture; placeholderText: string }> = ({
     const team1 = fixture ? getTeamById(fixture.team1Id) : null;
     const team2 = fixture ? getTeamById(fixture.team2Id) : null;
 
-    const renderTeam = (team: Team | null, score?: number) => {
+    const renderTeam = (team: Team | null | undefined, score?: number) => {
         const isWinner = fixture?.status === 'completed' && fixture.score && score === Math.max(fixture.score.team1Score, fixture.score.team2Score);
         const scoreExists = typeof score === 'number';
 
@@ -54,7 +54,7 @@ const MatchupCard: React.FC<{ fixture?: Fixture; placeholderText: string }> = ({
                          Final
                      </div>
                  )}
-                 {fixture?.status === 'scheduled' && (
+                 {fixture?.status === 'upcoming' && (
                      <div className="absolute -top-2.5 -right-2.5 bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest text-[#D4AF37] shadow-md backdrop-blur-sm">
                          Upcoming
                      </div>
