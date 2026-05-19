@@ -45,7 +45,7 @@ interface SportsContextType extends Omit<SportsState, 'tournaments' | 'clubs' | 
     tournamentTeams: TournamentTeam[];
     tournamentAwards: TournamentAward[];
     _internal_state: SportsState;
-    fetchData: <T extends EntityName>(entityName: T) => Promise<SportsState[T]>;
+    fetchData: <T extends EntityName>(entityName: T, force?: boolean) => Promise<SportsState[T]>;
     prefetchAllData: () => Promise<void>;
     addTournament: (tournament: Omit<Tournament, 'id'>) => Promise<void>;
     updateTournament: (tournament: Tournament) => Promise<void>;
@@ -187,14 +187,14 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         stateRef.current = state;
     }, [state]);
 
-    const fetchData = useCallback(async <T extends EntityName>(entityName: T): Promise<SportsState[T]> => {
+    const fetchData = useCallback(async <T extends EntityName>(entityName: T, force: boolean = false): Promise<SportsState[T]> => {
         const currentState = stateRef.current;
 
-        if (currentState[entityName] !== null) {
+        if (!force && currentState[entityName] !== null) {
             return currentState[entityName] as SportsState[T];
         }
 
-        if (currentState.loading.has(entityName)) {
+        if (!force && currentState.loading.has(entityName)) {
             return currentState[entityName] as SportsState[T];
         }
 
@@ -276,8 +276,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }]);
         if (error) throw error;
         // Invalidate cache
-        setState(s => ({...s, tournaments: null}));
-        await fetchData('tournaments');
+        await fetchData('tournaments', true);
     };
 
     const updateTournament = async (tournament: Tournament) => {
@@ -288,15 +287,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             show_champion_banner: tournament.showChampionBanner
         }).eq('id', tournament.id);
         if (error) throw error;
-        setState(s => ({...s, tournaments: null}));
-        await fetchData('tournaments');
+        await fetchData('tournaments', true);
     };
 
     const deleteTournament = async (id: number) => {
         const { error } = await supabase.from('tournaments').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, tournaments: null}));
-        await fetchData('tournaments');
+        await fetchData('tournaments', true);
     };
 
     const addClub = async (club: Omit<Club, 'id'> & { logoFile?: File }) => {
@@ -306,8 +303,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
         const { error } = await supabase.from('clubs').insert([{ name: club.name, logo_url: logoUrl }]);
         if (error) throw error;
-        setState(s => ({...s, clubs: null}));
-        await fetchData('clubs');
+        await fetchData('clubs', true);
     };
 
     const updateClub = async (club: Club & { logoFile?: File }) => {
@@ -317,15 +313,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
         const { error } = await supabase.from('clubs').update({ name: club.name, logo_url: logoUrl }).eq('id', club.id);
         if (error) throw error;
-        setState(s => ({...s, clubs: null}));
-        await fetchData('clubs');
+        await fetchData('clubs', true);
     };
 
     const deleteClub = async (id: number) => {
         const { error } = await supabase.from('clubs').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, clubs: null}));
-        await fetchData('clubs');
+        await fetchData('clubs', true);
     };
 
     const addTeam = async (team: Omit<Team, 'id'> & { logoFile?: File }) => {
@@ -335,8 +329,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
         const { error } = await supabase.from('teams').insert([{ name: team.name, short_name: team.shortName, division: team.division, club_id: team.clubId, logo_url: logoUrl }]);
         if (error) throw error;
-        setState(s => ({...s, teams: null}));
-        await fetchData('teams');
+        await fetchData('teams', true);
     };
 
     const updateTeam = async (team: Team & { logoFile?: File }) => {
@@ -346,15 +339,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
         const { error } = await supabase.from('teams').update({ name: team.name, short_name: team.shortName, division: team.division, club_id: team.clubId, logo_url: logoUrl }).eq('id', team.id);
         if (error) throw error;
-        setState(s => ({...s, teams: null}));
-        await fetchData('teams');
+        await fetchData('teams', true);
     };
 
     const deleteTeam = async (id: number) => {
         const { error } = await supabase.from('teams').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, teams: null}));
-        await fetchData('teams');
+        await fetchData('teams', true);
     };
 
     const addPlayer = async (player: Omit<Player, 'id'> & { photoFile?: File }) => {
@@ -373,8 +364,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             joined_at: player.joinedAt || new Date().toISOString()
         }]);
         if (error) throw error;
-        setState(s => ({...s, players: null}));
-        await fetchData('players');
+        await fetchData('players', true);
     };
 
     const updatePlayer = async (player: Player & { photoFile?: File }) => {
@@ -392,22 +382,19 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             joined_at: player.joinedAt 
         }).eq('id', player.id);
         if (error) throw error;
-        setState(s => ({...s, players: null}));
-        await fetchData('players');
+        await fetchData('players', true);
     };
 
     const deletePlayer = async (id: number) => {
         const { error } = await supabase.from('players').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, players: null}));
-        await fetchData('players');
+        await fetchData('players', true);
     };
     
     const deleteAllPlayers = async () => {
         const { error } = await supabase.from('players').delete().neq('id', 0); // Delete all
         if (error) throw error;
-        setState(s => ({...s, players: null}));
-        await fetchData('players');
+        await fetchData('players', true);
     };
 
     const addFixture = async (fixture: Omit<Fixture, 'id' | 'score'>) => {
@@ -423,8 +410,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             man_of_the_match_id: fixture.manOfTheMatchId
         }]);
         if (error) throw error;
-        setState(s => ({...s, fixtures: null}));
-        await fetchData('fixtures');
+        await fetchData('fixtures', true);
     };
 
     const updateFixture = async (fixture: Fixture) => {
@@ -441,15 +427,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             man_of_the_match_id: fixture.manOfTheMatchId
         }).eq('id', fixture.id);
         if (error) throw error;
-        setState(s => ({...s, fixtures: null}));
-        await fetchData('fixtures');
+        await fetchData('fixtures', true);
     };
 
     const deleteFixture = async (id: number) => {
         const { error } = await supabase.from('fixtures').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, fixtures: null}));
-        await fetchData('fixtures');
+        await fetchData('fixtures', true);
     };
 
     const bulkAddFixtures = async (fixtures: Omit<Fixture, 'id' | 'score'>[]) => {
@@ -464,8 +448,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             stage: f.stage
         })));
         if (error) throw error;
-        setState(s => ({...s, fixtures: null}));
-        await fetchData('fixtures');
+        await fetchData('fixtures', true);
     };
 
     const addSponsor = async (sponsor: Omit<Sponsor, 'id'> & { logoFile?: File }) => {
@@ -475,8 +458,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
         const { error } = await supabase.from('sponsors').insert([{ name: sponsor.name, website: sponsor.website, logo_url: logoUrl, show_in_footer: sponsor.showInFooter }]);
         if (error) throw error;
-        setState(s => ({...s, sponsors: null}));
-        await fetchData('sponsors');
+        await fetchData('sponsors', true);
     };
 
     const updateSponsor = async (sponsor: Sponsor & { logoFile?: File }) => {
@@ -486,22 +468,19 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         }
         const { error } = await supabase.from('sponsors').update({ name: sponsor.name, website: sponsor.website, logo_url: logoUrl, show_in_footer: sponsor.showInFooter }).eq('id', sponsor.id);
         if (error) throw error;
-        setState(s => ({...s, sponsors: null}));
-        await fetchData('sponsors');
+        await fetchData('sponsors', true);
     };
 
     const deleteSponsor = async (id: number) => {
         const { error } = await supabase.from('sponsors').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, sponsors: null}));
-        await fetchData('sponsors');
+        await fetchData('sponsors', true);
     };
     
     const toggleSponsorShowInFooter = async (sponsor: Sponsor) => {
         const { error } = await supabase.from('sponsors').update({ show_in_footer: !sponsor.showInFooter }).eq('id', sponsor.id);
         if (error) throw error;
-        setState(s => ({...s, sponsors: null}));
-        await fetchData('sponsors');
+        await fetchData('sponsors', true);
     }
 
     const addPlayerTransfer = async (transfer: Omit<PlayerTransfer, 'id' | 'isAutomated'>) => {
@@ -525,9 +504,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             club_id: transfer.toClubId // Keep club affiliation in sync
         }).eq('id', transfer.playerId);
         if (pError) throw pError;
-        
-        setState(s => ({...s, playerTransfers: null, players: null}));
-        await Promise.all([fetchData('playerTransfers'), fetchData('players')]);
+        await Promise.all([fetchData('playerTransfers', true), fetchData('players', true)]);
     };
     
     const updatePlayerTransfer = async (transfer: PlayerTransfer) => {
@@ -541,37 +518,32 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
              notes: transfer.notes 
         }).eq('id', transfer.id);
         if (error) throw error;
-        setState(s => ({...s, playerTransfers: null}));
-        await fetchData('playerTransfers');
+        await fetchData('playerTransfers', true);
     };
 
     const deletePlayerTransfer = async (id: number) => {
         const { error } = await supabase.from('player_transfers').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, playerTransfers: null}));
-        await fetchData('playerTransfers');
+        await fetchData('playerTransfers', true);
     };
 
     const addNotice = async (notice: Omit<Notice, 'id' | 'createdAt'>) => {
         const { error } = await supabase.from('notices').insert([{ title: notice.title, message: notice.message, level: notice.level, expires_at: notice.expiresAt }]);
         if (error) throw error;
-        setState(s => ({...s, notices: null}));
-        await fetchData('notices');
+        await fetchData('notices', true);
     };
     
     const deleteNotice = async (id: number) => {
          const { error } = await supabase.from('notices').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, notices: null}));
-        await fetchData('notices');
+        await fetchData('notices', true);
     };
     
     const updateRules = async (content: string) => {
         // Upsert logic for single row table
         const { error } = await supabase.from('game_rules').upsert({ id: 1, content });
         if (error) throw error;
-        setState(s => ({...s, rules: null}));
-        await fetchData('rules');
+        await fetchData('rules', true);
     };
 
     const getActiveNotice = () => {
@@ -616,9 +588,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
              }, { onConflict: 'name' }); // Assuming 'name' has a unique constraint in DB, or this might duplicate.
              if (teamError) throw teamError;
          }
-         
-         setState(s => ({...s, clubs: null, teams: null}));
-         await Promise.all([fetchData('clubs'), fetchData('teams')]);
+         await Promise.all([fetchData('clubs', true), fetchData('teams', true)]);
     };
 
     const bulkAddOrUpdatePlayers = async (csvPlayers: CsvPlayer[]) => {
@@ -654,8 +624,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 }
             }, { onConflict: 'name' });
         }
-        setState(s => ({...s, players: null}));
-        await fetchData('players');
+        await fetchData('players', true);
     };
     
     const updateSponsorsForTournament = async (tournamentId: number, sponsorIds: number[]) => {
@@ -668,15 +637,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 sponsor_id: sid
             })));
         }
-        setState(s => ({...s, tournamentSponsors: null}));
-        await fetchData('tournamentSponsors');
+        await fetchData('tournamentSponsors', true);
     };
     
     const bulkUpdatePlayerTeam = async (playerIds: number[], teamId: number | null) => {
         const { error } = await supabase.from('players').update({ team_id: teamId }).in('id', playerIds);
         if (error) throw error;
-        setState(s => ({...s, players: null}));
-        await fetchData('players');
+        await fetchData('players', true);
     };
     
     // TOURNAMENT LOGIC Helpers
@@ -855,9 +822,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
         // 3. Update Tournament Phase
         const { error: tError } = await supabase.from('tournaments').update({ phase: 'knockout' }).eq('id', tournamentId);
         if (tError) throw tError;
-        
-        setState(s => ({...s, fixtures: null, tournaments: null}));
-        await Promise.all([fetchData('fixtures'), fetchData('tournaments')]);
+        await Promise.all([fetchData('fixtures', true), fetchData('tournaments', true)]);
     };
     
     const updateTournamentSquad = async (tournamentId: number, teamId: number, playerIds: number[]) => {
@@ -871,8 +836,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 player_id: pid
             })));
         }
-        setState(s => ({...s, tournamentRosters: null}));
-        await fetchData('tournamentRosters');
+        await fetchData('tournamentRosters', true);
     };
     
     const getTournamentSquad = (tournamentId: number, teamId: number) => {
@@ -898,8 +862,7 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
                 team_id: tid
             })));
         }
-        setState(s => ({...s, tournamentTeams: null}));
-        await fetchData('tournamentTeams');
+        await fetchData('tournamentTeams', true);
     };
     
     const addTournamentAward = async (award: Omit<TournamentAward, 'id'> & { imageFile?: File }) => {
@@ -915,15 +878,13 @@ export const SportsDataProvider: React.FC<{ children: ReactNode }> = ({ children
             image_url: imageUrl
         }]);
         if (error) throw error;
-        setState(s => ({...s, tournamentAwards: null}));
-        await fetchData('tournamentAwards');
+        await fetchData('tournamentAwards', true);
     };
     
     const deleteTournamentAward = async (id: number) => {
          const { error } = await supabase.from('tournament_awards').delete().eq('id', id);
         if (error) throw error;
-        setState(s => ({...s, tournamentAwards: null}));
-        await fetchData('tournamentAwards');
+        await fetchData('tournamentAwards', true);
     };
 
     const value: SportsContextType = {
