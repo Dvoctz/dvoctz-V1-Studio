@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useSports, useEntityData } from '../context/SportsDataContext';
+import { useSports } from '../context/SportsDataContext';
 import type { Team, Player } from '../types';
 
 interface TeamDetailViewProps {
@@ -26,10 +26,9 @@ const PlayerRow: React.FC<{ player: Player; onSelect: () => void; }> = ({ player
 );
 
 export const TeamDetailView: React.FC<TeamDetailViewProps> = ({ team, onSelectPlayer, onBack }) => {
-  const { getPlayersByTeam } = useSports();
+  const { getPlayersByTeam, loading } = useSports();
   
-  // Ensure players are loaded to display the roster
-  const { loading: playersLoading } = useEntityData('players');
+  const playersLoading = loading.has('players');
   
   const teamPlayers = useMemo(() => getPlayersByTeam(team.id), [getPlayersByTeam, team.id]);
 
