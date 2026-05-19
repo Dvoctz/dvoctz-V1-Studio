@@ -21,8 +21,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { initializeSupabase } from './supabaseClient';
 import { SupabaseProvider } from './context/SupabaseContext';
 import { Analytics } from '@vercel/analytics/react';
+import { AddToHomeScreenPrompt } from './components/AddToHomeScreenPrompt';
 import { ServiceWorkerManager } from './components/ServiceWorkerManager';
 
+// Initialize the Supabase client once, outside of the component render cycle.
 const supabaseClient = initializeSupabase();
 
 const AppContent: React.FC = () => {
@@ -34,9 +36,12 @@ const AppContent: React.FC = () => {
   const { currentUser, userProfile, loading: authLoading } = useAuth();
   const { prefetchAllData } = useSports();
   
+  const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
   const [viewBeforeLogin, setViewBeforeLogin] = useState<View | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
 
+  // SINGLE DATA FETCH: Instead of firing 11 separate requests that cause flickering,
+  // we fire one consolidated request that loads everything in parallel and updates the UI once.
   useEffect(() => {
       const loadData = async () => {
           await prefetchAllData();
@@ -44,6 +49,22 @@ const AppContent: React.FC = () => {
       };
       loadData();
   }, [prefetchAllData]);
+
+  // Auto-refresh when app comes to foreground (tab switch, mobile unlock)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('App is visible, refreshing data...');
+        prefetchAllData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [prefetchAllData]);
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -116,6 +137,21 @@ const AppContent: React.FC = () => {
       setCurrentView('players');
   };
 
+
+  useEffect(() => {
+    const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    const isInStandaloneMode = () => ('standalone' in window.navigator) && ((window.navigator as any).standalone);
+
+    if (isIos() && !isInStandaloneMode() && !sessionStorage.getItem('iosInstallPromptDismissed')) {
+      setShowIosInstallPrompt(true);
+    }
+  }, []);
+
+  const handleIosInstallPromptClose = () => {
+    sessionStorage.setItem('iosInstallPromptDismissed', 'true');
+    setShowIosInstallPrompt(false);
+  };
+  
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [currentView, selectedTournament, selectedClub, selectedTeam, selectedPlayer]);
@@ -159,6 +195,7 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // LOADING SCREEN
   if (!isAppReady) {
       return (
           <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-4">
@@ -183,6 +220,7 @@ const AppContent: React.FC = () => {
         {renderView()}
       </main>
       <Footer />
+      {showIosInstallPrompt && <AddToHomeScreenPrompt onClose={handleIosInstallPromptClose} />}
       <ServiceWorkerManager />
     </div>
   );

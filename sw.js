@@ -1,36 +1,107 @@
 
-// Service Worker Uninstallation Script
-// This script clears all caches and unregisters itself to ensure clients load fresh assets.
+const CACHE_NAME = 'dvoc-tanzania-cache-v7.3.7'; // Increment version to force update & clear old caches
+const APP_SHELL_URLS = [
+  '/',
+  '/index.html',
+  '/bundle.js',
+  '/bundle.css',
+  '/manifest.json',
+  '/icon-192.svg',
+  '/icon-512.svg',
+  'https://rsms.me/inter/inter.css'
+];
 
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Opened cache and caching app shell');
+        // Only cache local assets during install for robustness. External assets are cached on fetch.
+        const localAppShellUrls = APP_SHELL_URLS.filter(url => !url.startsWith('http'));
+        return cache.addAll(localAppShellUrls);
+      })
+      .catch(error => {
+        console.error('Failed to cache app shell during install:', error);
+      })
+  );
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
+  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          console.log('Uninstallation: Deleting cache', cacheName);
-          return caches.delete(cacheName);
+        cacheNames.map(cacheName => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
-    }).then(() => {
-      console.log('Uninstallation: All caches cleared. Unregistering...');
-      return self.registration.unregister();
-    }).then(() => {
-      return self.clients.matchAll();
-    }).then((clients) => {
-      clients.forEach((client) => {
-        if (client.url && 'navigate' in client) {
-          client.navigate(client.url);
+    }).then(() => self.clients.claim()) // Take control of all clients immediately
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Ignore Supabase API calls and non-GET requests. Let the browser handle them.
+  if (request.method !== 'GET' || url.hostname.includes('supabase.co')) {
+    return;
+  }
+
+  // Strategy 1: Network-First for navigation requests (the app's HTML page).
+  // This is crucial for authentication state consistency.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(networkResponse => {
+          // If the fetch is successful, cache the response for offline use.
+          if (networkResponse.ok) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              // For navigation, we cache the request for the specific path,
+              // but we'll fall back to '/index.html'.
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // If the network fails, serve the main index.html from the cache.
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+  
+  // Strategy 2: Cache-First for all other static assets (CSS, JS, images, fonts).
+  // This is good for performance as they are served instantly from the cache.
+  event.respondWith(
+    caches.match(request).then(cachedResponse => {
+      // Return the cached response if it exists.
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      // Otherwise, fetch from the network.
+      return fetch(request).then(networkResponse => {
+        // Cache the new response for future use if it's a valid response.
+        if (networkResponse.ok) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseToCache);
+          });
         }
+        return networkResponse;
       });
     })
   );
 });
 
-// Pass through all requests to the network
-self.addEventListener('fetch', (event) => {
-  return; // Do nothing, let the browser handle it
+// Listener for SKIP_WAITING message to allow the app to update immediately
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

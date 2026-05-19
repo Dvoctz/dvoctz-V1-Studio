@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { TournamentAward, Tournament } from '../types';
 
 interface AwardsViewProps {
@@ -100,9 +100,10 @@ const AwardSection: React.FC<{
 };
 
 export const AwardsView: React.FC<AwardsViewProps> = ({ onNavigate }) => {
-    const { tournamentAwards, tournaments, loading } = useSports();
-    const awardsLoading = loading.has('tournamentAwards');
-    const tourneyLoading = loading.has('tournaments');
+    const { tournamentAwards, tournaments } = useSports();
+    // Ensure data is loaded
+    const { loading: awardsLoading } = useEntityData('tournamentAwards');
+    const { loading: tourneyLoading } = useEntityData('tournaments');
 
     // Grouping Logic
     const { div1Awards, div2Awards, appreciationAwards } = useMemo(() => {

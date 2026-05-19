@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 
 // Helper component to highlight search terms within text
@@ -24,8 +24,8 @@ const HighlightedText: React.FC<{ text: string; highlight: string }> = ({ text, 
 };
 
 export const RulesView: React.FC = () => {
-    const { updateRules, rules, loading } = useSports();
-    const rulesLoading = loading.has('rules');
+    const { updateRules } = useSports();
+    const { data: rules, loading } = useEntityData('rules');
     const { userProfile } = useAuth();
     
     // Editor State
@@ -119,7 +119,7 @@ export const RulesView: React.FC = () => {
             </div>
 
             <div className="bg-secondary/40 backdrop-blur-md p-6 sm:p-10 rounded-3xl shadow-xl border border-accent/30 min-h-[500px]">
-                {rulesLoading ? (
+                {loading ? (
                      <div className="space-y-6 animate-pulse">
                         <div className="h-8 bg-accent/40 rounded-lg w-3/4"></div>
                         <div className="h-4 bg-accent/30 rounded w-full"></div>

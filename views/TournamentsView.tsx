@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Tournament } from '../types';
 
 interface TournamentsViewProps {
@@ -38,8 +38,8 @@ const TournamentCard: React.FC<{ tournament: Tournament; onSelect: () => void; }
 export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTournament }) => {
   const [activeTab, setActiveTab] = useState<'d1' | 'd2'>('d1');
   const [searchTerm, setSearchTerm] = useState('');
-  const { getTournamentsByDivision, tournaments, loading } = useSports();
-  const tournamentsLoading = loading.has('tournaments');
+  const { getTournamentsByDivision } = useSports();
+  const { data: tournaments, loading } = useEntityData('tournaments');
   
   const division1Tournaments = useMemo(() => {
     return getTournamentsByDivision('Division 1').filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -93,7 +93,7 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
       
       {renderTabs()}
       
-      {tournamentsLoading ? (
+      {loading ? (
         <div className="flex justify-center py-20">
            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4AF37]"></div>
         </div>

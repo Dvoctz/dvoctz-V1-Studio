@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Club, Team, Player } from '../types';
 import { AssignPlayerModal } from '../components/AssignPlayerModal';
@@ -152,10 +152,10 @@ const QuickAddPlayerModal: React.FC<{ clubId: number; teams: Team[]; onClose: ()
 
 export const ClubDetailView: React.FC<ClubDetailViewProps> = ({ club, onSelectTeam, onSelectPlayer, onBack }) => {
   const { userProfile } = useAuth();
-  const { getTeamsByClub, getPlayersByClub, loading } = useSports();
+  const { getTeamsByClub, getPlayersByClub } = useSports();
   
-  const playersLoading = loading.has('players');
-  const teamsLoading = loading.has('teams');
+  const { loading: playersLoading } = useEntityData('players');
+  const { loading: teamsLoading } = useEntityData('teams');
 
   const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
   const [searchTerm, setSearchTerm] = useState('');

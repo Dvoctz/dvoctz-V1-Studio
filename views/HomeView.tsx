@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import { NoticeBanner } from '../components/NoticeBanner';
 import type { Fixture, Team, Tournament, View, Notice, TeamStanding, Player } from '../types';
 import { ShareFixtureCard } from '../components/ShareFixtureCard';
@@ -251,10 +251,13 @@ const DailyScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, onSelectTournament }) => {
-    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams, lastUpdated, prefetchAllData, tournaments, loading } = useSports();
-    
-    const noticesLoading = loading.has('notices');
-    const tournamentsLoading = loading.has('tournaments');
+    const { getActiveNotice, getTournamentsByDivision, getStandingsForTournament, fixtures, players, teams, lastUpdated, prefetchAllData, tournaments } = useSports();
+    // Ensure data is loaded
+    useEntityData('fixtures');
+    useEntityData('teams');
+    useEntityData('players');
+    const { loading: noticesLoading } = useEntityData('notices');
+    const { loading: tournamentsLoading } = useEntityData('tournaments');
     
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [celebrationShown, setCelebrationShown] = useState(false);

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Player } from '../types';
 
 const PlayerCardSkeleton: React.FC = () => (
@@ -91,10 +91,9 @@ const PlayerCard: React.FC<{ player: Player; onSelect: () => void; }> = ({ playe
 };
 
 export const PlayersView: React.FC<{onSelectPlayer: (player: Player) => void;}> = ({ onSelectPlayer }) => {
-  const { players, loading } = useSports();
-  const playersLoading = loading.has('players');
-  const teamsLoading = loading.has('teams');
-  const clubsLoading = loading.has('clubs');
+  const { data: players, loading: playersLoading } = useEntityData('players');
+  const { loading: teamsLoading } = useEntityData('teams');
+  const { loading: clubsLoading } = useEntityData('clubs');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'freeAgents'>('all');
 

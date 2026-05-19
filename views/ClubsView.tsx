@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Club } from '../types';
 
 interface ClubsViewProps {
@@ -40,8 +40,7 @@ const ClubCard: React.FC<{ club: Club, onSelect: () => void }> = ({ club, onSele
 );
 
 export const ClubsView: React.FC<ClubsViewProps> = ({ onSelectClub }) => {
-  const { clubs, loading } = useSports();
-  const clubsLoading = loading.has('clubs');
+  const { data: clubs, loading } = useEntityData('clubs');
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredClubs = useMemo(() => (clubs || []).filter(club => {
@@ -71,7 +70,7 @@ export const ClubsView: React.FC<ClubsViewProps> = ({ onSelectClub }) => {
         </div>
       </div>
       
-      {clubsLoading ? (
+      {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {Array.from({ length: 8 }).map((_, i) => <ClubCardSkeleton key={i} />)}
         </div>

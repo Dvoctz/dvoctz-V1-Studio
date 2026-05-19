@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSports } from '../context/SportsDataContext';
+import { useSports, useEntityData } from '../context/SportsDataContext';
 import type { Fixture, Tournament, Team, TeamStanding, Player, TournamentAward } from '../types';
 import { ScoreSheetModal } from '../components/ScoreSheetModal';
 import { KnockoutBracket } from '../components/KnockoutBracket';
@@ -585,17 +585,22 @@ const AwardCard: React.FC<{ award: TournamentAward, onPlayerClick: (id: number) 
 
 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({ tournament: initialTournament, onBack }) => {
-  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, getAwardsByTournament, tournaments, fixtures: globalFixtures, teams, getPlayerById, loading } = useSports();
-  
-  const awardsLoading = loading.has('tournamentAwards');
-  const fixturesLoading = loading.has('fixtures');
-  const teamsLoading = loading.has('teams');
-  const sponsorsLoading = loading.has('sponsors');
-  const tsLoading = loading.has('tournamentSponsors');
-  const trLoading = loading.has('tournamentRosters');
+  const { getFixturesByTournament, getTeamById, getStandingsForTournament, getSponsorsForTournament, getAwardsByTournament, tournaments, fixtures: globalFixtures, teams, getPlayerById } = useSports();
+  // We need players loaded to link awards
+  useEntityData('players');
+  const { loading: awardsLoading } = useEntityData('tournamentAwards');
   
   // FIX: Get the absolute latest version of the tournament from context.
   const tournament = useMemo(() => tournaments.find(t => t.id === initialTournament.id) || initialTournament, [tournaments, initialTournament]);
+
+  // Ensure dependencies for this view are loaded
+  const { loading: fixturesLoading } = useEntityData('fixtures');
+  const { loading: teamsLoading } = useEntityData('teams');
+  const { loading: sponsorsLoading } = useEntityData('sponsors');
+  const { loading: tsLoading } = useEntityData('tournamentSponsors');
+  const { loading: trLoading } = useEntityData('tournamentRosters');
+  // Ensure tournament teams are loaded so standings/teams list is complete
+  useEntityData('tournamentTeams');
   
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null);
   const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<Team | null>(null);
